@@ -1,0 +1,12 @@
+.cache
+.dockerignore
+.gitignore
+.git
+.github
+.env
+.pylintrc
+__pycache__
+*.pyc
+*.egg-info
+.idea/
+.vscode
