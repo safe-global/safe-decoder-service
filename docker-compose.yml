@@ -32,6 +32,29 @@ services:
     command:
       - --appendonly yes
 
+  rabbitmq:
+    image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  dramatiq-worker:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_QUEUE_NAME: "default"
+    depends_on:
+      - redis
+    command:
+      docker/web/dramatiq/worker/run.sh
+
   web:
     build:
       context: .
@@ -43,4 +66,8 @@ services:
       - "8888:8888"
     volumes:
       - nginx-shared:/nginx
-    command: docker/web/run_web.sh
+    command:
+      docker/web/wait_for_it.sh rabbitmq:5672 --timeout=30 --strict --
+      docker/web/run_web.sh
+    depends_on:
+      - rabbitmq

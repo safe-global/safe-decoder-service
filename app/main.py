@@ -1,6 +1,9 @@
+import asyncio
+
 from fastapi import APIRouter, FastAPI
 
 from . import VERSION
+from .consumers.queue_consumer import QueueConsumer
 from .routers import about, default
 
 app = FastAPI(
@@ -18,3 +21,10 @@ api_v1_router = APIRouter(
 api_v1_router.include_router(about.router)
 app.include_router(api_v1_router)
 app.include_router(default.router)
+
+
+@app.on_event("startup")
+async def startup():
+    loop = asyncio.get_running_loop()
+    task = loop.create_task(QueueConsumer().consume(loop))
+    await task
