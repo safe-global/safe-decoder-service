@@ -38,9 +38,9 @@ services:
       - "5672:5672"
     healthcheck:
       test: rabbitmq-diagnostics -q ping
-      interval: 30s
+      interval: 10s
       timeout: 30s
-      retries: 3
+      retries: 5
 
   dramatiq-worker:
     build:
@@ -67,7 +67,7 @@ services:
     volumes:
       - nginx-shared:/nginx
     command:
-      docker/web/wait_for_it.sh rabbitmq:5672 --timeout=30 --strict --
       docker/web/run_web.sh
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
