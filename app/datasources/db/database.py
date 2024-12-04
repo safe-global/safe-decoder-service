@@ -1,17 +1,22 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
+from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
+pool_classes = {
+    "NullPool": NullPool,
+    "AsyncAdaptedQueuePool": AsyncAdaptedQueuePool,
+}
 
-
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=True,
+    future=True,
+    poolclass=pool_classes.get(settings.DATABASE_POOL_CLASS),
+)
 
 
 async def get_session() -> AsyncGenerator:

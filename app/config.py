@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     RABBITMQ_HOST: str = "rabbitmq"
     RABBITMQ_PORT: int = 5672
     RABBITMQ_QUEUE_NAME: str = ""
+    DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
 
 
 settings = Settings()
