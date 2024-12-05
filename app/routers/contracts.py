@@ -1,10 +1,7 @@
 from typing import Sequence
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from sqlmodel.ext.asyncio.session import AsyncSession
-
-from ..datasources.db.database import get_session
 from ..datasources.db.models import Contract
 from ..services.contract import ContractService
 
@@ -15,8 +12,6 @@ router = APIRouter(
 
 
 @router.get("", response_model=Sequence[Contract])
-async def list_contracts(
-    session: AsyncSession = Depends(get_session),
-) -> Sequence[Contract]:
-    contract_service = ContractService(session)
+async def list_contracts() -> Sequence[Contract]:
+    contract_service = ContractService()
     return await contract_service.get_all()

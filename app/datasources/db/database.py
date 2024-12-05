@@ -1,6 +1,7 @@
-from collections.abc import AsyncGenerator
+import logging
+from functools import wraps
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -19,9 +20,26 @@ engine = create_async_engine(
 )
 
 
-async def get_session() -> AsyncGenerator:
-    async_session = async_sessionmaker(
-        bind=engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
+def get_database_session(func):
+    """
+    Decorator that creates a new database session for the given function
+
+    :param func:
+    :return:
+    """
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        async with AsyncSession(engine) as session:
+            try:
+                return await func(*args, **kwargs, session=session)
+            except Exception as e:
+                # Rollback errors
+                await session.rollback()
+                logging.error(f"Error occurred: {e}")
+                raise
+            finally:
+                # Ensure that session is closed
+                await session.close()
+
+    return wrapper

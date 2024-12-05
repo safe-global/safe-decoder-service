@@ -1,15 +1,17 @@
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.datasources.db.database import get_database_session
 from app.datasources.db.models import Contract
 from app.tests.db.db_async_conn import DbAsyncConn
 
 
 class TestModel(DbAsyncConn):
-
-    async def test_contract(self):
+    @get_database_session
+    async def test_contract(self, session: AsyncSession):
         contract = Contract(address=b"a", name="A Test Contracts")
-        self.session.add(contract)
-        await self.session.commit()
+        session.add(contract)
+        await session.commit()
         statement = select(Contract).where(Contract.address == b"a")
-        result = await self.session.exec(statement)
+        result = await session.exec(statement)
         self.assertEqual(result.one(), contract)

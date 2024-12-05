@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from ...datasources.db.models import Contract
 from ...main import app
+from ...services.contract import ContractService
 from ..db.db_async_conn import DbAsyncConn
 
 
@@ -14,7 +15,12 @@ class TestRouterContract(DbAsyncConn):
 
     async def test_view_contracts(self):
         contract = Contract(address=b"a", name="A Test Contracts")
-        self.session.add(contract)
-        await self.session.commit()
+        expected_response = {
+            "name": "A Test Contracts",
+            "description": None,
+            "address": "a",
+        }
+        await ContractService.create(contract=contract)
         response = self.client.get("/api/v1/contracts")
         self.assertEqual(response.status_code, 200)
+        self.assertDictEqual(response.json()[0], expected_response)
