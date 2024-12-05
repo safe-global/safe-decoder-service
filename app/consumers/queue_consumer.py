@@ -2,17 +2,19 @@ import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
 
 from app.config import settings
-from app.workers.tasks import example_task
+from app.workers.tasks import create_random_contract
 
 
 class QueueConsumer:
 
     @staticmethod
     async def process_incoming_message(message: AbstractIncomingMessage) -> None:
+        print(message)
         await message.ack()
         body = message.body
         if body:
-            example_task.send(body.decode())
+            create_random_contract.send()
+            # example_task.send(body.decode())
 
     async def consume(self, loop):
         connection = await aio_pika.connect_robust(

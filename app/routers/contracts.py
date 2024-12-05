@@ -18,5 +18,5 @@ router = APIRouter(
 async def list_contracts(
     session: AsyncSession = Depends(get_session),
 ) -> Sequence[Contract]:
-    contract_service = ContractService(session)
+    contract_service = ContractService()
     return await contract_service.get_all()

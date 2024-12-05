@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "psql://postgres:"
     RABBITMQ_HOST: str = "rabbitmq"
     RABBITMQ_PORT: int = 5672
-    RABBITMQ_QUEUE_NAME: str = ""
+    RABBITMQ_QUEUE_NAME: str = "default"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
 
 
