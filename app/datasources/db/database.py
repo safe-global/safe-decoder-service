@@ -7,8 +7,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.config import settings
 
 pool_classes = {
-    "NullPool": NullPool,
-    "AsyncAdaptedQueuePool": AsyncAdaptedQueuePool,
+    NullPool.__name__: NullPool,
+    AsyncAdaptedQueuePool.__name__: AsyncAdaptedQueuePool,
 }
 
 engine = create_async_engine(
