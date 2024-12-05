@@ -11,6 +11,3 @@ docker compose -f docker-compose.yml start redis db
 # sleep 10
 
 pytest -rxXs
-
-unset ENV_FILE
-unset DB_NAME
