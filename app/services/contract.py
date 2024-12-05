@@ -24,6 +24,13 @@ class ContractService:
     @staticmethod
     @get_database_session
     async def create(contract: Contract, session: AsyncSession) -> Contract:
+        """
+        Create a new contract
+
+        :param contract:
+        :param session:
+        :return:
+        """
         session.add(contract)
         await session.commit()
         return contract
