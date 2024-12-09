@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
     REDIS_URL: str = "redis://"
     DATABASE_URL: str = "psql://postgres:"
+    DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
 
 
 settings = Settings()
