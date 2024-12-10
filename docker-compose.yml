@@ -44,3 +44,14 @@ services:
     volumes:
       - nginx-shared:/nginx
     command: docker/web/run_web.sh
+
+  dramatiq-worker:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    command:
+      docker/web/dramatiq/worker/run.sh
