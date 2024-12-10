@@ -5,7 +5,7 @@ from ..models import About
 
 router = APIRouter(
     prefix="/about",
-    tags=["About"],
+    tags=["about"],
 )
 
 

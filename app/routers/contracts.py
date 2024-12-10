@@ -7,7 +7,7 @@ from ..services.contract import ContractService
 
 router = APIRouter(
     prefix="/contracts",
-    tags=["Contracts"],
+    tags=["contracts"],
 )
 
 
