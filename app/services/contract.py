@@ -3,14 +3,12 @@ from typing import Sequence
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.datasources.db.database import get_database_session
 from app.datasources.db.models import Contract
 
 
 class ContractService:
 
     @staticmethod
-    @get_database_session
     async def get_all(session: AsyncSession) -> Sequence[Contract]:
         """
         Get all contracts
@@ -22,7 +20,6 @@ class ContractService:
         return result.all()
 
     @staticmethod
-    @get_database_session
     async def create(contract: Contract, session: AsyncSession) -> Contract:
         """
         Create a new contract
