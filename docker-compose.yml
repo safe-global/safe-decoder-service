@@ -25,12 +25,27 @@ services:
       timeout: 5s
       retries: 3
 
+  # Only for development purposes
+  rabbitmq:
+    image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 30s
+      retries: 5
+
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
     command:
       - --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      timeout: 5s
+      retries: 3
 
   web:
     build:
@@ -43,6 +58,13 @@ services:
       - "8888:8888"
     volumes:
       - nginx-shared:/nginx
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     command: docker/web/run_web.sh
 
   dramatiq-worker:
