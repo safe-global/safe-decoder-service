@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI
 
 from . import VERSION
-from .routers import about, contracts, default
+from .routers import about, admin, contracts, default
 
 app = FastAPI(
     title="Safe Decoder Service",
@@ -10,6 +10,8 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+admin.load_admin(app)
 
 # Router configuration
 api_v1_router = APIRouter(
