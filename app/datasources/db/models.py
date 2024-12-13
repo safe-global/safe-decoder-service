@@ -2,6 +2,7 @@ from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint, select
 
 
 class SqlQueryBase:
+
     @classmethod
     async def get_all(cls, session):
         result = await session.exec(select(cls))
@@ -19,17 +20,26 @@ class SqlQueryBase:
         return await self._save(session)
 
 
-class AbiSource(SQLModel, table=True):
+class AbiSource(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
     url: str = Field(nullable=False)
 
 
 class Abi(SqlQueryBase, SQLModel, table=True):
-    abi_hash: bytes = Field(nullable=False, primary_key=True)
-    relevance: int = Field(nullable=False, default=0)
+    id: int | None = Field(default=None, primary_key=True)
+    abi_hash: bytes = Field(nullable=False, index=True, unique=True)
+    relevance: int | None = Field(nullable=False, default=0)
     abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
-    source_id: int = Field(default=None, foreign_key="abisource.id")
+    source_id: int | None = Field(
+        nullable=True, default=None, foreign_key="abisource.id"
+    )
+
+
+class Project(SqlQueryBase, SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    description: str = Field(nullable=False)
+    logo_file: str = Field(nullable=False)
 
 
 class Contract(SqlQueryBase, SQLModel, table=True):
@@ -38,7 +48,7 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    address: bytes = Field(nullable=False)
+    address: bytes = Field(nullable=False, index=True)
     name: str = Field(nullable=False)
     display_name: str | None = None
     description: str | None = None
@@ -47,5 +57,8 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     fetch_retries: int = Field(nullable=False, default=0)
     abi_id: bytes | None = Field(
         nullable=True, default=None, foreign_key="abi.abi_hash"
+    )
+    project_id: int | None = Field(
+        nullable=True, default=None, foreign_key="project.id"
     )
     chain_id: int = Field(default=None)
