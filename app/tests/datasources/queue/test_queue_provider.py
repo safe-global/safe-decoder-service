@@ -6,10 +6,8 @@ import aio_pika
 from aio_pika.abc import AbstractRobustConnection
 
 from app.config import settings
-from app.datasources.queue.queue_provider import (
-    QueueProvider,
-    QueueProviderUnableToConnectException,
-)
+from app.datasources.queue.exceptions import QueueProviderUnableToConnectException
+from app.datasources.queue.queue_provider import QueueProvider
 
 
 class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):

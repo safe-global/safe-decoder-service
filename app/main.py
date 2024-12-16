@@ -5,10 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from . import VERSION
-from .datasources.queue.queue_provider import (
-    QueueProvider,
-    QueueProviderUnableToConnectException,
-)
+from .datasources.queue.exceptions import QueueProviderUnableToConnectException
+from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, contracts, default
 from .services.events import EventsService
 
