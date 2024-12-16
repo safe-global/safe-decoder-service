@@ -10,7 +10,6 @@ class TestEventsService(unittest.TestCase):
         valid_event = {"chainId": "123", "type": "transaction"}
         self.assertTrue(EventsService().is_event_valid(valid_event))
 
-    def test_is_event_invalid(self):
         invalid_event_missing_chain_id = {"type": "transaction"}
         self.assertFalse(EventsService().is_event_valid(invalid_event_missing_chain_id))
 
