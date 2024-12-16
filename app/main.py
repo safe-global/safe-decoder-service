@@ -29,8 +29,9 @@ async def lifespan(app: FastAPI):
         except QueueProviderUnableToConnectException as e:
             logging.error(f"Unable to connect to Queue Provider: {e}")
         if queue_provider.is_connected():
+            events_service = EventsService()
             consume_task = asyncio.create_task(
-                queue_provider.consume(EventsService.process_event)
+                queue_provider.consume(events_service.process_event)
             )
         yield
     finally:

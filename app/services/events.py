@@ -5,8 +5,7 @@ from typing import Dict
 
 class EventsService:
 
-    @classmethod
-    def process_event(cls, message: str) -> None:
+    def process_event(self, message: str) -> None:
         """
         Processes the incoming event message.
 
@@ -15,7 +14,7 @@ class EventsService:
         try:
             tx_service_event = json.loads(message)
 
-            if cls.is_event_valid(tx_service_event):
+            if self.is_event_valid(tx_service_event):
                 # TODO: process event!
                 pass
             else:
@@ -25,8 +24,7 @@ class EventsService:
         except json.JSONDecodeError:
             logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
 
-    @staticmethod
-    def is_event_valid(tx_service_event: Dict) -> bool:
+    def is_event_valid(self, tx_service_event: Dict) -> bool:
         """
         Validates if the event has the required fields 'chainId' and 'type' as strings.
 
