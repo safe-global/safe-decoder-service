@@ -1,6 +1,5 @@
 from typing import Sequence
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.models import Contract
@@ -16,18 +15,4 @@ class ContractService:
         :param session: passed by the decorator
         :return:
         """
-        result = await session.exec(select(Contract))
-        return result.all()
-
-    @staticmethod
-    async def create(contract: Contract, session: AsyncSession) -> Contract:
-        """
-        Create a new contract
-
-        :param contract:
-        :param session:
-        :return:
-        """
-        session.add(contract)
-        await session.commit()
-        return contract
+        return await Contract.get_all(session)
