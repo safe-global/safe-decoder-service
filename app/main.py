@@ -7,7 +7,7 @@ from fastapi import APIRouter, FastAPI
 from . import VERSION
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
-from .routers import about, contracts, default
+from .routers import about, admin, contracts, default
 from .services.events import EventsService
 
 
@@ -46,6 +46,8 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+
+admin.load_admin(app)
 
 # Router configuration
 api_v1_router = APIRouter(
