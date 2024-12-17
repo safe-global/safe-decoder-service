@@ -4,7 +4,7 @@ asyncpg==0.30.0
 dramatiq[redis, watch]==1.17.1
 fastapi[all]==0.115.6
 periodiq==0.13.0
-pydantic-settings==2.6.1
+pydantic-settings==2.7.0
 redis[hiredis]==5.2.1
 sqladmin[full]==0.20.1
 sqlmodel==0.0.22
