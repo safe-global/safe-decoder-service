@@ -6,4 +6,5 @@ fastapi[all]==0.115.6
 periodiq==0.13.0
 pydantic-settings==2.6.1
 redis[hiredis]==5.2.1
+sqladmin[full]==0.20.1
 sqlmodel==0.0.22

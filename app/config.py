@@ -3,6 +3,7 @@ Base settings file for FastApi application.
 """
 
 import os
+import secrets
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,14 @@ class Settings(BaseSettings):
     RABBITMQ_AMPQ_URL: str = "amqp://guest:guest@"
     RABBITMQ_AMQP_EXCHANGE: str = "safe-transaction-service-events"
     RABBITMQ_DECODER_EVENTS_QUEUE_NAME: str = "safe-decoder-service"
+    SECRET_KEY: str = secrets.token_urlsafe(
+        32
+    )  # In production it must be defined so it doesn't change
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
+    ADMIN_TOKEN_EXPIRATION_SECONDS: int = (
+        7 * 24 * 60 * 60
+    )  # Admin token expires in 1 week
 
 
 settings = Settings()
