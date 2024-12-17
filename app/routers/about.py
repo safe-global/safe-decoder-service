@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
+from app.routers.models import About
+
 from .. import VERSION
-from ..models import About
 
 router = APIRouter(
     prefix="/about",
