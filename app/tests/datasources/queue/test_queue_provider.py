@@ -25,7 +25,7 @@ class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_connect_failure(self):
         provider = QueueProvider()
 
-        with patch("app.config.settings.RABBITMQ_AMPQ_URL", "amqp://invalid-url"):
+        with patch("app.config.settings.RABBITMQ_AMQP_URL", "amqp://invalid-url"):
             with self.assertRaises(QueueProviderUnableToConnectException):
                 await provider.connect(self.loop)
 
