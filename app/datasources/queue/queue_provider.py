@@ -42,7 +42,7 @@ class QueueProvider:
         """
         try:
             self._connection = await aio_pika.connect_robust(
-                url=settings.RABBITMQ_AMPQ_URL, loop=loop
+                url=settings.RABBITMQ_AMQP_URL, loop=loop
             )
         except aio_pika.exceptions.AMQPConnectionError as e:
             raise QueueProviderUnableToConnectException(e)

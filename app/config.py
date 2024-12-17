@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "psql://postgres:"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
     DATABASE_POOL_SIZE: int = 10
-    RABBITMQ_AMPQ_URL: str = "amqp://guest:guest@"
+    RABBITMQ_AMQP_URL: str = "amqp://guest:guest@"
     RABBITMQ_AMQP_EXCHANGE: str = "safe-transaction-service-events"
     RABBITMQ_DECODER_EVENTS_QUEUE_NAME: str = "safe-decoder-service"
     SECRET_KEY: str = secrets.token_urlsafe(
