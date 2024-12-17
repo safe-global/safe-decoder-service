@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from sqlmodel import (
     JSON,
     Column,
@@ -5,8 +7,10 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     UniqueConstraint,
+    col,
     select,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class SqlQueryBase:
@@ -72,9 +76,24 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     abi_id: bytes | None = Field(
         nullable=True, default=None, foreign_key="abi.abi_hash"
     )
-    abi: Abi | None = Relationship(back_populates="contracts")
+    abi: Abi | None = Relationship(
+        back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
+    )
     project_id: int | None = Field(
         nullable=True, default=None, foreign_key="project.id"
     )
-    project: Project | None = Relationship(back_populates="contracts")
+    project: Project | None = Relationship(
+        back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
+    )
     chain_id: int = Field(default=None)
+
+    @classmethod
+    async def get_contract(
+        cls, session: AsyncSession, address: bytes, chain_ids: list[int] | None = None
+    ) -> Sequence["Contract"]:
+        query = select(cls).where(cls.address == address)
+        if chain_ids:
+            query = query.where(col(cls.chain_id).in_(chain_ids))
+
+        result = await session.exec(query)
+        return result.all()
