@@ -8,7 +8,7 @@ from app.tests.db.db_async_conn import DbAsyncConn
 class TestModel(DbAsyncConn):
     @database_session
     async def test_contract(self, session: AsyncSession):
-        contract = Contract(address=b"a", name="A Test Contracts", chain_id=1)
+        contract = Contract(address=b"a", name="A test contract", chain_id=1)
         await contract.create(session)
         await contract.create(session)
         result = await contract.get_all(session)
@@ -34,3 +34,12 @@ class TestModel(DbAsyncConn):
         await abi_source.create(session)
         result = await abi_source.get_all(session)
         self.assertEqual(result[0], abi_source)
+        abi = Abi(
+            abi_hash=b"A Test Abi",
+            abi_json={"name": "A Test Project"},
+            source_id=abi_source.id,
+        )
+        await abi.create(session)
+        result = await abi.get_all(session)
+        self.assertEqual(result[0], abi)
+        self.assertEqual(result[0].source, abi_source)

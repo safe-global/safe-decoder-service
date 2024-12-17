@@ -1,4 +1,12 @@
-from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint, select
+from sqlmodel import (
+    JSON,
+    Column,
+    Field,
+    Relationship,
+    SQLModel,
+    UniqueConstraint,
+    select,
+)
 
 
 class SqlQueryBase:
@@ -25,6 +33,8 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
     name: str = Field(nullable=False)
     url: str = Field(nullable=False)
 
+    abis: list["Abi"] = Relationship(back_populates="source")
+
 
 class Abi(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -35,11 +45,15 @@ class Abi(SqlQueryBase, SQLModel, table=True):
         nullable=True, default=None, foreign_key="abisource.id"
     )
 
+    source: AbiSource | None = Relationship(back_populates="abis")
+    contracts: list["Contract"] = Relationship(back_populates="abi")
+
 
 class Project(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     description: str = Field(nullable=False)
     logo_file: str = Field(nullable=False)
+    contracts: list["Contract"] = Relationship(back_populates="project")
 
 
 class Contract(SqlQueryBase, SQLModel, table=True):
@@ -58,7 +72,9 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     abi_id: bytes | None = Field(
         nullable=True, default=None, foreign_key="abi.abi_hash"
     )
+    abi: Abi | None = Relationship(back_populates="contracts")
     project_id: int | None = Field(
         nullable=True, default=None, foreign_key="project.id"
     )
+    project: Project | None = Relationship(back_populates="contracts")
     chain_id: int = Field(default=None)
