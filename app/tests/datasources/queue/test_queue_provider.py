@@ -35,7 +35,7 @@ class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
         message = "Test message"
         channel = await self.provider._connection.channel()
         exchange = await channel.declare_exchange(
-            settings.RABBITMQ_AMQP_EXCHANGE, aio_pika.ExchangeType.FANOUT
+            settings.RABBITMQ_AMQP_EXCHANGE, aio_pika.ExchangeType.FANOUT, durable=True
         )
 
         await exchange.publish(

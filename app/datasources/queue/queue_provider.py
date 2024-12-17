@@ -49,7 +49,7 @@ class QueueProvider:
 
         channel = await self._connection.channel()
         self._exchange = await channel.declare_exchange(
-            settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.FANOUT
+            settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.FANOUT, durable=True
         )
         self._events_queue = await channel.declare_queue(
             settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME, durable=True
