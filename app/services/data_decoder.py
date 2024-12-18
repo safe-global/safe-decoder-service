@@ -5,14 +5,18 @@ from typing import Any, NotRequired, Sequence, TypedDict, cast
 
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
-from eth_typing import ABIFunction, ChecksumAddress, HexStr
+from eth_typing import ABIFunction, Address, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from safe_eth.eth.contracts import get_multi_send_contract
 from safe_eth.safe.multi_send import MultiSend
+from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
+
+from app.datasources.db.database import get_engine
+from app.datasources.db.models import Abi, Contract
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ class DataDecoded(TypedDict):
 
 class MultisendDecoded(TypedDict):
     operation: int
-    to: ChecksumAddress
+    to: Address
     value: str
     data: HexStr | None
     data_decoded: DataDecoded | None
@@ -103,36 +107,26 @@ class DataDecoderService:
             ).items()
         }
 
-    def get_supported_abis(self) -> Sequence[ABIFunction]:
+    async def get_supported_abis(self) -> Sequence[ABIFunction]:
         """
         :return: Every ABI in the database
         """
-        db_abis = (
-            ContractAbi.objects.all()
-            .order_by("-relevance")
-            .values_list("abi", flat=True)
-            .iterator()
-        )
-        return db_abis
+        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+            return Abi.get_abis_sorted_by_relevance(session)
 
     @lru_cache(maxsize=2048)
-    def get_contract_abi(self, address: ChecksumAddress) -> list[ABIFunction] | None:
+    async def get_contract_abi(self, address: Address) -> list[ABIFunction] | None:
         """
         Retrieves the ABI for the contract at the given address.
 
         :param address: Contract address
         :return: List of ABI data if found, `None` otherwise.
         """
-        return (
-            ContractAbi.objects.filter(contracts__address=address)
-            .values_list("abi", flat=True)
-            .first()
-        )
+        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+            return Contract.get_abis_sorted_by_relevance(session, HexBytes(address))
 
     @lru_cache(maxsize=2048)
-    def get_contract_fallback_function(
-        self, address: ChecksumAddress
-    ) -> ABIFunction | None:
+    def get_contract_fallback_function(self, address: Address) -> ABIFunction | None:
         """
         :param address: Contract address
         :return: Fallback ABIFunction if found, `None` otherwise.
@@ -150,7 +144,7 @@ class DataDecoderService:
 
     @lru_cache(maxsize=2048)
     def get_contract_abi_selectors_with_functions(
-        self, address: ChecksumAddress
+        self, address: Address
     ) -> dict[bytes, ABIFunction] | None:
         """
         :param address: Contract address
@@ -161,7 +155,7 @@ class DataDecoderService:
             return self._generate_selectors_with_abis_from_abi(abi)
 
     def get_abi_function(
-        self, data: bytes, address: ChecksumAddress | None = None
+        self, data: bytes, address: Address | None = None
     ) -> ABIFunction | None:
         """
         :param data: transaction data
@@ -201,7 +195,7 @@ class DataDecoderService:
         return value_decoded
 
     def _decode_data(
-        self, data: bytes | str, address: ChecksumAddress | None = None
+        self, data: bytes | str, address: Address | None = None
     ) -> tuple[str, list[tuple[str, str, Any]]]:
         """
         Decode tx data
@@ -263,7 +257,7 @@ class DataDecoderService:
             )
 
     def get_data_decoded(
-        self, data: bytes | str, address: ChecksumAddress | None = None
+        self, data: bytes | str, address: Address | None = None
     ) -> DataDecoded | None:
         """
         Return data prepared for serializing
@@ -316,7 +310,7 @@ class DataDecoderService:
         return parameters
 
     def decode_transaction_with_types(
-        self, data: bytes | str, address: ChecksumAddress | None = None
+        self, data: bytes | str, address: Address | None = None
     ) -> tuple[str, list[ParameterDecoded]]:
         """
         Decode tx data and return a list of dictionaries
