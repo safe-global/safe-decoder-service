@@ -7,24 +7,25 @@ from sqlmodel import (
     UniqueConstraint,
     select,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class SqlQueryBase:
 
     @classmethod
-    async def get_all(cls, session):
+    async def get_all(cls, session: AsyncSession):
         result = await session.exec(select(cls))
         return result.all()
 
-    async def _save(self, session):
+    async def _save(self, session: AsyncSession):
         session.add(self)
         await session.commit()
         return self
 
-    async def update(self, session):
+    async def update(self, session: AsyncSession):
         return await self._save(session)
 
-    async def create(self, session):
+    async def create(self, session: AsyncSession):
         return await self._save(session)
 
 
@@ -47,6 +48,11 @@ class Abi(SqlQueryBase, SQLModel, table=True):
 
     source: AbiSource | None = Relationship(back_populates="abis")
     contracts: list["Contract"] = Relationship(back_populates="abi")
+
+    @classmethod
+    async def get_abis_sorted_by_relevance(cls, session: AsyncSession):
+        result = await session.exec(select(cls))
+        return result.all()
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
