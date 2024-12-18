@@ -5,26 +5,28 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     UniqueConstraint,
+    col,
     select,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class SqlQueryBase:
 
     @classmethod
-    async def get_all(cls, session):
+    async def get_all(cls, session: AsyncSession):
         result = await session.exec(select(cls))
         return result.all()
 
-    async def _save(self, session):
+    async def _save(self, session: AsyncSession):
         session.add(self)
         await session.commit()
         return self
 
-    async def update(self, session):
+    async def update(self, session: AsyncSession):
         return await self._save(session)
 
-    async def create(self, session):
+    async def create(self, session: AsyncSession):
         return await self._save(session)
 
 
@@ -47,6 +49,14 @@ class Abi(SqlQueryBase, SQLModel, table=True):
 
     source: AbiSource | None = Relationship(back_populates="abis")
     contracts: list["Contract"] = Relationship(back_populates="abi")
+
+    @classmethod
+    async def get_abis_sorted_by_relevance(cls, session: AsyncSession):
+        results = await session.exec(
+            select(cls.abi_json).order_by(col(cls.relevance).desc())
+        )
+        for result in results:
+            yield result
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
@@ -78,3 +88,10 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     )
     project: Project | None = Relationship(back_populates="contracts")
     chain_id: int = Field(default=None)
+
+    @classmethod
+    async def get_abi_by_contract_address(cls, session: AsyncSession, address: bytes):
+        result = await session.exec(
+            select(cls.abi.abi_json).where(cls.address == address)
+        )
+        return result.all()
