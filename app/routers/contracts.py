@@ -23,8 +23,8 @@ async def list_contracts(
     request: Request,
     address: str,
     chain_ids: Annotated[list[int] | None, Query()] = None,
-    limit: int = Query(None),
-    offset: int = Query(None),
+    limit: int | None = Query(None),
+    offset: int | None = Query(None),
     session: AsyncSession = Depends(get_database_session),
 ) -> PaginatedResponse[Contract]:
     if not fast_is_checksum_address(address):
