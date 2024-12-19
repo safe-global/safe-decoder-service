@@ -9,3 +9,4 @@ redis[hiredis]==5.2.1
 safe-eth-py==6.0.0
 sqladmin[full]==0.20.1
 sqlmodel==0.0.22
+web3==6.20.3

@@ -92,6 +92,9 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     @classmethod
     async def get_abi_by_contract_address(cls, session: AsyncSession, address: bytes):
         result = await session.exec(
-            select(cls.abi.abi_json).where(cls.address == address)
+            select(Abi.abi_json)
+            .join(cls)
+            .where(cls.address == address)
+            .where(cls.abi_id == Abi.abi_hash)
         )
-        return result.all()
+        return result.first()
