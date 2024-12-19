@@ -1,14 +1,6 @@
 import logging
 from functools import cache, cached_property, lru_cache
-from typing import (
-    Any,
-    AsyncGenerator,
-    AsyncIterator,
-    NotRequired,
-    Sequence,
-    TypedDict,
-    cast,
-)
+from typing import Any, AsyncIterator, NotRequired, Sequence, TypedDict, cast
 
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
@@ -22,8 +14,8 @@ from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 
-from app.datasources.db.database import get_engine
-from app.datasources.db.models import Abi, Contract
+from ..datasources.db.database import get_engine
+from ..datasources.db.models import Abi, Contract
 
 logger = logging.getLogger(__name__)
 
@@ -61,22 +53,25 @@ class MultisendDecoded(TypedDict):
 
 
 @cache
-def get_data_decoder_service() -> "DataDecoderService":
-    d = DataDecoderService()
-    d.init()
-    return d
+async def get_data_decoder_service() -> "DataDecoderService":
+    async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+        data_decoder_service = DataDecoderService()
+        await data_decoder_service.init(session)
+    return data_decoder_service
 
 
 class DataDecoderService:
     EXEC_TRANSACTION_SELECTOR = HexBytes("0x6a761202")
 
     dummy_w3 = Web3()
+    session: AsyncSession | None
 
-    async def init(self):
+    async def init(self, session: AsyncSession) -> None:
         """
         Initialize the data decoder service, loading the ABIs from the database and storing the 4byte selectors
         in memory
         """
+        self.session = session
         logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
         self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
             await self._generate_selectors_with_abis_from_abis(
@@ -86,6 +81,7 @@ class DataDecoderService:
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
+        self.session = None
 
     @cached_property
     def multisend_abis(self) -> list[Sequence[ABIFunction]]:
@@ -93,7 +89,7 @@ class DataDecoderService:
 
     @cached_property
     def multisend_fn_selectors_with_abis(self) -> dict[bytes, ABIFunction]:
-        return self._generate_selectors_with_abis_from_abis(self.multisend_abis)
+        return self._generate_selectors_with_abis_from_abis_sync(self.multisend_abis)
 
     def _generate_selectors_with_abis_from_abi(
         self, abi: Sequence[ABIFunction]
@@ -124,12 +120,27 @@ class DataDecoderService:
             ).items()
         }
 
+    def _generate_selectors_with_abis_from_abis_sync(
+        self, abis: Sequence[ABIFunction]
+    ) -> dict[bytes, ABIFunction]:
+        """
+        :param abis: Contract ABIs. Last ABIs on the Sequence have preference if there's a collision on the
+        selector
+        :return: Dictionary with function selector as bytes and the function abi
+        """
+        return {
+            fn_selector: fn_abi
+            for supported_abi in abis
+            for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(
+                supported_abi
+            ).items()
+        }
+
     async def get_supported_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
         """
         :return: Every ABI in the database
         """
-        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-            return Abi.get_abis_sorted_by_relevance(session)
+        return Abi.get_abis_sorted_by_relevance(self.session)
 
     @lru_cache(maxsize=2048)
     async def get_contract_abi(self, address: Address) -> list[ABIFunction] | None:
@@ -139,8 +150,7 @@ class DataDecoderService:
         :param address: Contract address
         :return: List of ABI data if found, `None` otherwise.
         """
-        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-            return Contract.get_abis_sorted_by_relevance(session, HexBytes(address))
+        return Contract.get_abis_sorted_by_relevance(self.session, HexBytes(address))
 
     @lru_cache(maxsize=2048)
     def get_contract_fallback_function(self, address: Address) -> ABIFunction | None:
@@ -209,6 +219,8 @@ class DataDecoderService:
         """
         if isinstance(value_decoded, bytes):
             value_decoded = HexBytes(value_decoded).hex()
+        elif isinstance(value_decoded, int):
+            value_decoded = str(value_decoded)
         return value_decoded
 
     def _decode_data(
@@ -348,3 +360,23 @@ class DataDecoderService:
         ]
         nested_parameters = self.decode_parameters_data(data, parameters)
         return fn_name, nested_parameters
+
+    def decode_transaction(
+        self, data: bytes | str, address: Address | None = None
+    ) -> tuple[str, dict[str, Any]]:
+        """
+        Decode tx data and return all the parameters in the same dictionary
+
+        :param data: Tx data as `hex string` or `bytes`
+        :param address: contract address in case of ABI colliding
+        :return: Tuple with the `function name` and a dictionary with the arguments of the function
+        :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
+        :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
+        """
+        fn_name, decoded_transactions_with_types = self.decode_transaction_with_types(
+            data, address=address
+        )
+        decoded_transactions = {
+            d["name"]: d["value"] for d in decoded_transactions_with_types
+        }
+        return fn_name, decoded_transactions

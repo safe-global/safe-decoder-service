@@ -2,7 +2,7 @@ from typing import Sequence
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.datasources.db.models import Contract
+from ..datasources.db.models import Contract
 
 
 class ContractService:
