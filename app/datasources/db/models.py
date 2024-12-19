@@ -100,15 +100,14 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     chain_id: int = Field(default=None)
 
     @classmethod
-    async def get_contract(
-        cls, session: AsyncSession, address: bytes, chain_ids: list[int] | None = None
-    ) -> Sequence["Contract"]:
+    def get_contract(
+        cls, address: bytes, chain_ids: list[int] | None = None
+    ) -> SelectBase["Contract"]:
         query = select(cls).where(cls.address == address)
         if chain_ids:
             query = query.where(col(cls.chain_id).in_(chain_ids))
 
-        result = await session.exec(query)
-        return result.all()
+        return query
 
     @classmethod
     async def get_abi_by_contract_address(

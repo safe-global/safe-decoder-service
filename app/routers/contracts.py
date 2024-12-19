@@ -1,4 +1,4 @@
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -7,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from ..datasources.db.database import get_database_session
 from ..datasources.db.models import Contract
 from ..services.contract import ContractService
+from ..services.pagination import PaginatedResponse
 from .models import ContractsPublic
 
 router = APIRouter(
@@ -15,10 +16,13 @@ router = APIRouter(
 )
 
 
-@router.get("/{address}", response_model=Sequence[ContractsPublic])
+@router.get("/{address}", response_model=PaginatedResponse[ContractsPublic])
 async def list_contracts(
     address: str,
     chain_ids: Annotated[list[int] | None, Query()] = None,
+    limit: int = Query(None),
+    offset: int = Query(None),
     session: AsyncSession = Depends(get_database_session),
-) -> Sequence[Contract]:
-    return await ContractService.get_contract(session, address, chain_ids)
+) -> PaginatedResponse[Contract]:
+    contracts_service = ContractService(limit, offset)
+    return await contracts_service.get_contract(session, address, chain_ids)
