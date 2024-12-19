@@ -1,12 +1,18 @@
-from typing import Sequence
+from typing import Any, Sequence
 
 from hexbytes import HexBytes
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.models import Contract
+from app.services.pagination import GenericPagination, PaginatedResponse
 
 
 class ContractService:
+
+    def __init__(self, limit: int | None, offset: int | None):
+        self.pagination = GenericPagination(model=Contract)
+        self.pagination.set_limit(limit)
+        self.pagination.set_offset(offset)
 
     @staticmethod
     async def get_all(session: AsyncSession) -> Sequence[Contract]:
@@ -18,10 +24,9 @@ class ContractService:
         """
         return await Contract.get_all(session)
 
-    @staticmethod
     async def get_contract(
-        session: AsyncSession, address: str, chain_ids: list[int] | None
-    ) -> Sequence[Contract]:
+        self, session: AsyncSession, address: str, chain_ids: list[int] | None
+    ) -> PaginatedResponse[Any]:
         """
         Get the contract by address and/or chain_ids
 
@@ -30,4 +35,7 @@ class ContractService:
         :param chain_ids: list of filtered chains
         :return:
         """
-        return await Contract.get_contract(session, HexBytes(address), chain_ids)
+
+        return await self.pagination.paginate(
+            session, Contract.get_contract(HexBytes(address), chain_ids)
+        )

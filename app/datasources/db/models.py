@@ -1,5 +1,3 @@
-from typing import Sequence
-
 from sqlmodel import (
     JSON,
     Column,
@@ -10,7 +8,7 @@ from sqlmodel import (
     col,
     select,
 )
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql._expression_select_cls import SelectBase
 
 
 class SqlQueryBase:
@@ -88,12 +86,11 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     chain_id: int = Field(default=None)
 
     @classmethod
-    async def get_contract(
-        cls, session: AsyncSession, address: bytes, chain_ids: list[int] | None = None
-    ) -> Sequence["Contract"]:
+    def get_contract(
+        cls, address: bytes, chain_ids: list[int] | None = None
+    ) -> SelectBase["Contract"]:
         query = select(cls).where(cls.address == address)
         if chain_ids:
             query = query.where(col(cls.chain_id).in_(chain_ids))
 
-        result = await session.exec(query)
-        return result.all()
+        return query

@@ -9,10 +9,16 @@ class ProjectPublic(BaseModel):
     description: str
     logo_file: str
 
+    class Config:
+        from_attributes = True
+
 
 class AbiPublic(BaseModel):
     abi_json: list[dict] | dict | None
     abi_hash: bytes | str
+
+    class Config:
+        from_attributes = True
 
     @field_validator("abi_hash")
     @classmethod
@@ -29,6 +35,9 @@ class ContractsPublic(BaseModel):
     chain_id: int
     project: ProjectPublic | None
     abi: AbiPublic | None
+
+    class Config:
+        from_attributes = True
 
     @field_validator("address")
     @classmethod
