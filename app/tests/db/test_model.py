@@ -10,7 +10,6 @@ class TestModel(DbAsyncConn):
     async def test_contract(self, session: AsyncSession):
         contract = Contract(address=b"a", name="A test contract", chain_id=1)
         await contract.create(session)
-        await contract.create(session)
         result = await contract.get_all(session)
         self.assertEqual(result[0], contract)
 

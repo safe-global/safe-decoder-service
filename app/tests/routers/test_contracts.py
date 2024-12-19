@@ -17,12 +17,18 @@ class TestRouterContract(DbAsyncConn):
 
     @database_session
     async def test_view_contracts(self, session: AsyncSession):
-        contract = Contract(address=b"a", name="A Test Contracts", chain_id=1)
+        contract = Contract(
+            address=b"0xe94B2EC38FA88bDc8cA9110b24deB5341ECeF251",
+            name="A Test Contracts",
+            chain_id=1,
+        )
         expected_response = {
             "name": "A Test Contracts",
             "description": None,
-            "address": "a",
+            "address": "0xe94B2EC38FA88bDc8cA9110b24deB5341ECeF251",
         }
         await contract.create(session)
-        response = self.client.get("/api/v1/contracts")
+        response = self.client.get(
+            "/api/v1/contracts/0xe94B2EC38FA88bDc8cA9110b24deB5341ECeF251"
+        )
         self.assertEqual(response.status_code, 200)
