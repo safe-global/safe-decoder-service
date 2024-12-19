@@ -51,7 +51,7 @@ class ContractsPublic(BaseModel):
     @classmethod
     def convert_to_checksum_address(cls, address):
         """
-        Convert address bytes to hex
+        Convert bytes address to checksum address
 
         :param address:
         :return:
