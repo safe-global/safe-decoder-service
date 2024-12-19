@@ -14,10 +14,8 @@ from app.services.pagination import GenericPagination, PaginatedResponse
 
 class ContractService:
 
-    def __init__(self, request: Request, limit: int | None, offset: int | None):
-        self.pagination = GenericPagination(request=request, model=Contract)
-        self.pagination.set_limit(limit)
-        self.pagination.set_offset(offset)
+    def __init__(self, request: Request):
+        self.pagination = GenericPagination(request=request)
 
     @staticmethod
     async def get_all(session: AsyncSession) -> Sequence[Contract]:
@@ -42,5 +40,5 @@ class ContractService:
         """
 
         return await self.pagination.paginate(
-            session, Contract.get_contract(address, chain_ids)
+            session, Contract.get_contracts_query(address, chain_ids)
         )

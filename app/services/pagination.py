@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar
 
-from fastapi import Request
+from fastapi import Query, Request
 from pydantic import BaseModel
 
 from sqlalchemy import func
@@ -16,33 +16,29 @@ class PaginatedResponse(BaseModel, Generic[T]):
     results: list[T]
 
 
+class PaginationParams(BaseModel):
+    limit: int | None = Query(None, ge=1)
+    offset: int | None = Query(0, ge=0)
+
+
 class GenericPagination:
     def __init__(
         self,
         request: Request,
-        model,
         default_page_size: int = 10,
         max_page_size: int = 100,
     ):
-        self.max_page_size = max_page_size
-        self.model = model
-        self.limit = default_page_size
-        self.offset = 0
         self.request = request
-
-    def set_limit(self, limit):
-        if limit:
-            if limit < self.max_page_size:
-                self.limit = limit
-            else:
-                self.limit = self.max_page_size
-
-    def set_offset(self, offset):
-        if offset:
-            self.offset = offset
+        self.max_page_size = max_page_size
+        self.limit = min(
+            int(self.request.query_params.get("limit", default_page_size)),
+            max_page_size,
+        )
+        self.offset = int(self.request.query_params.get("offset", 0))
 
     def get_next_page(self, count: int) -> str | None:
         """
+        Calculates the next page of results. If there are no more pages return None
 
         :param base_url:
         :param count:
@@ -59,6 +55,7 @@ class GenericPagination:
 
     def get_previous_page(self) -> str | None:
         """
+        Calculates the previous page of results. If there are no more pages return None
 
         :param base_url:
         :return:
@@ -74,6 +71,7 @@ class GenericPagination:
 
     async def paginate(self, session, query) -> PaginatedResponse:
         """
+        Get the paginated response for the provided query
 
         :param session:
         :param query:
@@ -81,9 +79,7 @@ class GenericPagination:
         :return:
         """
         queryset = await session.exec(query.offset(self.offset).limit(self.limit))
-        count_query = await session.exec(
-            select(func.count()).select_from(self.model).where(query._whereclause)
-        )
+        count_query = await session.exec(select(func.count()).where(query._whereclause))
         count = count_query.one()
         paginated_response = PaginatedResponse(
             count=count,
