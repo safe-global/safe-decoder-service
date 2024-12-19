@@ -2,7 +2,7 @@ from functools import cache
 
 from redis import Redis
 
-from app.config import settings
+from ...config import settings
 
 
 @cache

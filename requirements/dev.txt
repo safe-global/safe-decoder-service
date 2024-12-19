@@ -5,3 +5,4 @@ httpx
 mypy
 pre-commit
 pytest
+pytest-asyncio
