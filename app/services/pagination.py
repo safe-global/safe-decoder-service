@@ -1,5 +1,6 @@
 from typing import Generic, TypeVar
 
+from fastapi import Request
 from pydantic import BaseModel
 
 from sqlalchemy import func
@@ -18,7 +19,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 class GenericPagination:
     def __init__(
         self,
-        base_url: str,
+        request: Request,
         model,
         default_page_size: int = 10,
         max_page_size: int = 100,
@@ -27,7 +28,7 @@ class GenericPagination:
         self.model = model
         self.limit = default_page_size
         self.offset = 0
-        self.base_url = base_url
+        self.request = request
 
     def set_limit(self, limit):
         if limit:
@@ -49,7 +50,11 @@ class GenericPagination:
         """
         if self.offset + self.limit < count:
             next_offset = self.offset + self.limit
-            return f"{self.base_url}?limit={self.limit}&offset={next_offset}"
+            return str(
+                self.request.url.include_query_params(
+                    limit=self.limit, offset=next_offset
+                )
+            )
         return None
 
     def get_previous_page(self) -> str | None:
@@ -60,7 +65,11 @@ class GenericPagination:
         """
         if self.offset > 0:
             prev_offset = max(0, self.offset - self.limit)  # Prevent negative offset
-            return f"{self.base_url}?limit={self.limit}&offset={prev_offset}"
+            return str(
+                self.request.url.include_query_params(
+                    limit=self.limit, offset=prev_offset
+                )
+            )
         return None
 
     async def paginate(self, session, query) -> PaginatedResponse:
@@ -72,7 +81,9 @@ class GenericPagination:
         :return:
         """
         queryset = await session.exec(query.offset(self.offset).limit(self.limit))
-        count_query = await session.exec(select(func.count()).select_from(self.model))
+        count_query = await session.exec(
+            select(func.count()).select_from(self.model).where(query._whereclause)
+        )
         count = count_query.one()
         paginated_response = PaginatedResponse(
             count=count,
