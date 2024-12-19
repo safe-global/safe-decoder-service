@@ -1,4 +1,4 @@
-abi_json: list[dict] = [
+mock_abi_json: list[dict] = [
     {
         "inputs": [],
         "payable": False,
