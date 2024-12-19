@@ -1,6 +1,5 @@
 from fastapi.testclient import TestClient
 
-from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -24,7 +23,8 @@ class TestRouterContract(DbAsyncConn):
 
         abi = Abi(abi_json=mock_abi_json)
         await abi.create(session)
-        address = HexBytes(Account.create().address)
+        address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
+        address = HexBytes(address_expected)
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=1, abi_id=abi.abi_hash
         )
@@ -39,7 +39,7 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(response_json["previous"], None)
         self.assertEqual(response_json["next"], None)
         self.assertEqual(results[0]["name"], "A Test Contracts")
-        self.assertEqual(results[0]["address"], address.hex())
+        self.assertEqual(results[0]["address"], address_expected)
         self.assertEqual(results[0]["abi"]["abi_json"], mock_abi_json)
         self.assertEqual(results[0]["abi"]["abi_hash"], "0xb4b61541")
         self.assertEqual(results[0]["display_name"], None)
