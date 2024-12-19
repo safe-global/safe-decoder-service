@@ -10,6 +10,8 @@ from sqlmodel import (
 )
 from sqlmodel.sql._expression_select_cls import SelectBase
 
+from app.datasources.db.utils import get_md5_abi_hash
+
 
 class SqlQueryBase:
 
@@ -40,7 +42,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
 class Abi(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    abi_hash: bytes = Field(nullable=False, index=True, unique=True)
+    abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
     relevance: int | None = Field(nullable=False, default=0)
     abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
@@ -49,6 +51,10 @@ class Abi(SqlQueryBase, SQLModel, table=True):
 
     source: AbiSource | None = Relationship(back_populates="abis")
     contracts: list["Contract"] = Relationship(back_populates="abi")
+
+    async def create(self, session):
+        self.abi_hash = get_md5_abi_hash(self.abi_json)
+        return await self._save(session)
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
