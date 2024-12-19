@@ -10,7 +10,6 @@ from ...datasources.db.models import Abi, Contract
 from ...main import app
 from ..db.db_async_conn import DbAsyncConn
 from ..mocks.abi_mock import mock_abi_json
-from ..utils import get_md5_abi_hash
 
 
 class TestRouterContract(DbAsyncConn):
@@ -22,11 +21,10 @@ class TestRouterContract(DbAsyncConn):
 
     @database_session
     async def test_view_contracts(self, session: AsyncSession):
-        abi_hash = get_md5_abi_hash(mock_abi_json)
-        abi = Abi(abi_hash=abi_hash, abi_json=mock_abi_json)
+
+        abi = Abi(abi_json=mock_abi_json)
         await abi.create(session)
         address = HexBytes(Account.create().address)
-
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=1, abi_id=abi.abi_hash
         )
@@ -43,6 +41,7 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(results[0]["name"], "A Test Contracts")
         self.assertEqual(results[0]["address"], address.hex())
         self.assertEqual(results[0]["abi"]["abi_json"], mock_abi_json)
+        self.assertEqual(results[0]["abi"]["abi_hash"], "0xb4b61541")
         self.assertEqual(results[0]["display_name"], None)
         self.assertEqual(results[0]["chain_id"], 1)
         self.assertEqual(results[0]["project"], None)

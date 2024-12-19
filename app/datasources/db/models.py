@@ -13,6 +13,8 @@ from sqlmodel import (
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3.types import ABI
 
+from app.datasources.db.utils import get_md5_abi_hash
+
 
 class SqlQueryBase:
 
@@ -43,7 +45,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
 class Abi(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    abi_hash: bytes = Field(nullable=False, index=True, unique=True)
+    abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
     relevance: int | None = Field(nullable=False, default=0)
     abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
@@ -63,6 +65,10 @@ class Abi(SqlQueryBase, SQLModel, table=True):
         results = await session.exec(select(cls.abi_json).order_by(col(cls.relevance)))
         for result in results:
             yield cast(ABI, result)
+
+    async def create(self, session):
+        self.abi_hash = get_md5_abi_hash(self.abi_json)
+        return await self._save(session)
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
