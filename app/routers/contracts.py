@@ -30,5 +30,5 @@ async def list_contracts(
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksumed")
 
-    contracts_service = ContractService(str(request.base_url), limit, offset)
+    contracts_service = ContractService(str(request.url), limit, offset)
     return await contracts_service.get_contract(session, HexBytes(address), chain_ids)
