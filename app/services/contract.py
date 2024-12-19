@@ -1,5 +1,7 @@
 from typing import Any, Sequence
 
+from fastapi import Request
+
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 <<<<<<< HEAD
@@ -12,8 +14,8 @@ from app.services.pagination import GenericPagination, PaginatedResponse
 
 class ContractService:
 
-    def __init__(self, base_url: str, limit: int | None, offset: int | None):
-        self.pagination = GenericPagination(base_url=base_url, model=Contract)
+    def __init__(self, request: Request, limit: int | None, offset: int | None):
+        self.pagination = GenericPagination(request=request, model=Contract)
         self.pagination.set_limit(limit)
         self.pagination.set_offset(offset)
 
