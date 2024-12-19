@@ -34,7 +34,13 @@ class TestModel(DbAsyncConn):
 
     @database_session
     async def test_abi(self, session: AsyncSession):
-        abi = Abi(abi_hash=b"A Test Abi", abi_json={"name": "A Test Project"})
+        abi_source = AbiSource(name="A Test Source", url="https://test.com")
+        await abi_source.create(session)
+        abi = Abi(
+            abi_hash=b"A Test Abi",
+            abi_json={"name": "A Test Project"},
+            source_id=abi_source.id,
+        )
         await abi.create(session)
         result = await abi.get_all(session)
         self.assertEqual(result[0], abi)

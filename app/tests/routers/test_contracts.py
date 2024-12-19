@@ -5,7 +5,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ...datasources.db.database import database_session
-from ...datasources.db.models import Abi, Contract
+from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ..db.db_async_conn import DbAsyncConn
 from ..mocks.abi_mock import mock_abi_json
@@ -20,8 +20,9 @@ class TestRouterContract(DbAsyncConn):
 
     @database_session
     async def test_view_contracts(self, session: AsyncSession):
-
-        abi = Abi(abi_json=mock_abi_json)
+        source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
+        await source.create(session)
+        abi = Abi(abi_json=mock_abi_json, source_id=source.id)
         await abi.create(session)
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
         address = HexBytes(address_expected)

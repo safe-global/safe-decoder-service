@@ -49,7 +49,7 @@ class Abi(SqlQueryBase, SQLModel, table=True):
     relevance: int | None = Field(nullable=False, default=0)
     abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
-        nullable=True, default=None, foreign_key="abisource.id"
+        nullable=False, default=None, foreign_key="abisource.id"
     )
 
     source: AbiSource | None = Relationship(back_populates="abis")
