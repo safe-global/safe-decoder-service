@@ -111,7 +111,9 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     ) -> SelectBase["Contract"]:
         query = select(cls).where(cls.address == address)
         if chain_ids:
-            query = query.where(col(cls.chain_id).in_(chain_ids))
+            query = query.where(col(cls.chain_id).in_(chain_ids)).order_by(
+                col(cls.chain_id).desc()
+            )
 
         return query
 
