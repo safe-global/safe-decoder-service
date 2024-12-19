@@ -37,7 +37,7 @@ class AbiPublic(BaseModel):
 class ContractsPublic(BaseModel):
     address: bytes | str
     name: str
-    display_name: str
+    display_name: str | None
     chain_id: int
     project: ProjectPublic | None
     abi: AbiPublic | None
