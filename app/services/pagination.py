@@ -18,6 +18,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 class GenericPagination:
     def __init__(
         self,
+        base_url: str,
         model,
         default_page_size: int = 10,
         max_page_size: int = 100,
@@ -26,7 +27,7 @@ class GenericPagination:
         self.model = model
         self.limit = default_page_size
         self.offset = 0
-        self.base_url = ""
+        self.base_url = base_url
 
     def set_limit(self, limit):
         if limit:

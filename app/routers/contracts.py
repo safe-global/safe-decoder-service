@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
@@ -20,6 +20,7 @@ router = APIRouter(
 
 @router.get("/{address}", response_model=PaginatedResponse[ContractsPublic])
 async def list_contracts(
+    request: Request,
     address: str,
     chain_ids: Annotated[list[int] | None, Query()] = None,
     limit: int = Query(None),
@@ -29,5 +30,5 @@ async def list_contracts(
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksumed")
 
-    contracts_service = ContractService(limit, offset)
+    contracts_service = ContractService(str(request.base_url), limit, offset)
     return await contracts_service.get_contract(session, HexBytes(address), chain_ids)
