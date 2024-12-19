@@ -5,8 +5,12 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     UniqueConstraint,
+    col,
     select,
 )
+from sqlmodel.sql._expression_select_cls import SelectBase
+
+from app.datasources.db.utils import get_md5_abi_hash
 
 
 class SqlQueryBase:
@@ -38,15 +42,19 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
 class Abi(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    abi_hash: bytes = Field(nullable=False, index=True, unique=True)
+    abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
     relevance: int | None = Field(nullable=False, default=0)
     abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
-        nullable=True, default=None, foreign_key="abisource.id"
+        nullable=False, default=None, foreign_key="abisource.id"
     )
 
     source: AbiSource | None = Relationship(back_populates="abis")
     contracts: list["Contract"] = Relationship(back_populates="abi")
+
+    async def create(self, session):
+        self.abi_hash = get_md5_abi_hash(self.abi_json)
+        return await self._save(session)
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
@@ -72,9 +80,23 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     abi_id: bytes | None = Field(
         nullable=True, default=None, foreign_key="abi.abi_hash"
     )
-    abi: Abi | None = Relationship(back_populates="contracts")
+    abi: Abi | None = Relationship(
+        back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
+    )
     project_id: int | None = Field(
         nullable=True, default=None, foreign_key="project.id"
     )
-    project: Project | None = Relationship(back_populates="contracts")
+    project: Project | None = Relationship(
+        back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
+    )
     chain_id: int = Field(default=None)
+
+    @classmethod
+    def get_contract(
+        cls, address: bytes, chain_ids: list[int] | None = None
+    ) -> SelectBase["Contract"]:
+        query = select(cls).where(cls.address == address)
+        if chain_ids:
+            query = query.where(col(cls.chain_id).in_(chain_ids))
+
+        return query
