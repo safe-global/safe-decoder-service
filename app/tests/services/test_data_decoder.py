@@ -1,14 +1,9 @@
-import unittest
-
 from ...services.data_decoder import DataDecoderService
+from ..db.db_async_conn import DbAsyncConn
 
 
-class TestRouterAbout(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.data_decoder = DataDecoderService()
-
-    def test_view_about(self):
-        response = self.client.get("/api/v1/about")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"version": VERSION})
+class TestDataDecoderService(DbAsyncConn):
+    async def test_init(self):
+        d = DataDecoderService()
+        await d.init()
+        assert d.fn_selectors_with_abis == {}

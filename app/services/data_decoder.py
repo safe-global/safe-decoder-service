@@ -1,7 +1,14 @@
 import logging
-from functools import cached_property, lru_cache
-from threading import Lock
-from typing import Any, NotRequired, Sequence, TypedDict, cast
+from functools import cache, cached_property, lru_cache
+from typing import (
+    Any,
+    AsyncGenerator,
+    AsyncIterator,
+    NotRequired,
+    Sequence,
+    TypedDict,
+    cast,
+)
 
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
@@ -53,7 +60,11 @@ class MultisendDecoded(TypedDict):
     data_decoded: DataDecoded | None
 
 
-mutex = Lock()
+@cache
+def get_data_decoder_service() -> "DataDecoderService":
+    d = DataDecoderService()
+    d.init()
+    return d
 
 
 class DataDecoderService:
@@ -61,10 +72,16 @@ class DataDecoderService:
 
     dummy_w3 = Web3()
 
-    def __init__(self):
+    async def init(self):
+        """
+        Initialize the data decoder service, loading the ABIs from the database and storing the 4byte selectors
+        in memory
+        """
         logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
         self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
-            self._generate_selectors_with_abis_from_abis(self.get_supported_abis())
+            await self._generate_selectors_with_abis_from_abis(
+                await self.get_supported_abis()
+            )
         )
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
@@ -91,8 +108,8 @@ class DataDecoderService:
             if fn_abi["type"] == "function"
         }
 
-    def _generate_selectors_with_abis_from_abis(
-        self, abis: Sequence[Sequence[ABIFunction]]
+    async def _generate_selectors_with_abis_from_abis(
+        self, abis: AsyncIterator[Sequence[ABIFunction]]
     ) -> dict[bytes, ABIFunction]:
         """
         :param abis: Contract ABIs. Last ABIs on the Sequence have preference if there's a collision on the
@@ -101,13 +118,13 @@ class DataDecoderService:
         """
         return {
             fn_selector: fn_abi
-            for supported_abi in abis
+            async for supported_abi in abis
             for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(
                 supported_abi
             ).items()
         }
 
-    async def get_supported_abis(self) -> Sequence[ABIFunction]:
+    async def get_supported_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
         """
         :return: Every ABI in the database
         """
