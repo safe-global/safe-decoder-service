@@ -1,4 +1,4 @@
-aio-pika==9.5.4
+aio-pika==9.5.1
 alembic==1.14.0
 async-lru==2.0.4
 asyncpg==0.30.0

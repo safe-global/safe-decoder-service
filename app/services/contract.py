@@ -1,6 +1,5 @@
 from typing import Any, Sequence
 
-from hexbytes import HexBytes
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 <<<<<<< HEAD
@@ -29,7 +28,7 @@ class ContractService:
         return await Contract.get_all(session)
 
     async def get_contract(
-        self, session: AsyncSession, address: str, chain_ids: list[int] | None
+        self, session: AsyncSession, address: bytes, chain_ids: list[int] | None
     ) -> PaginatedResponse[Any]:
         """
         Get the contract by address and/or chain_ids
@@ -41,5 +40,5 @@ class ContractService:
         """
 
         return await self.pagination.paginate(
-            session, Contract.get_contract(HexBytes(address), chain_ids)
+            session, Contract.get_contract(address, chain_ids)
         )
