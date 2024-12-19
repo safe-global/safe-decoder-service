@@ -22,10 +22,16 @@ class AbiPublic(BaseModel):
 
     @field_validator("abi_hash")
     @classmethod
-    def convert_bytes_to_hex(cls, v):
-        if isinstance(v, bytes):
-            return "0x" + v.hex()  # Convert bytes to a hex string
-        return v
+    def convert_bytes_to_hex(cls, abi_hash):
+        """
+        Convert bytes to hex
+
+        :param abi_hash:
+        :return:
+        """
+        if isinstance(abi_hash, bytes):
+            return "0x" + abi_hash.hex()  # Convert bytes to a hex string
+        return abi_hash
 
 
 class ContractsPublic(BaseModel):
@@ -41,7 +47,13 @@ class ContractsPublic(BaseModel):
 
     @field_validator("address")
     @classmethod
-    def convert_bytes_to_hex(cls, v):
-        if isinstance(v, bytes):
-            return "0x" + v.hex()  # Convert bytes to a hex string
-        return v
+    def convert_bytes_to_hex(cls, address):
+        """
+        Convert address bytes to hex
+
+        :param address:
+        :return:
+        """
+        if isinstance(address, bytes):
+            return "0x" + address.hex()
+        return address
