@@ -8,6 +8,7 @@ from sqlmodel import (
     col,
     select,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql._expression_select_cls import SelectBase
 
 from .utils import get_md5_abi_hash
@@ -16,19 +17,19 @@ from .utils import get_md5_abi_hash
 class SqlQueryBase:
 
     @classmethod
-    async def get_all(cls, session):
+    async def get_all(cls, session: AsyncSession):
         result = await session.exec(select(cls))
         return result.all()
 
-    async def _save(self, session):
+    async def _save(self, session: AsyncSession):
         session.add(self)
         await session.commit()
         return self
 
-    async def update(self, session):
+    async def update(self, session: AsyncSession):
         return await self._save(session)
 
-    async def create(self, session):
+    async def create(self, session: AsyncSession):
         return await self._save(session)
 
 
