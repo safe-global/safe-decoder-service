@@ -169,7 +169,21 @@ class TestDataDecoderService(DbAsyncConn):
                     "type": "bytes",
                     "value": "0xa9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234aaa4"
                     "3cc00000000000000000000000000000000000000000000000000005af3107a4000",
-                    "value_decoded": None,
+                    "value_decoded": {
+                        "method": "transfer",
+                        "parameters": [
+                            {
+                                "name": "to",
+                                "type": "address",
+                                "value": "0x0dc0dfD22C6Beab74672EADE5F9Be5234AAa43cC",
+                            },
+                            {
+                                "name": "value",
+                                "type": "uint256",
+                                "value": "100000000000000",
+                            },
+                        ],
+                    },
                 },
                 {"name": "operation", "type": "uint8", "value": "0"},
                 {"name": "safeTxGas", "type": "uint256", "value": "0"},
