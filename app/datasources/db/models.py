@@ -52,9 +52,10 @@ class Abi(SqlQueryBase, SQLModel, table=True):
 
     @classmethod
     async def get_abis_sorted_by_relevance(cls, session: AsyncSession):
-        results = await session.exec(
-            select(cls.abi_json).order_by(col(cls.relevance).desc())
-        )
+        """
+        :returns: Abi JSON, with the ones with less relevance first
+        """
+        results = await session.exec(select(cls.abi_json).order_by(col(cls.relevance)))
         for result in results:
             yield result
 

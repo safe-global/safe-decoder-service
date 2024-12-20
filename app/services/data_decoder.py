@@ -1,7 +1,8 @@
 import logging
-from functools import cache, cached_property, lru_cache
+from functools import cache
 from typing import Any, AsyncIterator, NotRequired, Sequence, TypedDict, cast
 
+from async_lru import alru_cache
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
 from eth_typing import ABIFunction, Address, HexStr
@@ -80,8 +81,14 @@ class DataDecoderService:
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
-        self.multisend_abis: list[Sequence[ABIFunction]] = [m async for m in self.get_multisend_abis()]
-        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = await self._generate_selectors_with_abis_from_abis(self.get_multisend_abis())
+        self.multisend_abis: list[Sequence[ABIFunction]] = [
+            m async for m in self.get_multisend_abis()
+        ]
+        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = (
+            await self._generate_selectors_with_abis_from_abis(
+                self.get_multisend_abis()
+            )
+        )
 
     def _generate_selectors_with_abis_from_abi(
         self, abi: Sequence[ABIFunction]
@@ -112,7 +119,9 @@ class DataDecoderService:
             ).items()
         }
 
-    async def get_supported_abis(self, session: AsyncSession) -> AsyncIterator[Sequence[ABIFunction]]:
+    async def get_supported_abis(
+        self, session: AsyncSession
+    ) -> AsyncIterator[Sequence[ABIFunction]]:
         """
         :return: Every ABI in the database
         """
@@ -121,7 +130,7 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    # @lru_cache(maxsize=2048)
+    @alru_cache(maxsize=2048)
     async def get_contract_abi(self, address: Address) -> list[ABIFunction] | None:
         """
         Retrieves the ABI for the contract at the given address.
@@ -130,10 +139,14 @@ class DataDecoderService:
         :return: List of ABI data if found, `None` otherwise.
         """
         async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-            return await Contract.get_abi_by_contract_address(session, HexBytes(address))
+            return await Contract.get_abi_by_contract_address(
+                session, HexBytes(address)
+            )
 
-    # @lru_cache(maxsize=2048)
-    async def get_contract_fallback_function(self, address: Address) -> ABIFunction | None:
+    @alru_cache(maxsize=2048)
+    async def get_contract_fallback_function(
+        self, address: Address
+    ) -> ABIFunction | None:
         """
         :param address: Contract address
         :return: Fallback ABIFunction if found, `None` otherwise.
@@ -149,7 +162,7 @@ class DataDecoderService:
                 None,
             )
 
-    # @lru_cache(maxsize=2048)
+    @alru_cache(maxsize=2048)
     async def get_contract_abi_selectors_with_functions(
         self, address: Address
     ) -> dict[bytes, ABIFunction] | None:
@@ -300,7 +313,7 @@ class DataDecoderService:
         fn_selector = data[:4]
         if fn_selector in self.multisend_fn_selectors_with_abis:
             # If MultiSend, decode the transactions
-            parameters[0]["value_decoded"] = self.decode_multisend_data(data)
+            parameters[0]["value_decoded"] = await self.decode_multisend_data(data)
 
         elif (
             fn_selector == self.EXEC_TRANSACTION_SELECTOR
@@ -353,10 +366,25 @@ class DataDecoderService:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
-        fn_name, decoded_transactions_with_types = await self.decode_transaction_with_types(
-            data, address=address
+        fn_name, decoded_transactions_with_types = (
+            await self.decode_transaction_with_types(data, address=address)
         )
         decoded_transactions = {
             d["name"]: d["value"] for d in decoded_transactions_with_types
         }
         return fn_name, decoded_transactions
+
+    def add_abi(self, abi: ABIFunction) -> bool:
+        """
+        Add a new abi without rebuilding the entire decoder
+
+        :return: True if decoder updated, False otherwise
+        """
+        updated = False
+        for selector, new_abi in self._generate_selectors_with_abis_from_abi(
+            abi
+        ).items():
+            if selector not in self.fn_selectors_with_abis:
+                self.fn_selectors_with_abis[selector] = new_abi
+                updated = True
+        return updated

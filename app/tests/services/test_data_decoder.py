@@ -1,16 +1,81 @@
 from hexbytes import HexBytes
-from safe_eth.eth.contracts import get_safe_V1_4_1_contract, get_safe_V1_1_1_contract
+from safe_eth.eth.constants import NULL_ADDRESS
+from safe_eth.eth.contracts import (
+    get_erc20_contract,
+    get_multi_send_contract,
+    get_safe_V1_1_1_contract,
+    get_safe_V1_4_1_contract,
+)
 from safe_eth.safe.multi_send import MultiSendOperation
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 
 from ...datasources.db.database import database_session
-from ...datasources.db.models import Abi
-from ...services.data_decoder import DataDecoderService, get_data_decoder_service
+from ...datasources.db.models import Abi, Contract
+from ...services.data_decoder import (
+    CannotDecode,
+    DataDecoderService,
+    UnexpectedProblemDecoding,
+    get_data_decoder_service,
+)
+from ...utils.abis import (
+    comptroller_abi,
+    ctoken_abi,
+    fleet_factory_abi,
+    fleet_factory_deterministic_abi,
+    gnosis_protocol_abi,
+)
 from ..db.db_async_conn import DbAsyncConn
+from .mocks_data_decoder import (
+    exec_transaction_data_mock,
+    exec_transaction_decoded_mock,
+    insufficient_data_bytes_mock,
+)
 
 
 class TestDataDecoderService(DbAsyncConn):
+    @staticmethod
+    async def _store_safe_contract_abi(session: AsyncSession):
+        dummy_web3 = Web3()
+        erc20_contract = get_erc20_contract(dummy_web3)
+        safe_v1_1_1_contract = get_safe_V1_1_1_contract(dummy_web3)
+        safe_v1_4_1_contract = get_safe_V1_4_1_contract(dummy_web3)
+        multisend_contract = get_multi_send_contract(dummy_web3)
+
+        # Add Safe Contract Abi and decode it
+        for abi in (
+            Abi(abi_hash=b"ERC20Contract", abi_json=erc20_contract.abi, relevance=150),
+            Abi(
+                abi_hash=b"SafeContractV1_1_1_ABI",
+                abi_json=safe_v1_1_1_contract.abi,
+                relevance=100,
+            ),
+            Abi(
+                abi_hash=b"SafeContractV1_4_1_ABI",
+                abi_json=safe_v1_4_1_contract.abi,
+                relevance=100,
+            ),
+            Abi(
+                abi_hash=b"MultiSendContractABI",
+                abi_json=multisend_contract.abi,
+                relevance=100,
+            ),
+            Abi(
+                abi_hash=b"GnosisProtocolABI",
+                abi_json=gnosis_protocol_abi,
+                relevance=50,
+            ),
+            Abi(
+                abi_hash=b"FleetFactoryDeterministic",
+                abi_json=fleet_factory_deterministic_abi,
+                relevance=50,
+            ),
+            Abi(abi_hash=b"FleetFactory", abi_json=fleet_factory_abi, relevance=50),
+            Abi(abi_hash=b"cTokenABI", abi_json=ctoken_abi, relevance=50),
+            Abi(abi_hash=b"comptrollerABI", abi_json=comptroller_abi, relevance=50),
+        ):
+            await abi.create(session)
+
     async def test_get_data_decoder_service(self):
         data_decoder_service = await get_data_decoder_service()
         assert data_decoder_service.fn_selectors_with_abis == {}
@@ -20,22 +85,6 @@ class TestDataDecoderService(DbAsyncConn):
         empty_decoder_service = DataDecoderService()
         await empty_decoder_service.init(session)
         assert empty_decoder_service.fn_selectors_with_abis == {}
-
-    @staticmethod
-    async def _store_safe_contract_abi(session: AsyncSession):
-        safe_v1_1_1_contract = get_safe_V1_1_1_contract(Web3())
-        safe_v1_4_1_contract = get_safe_V1_4_1_contract(Web3())
-
-        # Add Safe Contract Abi and decode it
-        for abi in (
-                Abi(
-                    abi_hash=b"SafeContractV1_1_1_ABI", abi_json=safe_v1_1_1_contract.abi, relevance=100
-                ),
-                Abi(
-                    abi_hash=b"SafeContractV1_4_1_ABI", abi_json=safe_v1_4_1_contract.abi, relevance=100
-                )
-        ):
-            await abi.create(session)
 
     @database_session
     async def test_init_with_abi(self, session: AsyncSession):
@@ -102,7 +151,9 @@ class TestDataDecoderService(DbAsyncConn):
 
         data_decoder = DataDecoderService()
         await data_decoder.init(session)
-        function_name, arguments = await data_decoder.decode_transaction_with_types(data)
+        function_name, arguments = await data_decoder.decode_transaction_with_types(
+            data
+        )
         self.assertEqual(function_name, "execTransaction")
         self.assertEqual(
             arguments,
@@ -112,18 +163,18 @@ class TestDataDecoderService(DbAsyncConn):
                     "type": "address",
                     "value": "0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa",
                 },
-                {"name": "value", "type": "uint256", "value": '0'},
+                {"name": "value", "type": "uint256", "value": "0"},
                 {
                     "name": "data",
                     "type": "bytes",
                     "value": "0xa9059cbb0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234aaa4"
-                             "3cc00000000000000000000000000000000000000000000000000005af3107a4000",
+                    "3cc00000000000000000000000000000000000000000000000000005af3107a4000",
                     "value_decoded": None,
                 },
-                {"name": "operation", "type": "uint8", "value": '0'},
-                {"name": "safeTxGas", "type": "uint256", "value": '0'},
-                {"name": "baseGas", "type": "uint256", "value": '0'},
-                {"name": "gasPrice", "type": "uint256", "value": '0'},
+                {"name": "operation", "type": "uint8", "value": "0"},
+                {"name": "safeTxGas", "type": "uint256", "value": "0"},
+                {"name": "baseGas", "type": "uint256", "value": "0"},
+                {"name": "gasPrice", "type": "uint256", "value": "0"},
                 {
                     "name": "gasToken",
                     "type": "address",
@@ -138,9 +189,9 @@ class TestDataDecoderService(DbAsyncConn):
                     "name": "signatures",
                     "type": "bytes",
                     "value": "0x0000000000000000000000000dc0dfd22c6beab74672eade5f9be5234aaa43cc00000"
-                             "00000000000000000000000000000000000000000000000000000000000010000000000"
-                             "00000000000000c791cb32ddb43de8260e6a2762b3b03498b615e500000000000000000"
-                             "0000000000000000000000000000000000000000000000001",
+                    "00000000000000000000000000000000000000000000000000000000000010000000000"
+                    "00000000000000c791cb32ddb43de8260e6a2762b3b03498b615e500000000000000000"
+                    "0000000000000000000000000000000000000000000000001",
                 },
             ],
         )
@@ -255,4 +306,186 @@ class TestDataDecoderService(DbAsyncConn):
                 }
             ],
         )
-        self.assertEqual(await data_decoder.decode_transaction_with_types(data), expected)
+        self.assertEqual(
+            await data_decoder.decode_transaction_with_types(data), expected
+        )
+
+    @database_session
+    async def test_decode_multisend_not_valid(self, session: AsyncSession):
+        await self._store_safe_contract_abi(session)
+
+        # Same data with some stuff deleted
+        data = HexBytes(
+            "0x8d80ff0a0000000000000000000000000000000000000000000000000000000000000020000000000000000000"
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            "000000000000000000000000000000247de7edef00000000000000000000000034cfac646f301356faa8b21e9422"
+            "7e3583fe3f5f005b9ea52aaa931d4eef74c8aeaf0fe759434fed7400000000000000000000000000000000000000"
+            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f0"
+            "8a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000"
+            "000000"
+        )
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+        self.assertEqual(await decoder_service.decode_multisend_data(data), [])
+        self.assertEqual(
+            await decoder_service.decode_transaction_with_types(data),
+            (
+                "multiSend",
+                [
+                    {
+                        "name": "transactions",
+                        "type": "bytes",
+                        "value": "0x",
+                        "value_decoded": [],
+                    }
+                ],
+            ),
+        )
+
+    @database_session
+    async def test_decode_safe_exec_transaction(self, session: AsyncSession):
+        await self._store_safe_contract_abi(session)
+
+        data = exec_transaction_data_mock
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+
+        self.assertIn(bytes.fromhex("c2998238"), decoder_service.fn_selectors_with_abis)
+        # Cowswap ABI is required for this test
+        self.assertEqual(
+            await decoder_service.get_data_decoded(data), exec_transaction_decoded_mock
+        )
+
+    @database_session
+    async def test_unexpected_problem_decoding(self, session: AsyncSession):
+        await self._store_safe_contract_abi(session)
+
+        data = insufficient_data_bytes_mock
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+
+        with self.assertRaises(UnexpectedProblemDecoding):
+            await decoder_service.decode_transaction(data)
+
+    @database_session
+    async def test_db_tx_decoder(self, session: AsyncSession):
+        example_abi = [
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
+                    {
+                        "internalType": "uint256",
+                        "name": "numberOfDroids",
+                        "type": "uint256",
+                    },
+                ],
+                "name": "buyDroid",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+        ]
+
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+        )
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+
+        with self.assertRaises(CannotDecode):
+            await decoder_service.decode_transaction(example_data)
+
+        # Test `add_abi`
+        decoder_service.add_abi(example_abi)
+        fn_name, arguments = await decoder_service.decode_transaction(example_data)
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
+
+        # Test load a new DbTxDecoder
+        abi = Abi(abi_hash=b"ExampleABI", abi_json=example_abi, relevance=100)
+        await abi.create(session)
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+        fn_name, arguments = await decoder_service.decode_transaction(example_data)
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
+
+        # Swap ABI parameters
+        swapped_abi = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "numberOfDroids",
+                        "type": "uint256",
+                    },
+                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
+                ],
+                "name": "buyDroid",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+        ]
+
+        abi = Abi(abi_hash=b"SwappedABI", abi_json=swapped_abi, relevance=100)
+        await abi.create(session)
+        contract = Contract(address=b"c", abi=abi, name="SwappedContract", chain_id=1)
+        await contract.create(session)
+
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=contract.address
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+        # self.assertIn((contract.address,), decoder_service.cache_abis_by_address)
+        # self.assertIn( (contract.address,), decoder_service.cache_contract_abi_selectors_with_functions_by_address, )
+
+    @database_session
+    async def test_decode_fallback_calls_db_tx_decoder(self, session: AsyncSession):
+        example_not_matched_abi = [
+            {
+                "inputs": [],
+                "name": "claimOwner",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+        ]
+
+        example_not_matched_data = (
+            Web3()
+            .eth.contract(abi=example_not_matched_abi)
+            .functions.claimOwner()
+            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+        )
+
+        fallback_abi = [
+            {"stateMutability": "payable", "type": "fallback"},
+        ]
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init(session)
+
+        contract_fallback_abi = Abi(
+            abi_hash=b"SwappedABI", abi_json=fallback_abi, relevance=100
+        )
+        await contract_fallback_abi.create(session)
+        contract_fallback = Contract(
+            address=b"h",
+            name="fallback_contract",
+            chain_id=1,
+            abi=contract_fallback_abi,
+        )
+        await contract_fallback.create(session)
+
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_not_matched_data, address=contract_fallback.address
+        )
+        self.assertEqual(fn_name, "fallback")
+        self.assertEqual(arguments, {})
+        # self.assertIn((contract_fallback.address,), decoder_service.cache_abis_by_address)
