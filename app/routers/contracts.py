@@ -9,7 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from ..datasources.db.database import get_database_session
 from ..datasources.db.models import Contract
 from ..services.contract import ContractService
-from ..services.pagination import PaginatedResponse, PaginationParams
+from ..services.pagination import GenericPagination, PaginatedResponse, PaginationParams
 from .models import ContractsPublic
 
 router = APIRouter(
@@ -29,5 +29,9 @@ async def list_contracts(
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksumed")
 
-    contracts_service = ContractService(request)
-    return await contracts_service.get_contract(session, HexBytes(address), chain_ids)
+    pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
+    contracts_service = ContractService(pagination=pagination)
+    results, count = await contracts_service.get_contracts(
+        session, HexBytes(address), chain_ids
+    )
+    return pagination.serialize(request.url, results, count)
