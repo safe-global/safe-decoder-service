@@ -1,6 +1,4 @@
-from typing import Any, Sequence
-
-from fastapi import Request
+from typing import Sequence, Tuple
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -10,8 +8,8 @@ from app.services.pagination import GenericPagination, PaginatedResponse
 
 class ContractService:
 
-    def __init__(self, request: Request):
-        self.pagination = GenericPagination(request=request)
+    def __init__(self, pagination: GenericPagination):
+        self.pagination = pagination
 
     @staticmethod
     async def get_all(session: AsyncSession) -> Sequence[Contract]:
@@ -23,9 +21,9 @@ class ContractService:
         """
         return await Contract.get_all(session)
 
-    async def get_contract(
+    async def get_contracts(
         self, session: AsyncSession, address: bytes, chain_ids: list[int] | None
-    ) -> PaginatedResponse[Any]:
+    ) -> Tuple[list[Contract], int]:
         """
         Get the contract by address and/or chain_ids
 
@@ -34,7 +32,10 @@ class ContractService:
         :param chain_ids: list of filtered chains
         :return:
         """
-
-        return await self.pagination.paginate(
+        page = await self.pagination.get_page(
             session, Contract.get_contracts_query(address, chain_ids)
         )
+        count = await self.pagination.get_count(
+            session, Contract.get_contracts_query(address, chain_ids)
+        )
+        return page, count
