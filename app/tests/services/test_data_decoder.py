@@ -1,14 +1,18 @@
+from typing import cast
+
+from eth_typing import Address
 from hexbytes import HexBytes
-from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.contracts import (
     get_erc20_contract,
     get_multi_send_contract,
     get_safe_V1_1_1_contract,
     get_safe_V1_4_1_contract,
 )
+from safe_eth.eth.utils import get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
+from web3.types import ABI
 
 from ...datasources.db.database import database_session
 from ...datasources.db.models import Abi, Contract
@@ -276,7 +280,7 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(await data_decoder.decode_multisend_data(data), expected)
 
         # Now decode all the data
-        expected = (
+        expected_2 = (
             "multiSend",
             [
                 {
@@ -321,7 +325,7 @@ class TestDataDecoderService(DbAsyncConn):
             ],
         )
         self.assertEqual(
-            await data_decoder.decode_transaction_with_types(data), expected
+            await data_decoder.decode_transaction_with_types(data), expected_2
         )
 
     @database_session
@@ -383,28 +387,35 @@ class TestDataDecoderService(DbAsyncConn):
 
     @database_session
     async def test_db_tx_decoder(self, session: AsyncSession):
-        example_abi = [
-            {
-                "inputs": [
-                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
-                    {
-                        "internalType": "uint256",
-                        "name": "numberOfDroids",
-                        "type": "uint256",
-                    },
-                ],
-                "name": "buyDroid",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function",
-            },
-        ]
+        example_abi = cast(
+            ABI,
+            [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "droidId",
+                            "type": "uint256",
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "numberOfDroids",
+                            "type": "uint256",
+                        },
+                    ],
+                    "name": "buyDroid",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                },
+            ],
+        )
 
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
             .functions.buyDroid(4, 10)
-            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+            .build_transaction(get_empty_tx_params())["data"]
         )
 
         decoder_service = DataDecoderService()
@@ -429,22 +440,29 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
 
         # Swap ABI parameters
-        swapped_abi = [
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "numberOfDroids",
-                        "type": "uint256",
-                    },
-                    {"internalType": "uint256", "name": "droidId", "type": "uint256"},
-                ],
-                "name": "buyDroid",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function",
-            },
-        ]
+        swapped_abi = cast(
+            ABI,
+            [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "numberOfDroids",
+                            "type": "uint256",
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "droidId",
+                            "type": "uint256",
+                        },
+                    ],
+                    "name": "buyDroid",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                },
+            ],
+        )
 
         abi = Abi(abi_hash=b"SwappedABI", abi_json=swapped_abi, relevance=100)
         await abi.create(session)
@@ -452,7 +470,7 @@ class TestDataDecoderService(DbAsyncConn):
         await contract.create(session)
 
         fn_name, arguments = await decoder_service.decode_transaction(
-            example_data, address=contract.address
+            example_data, address=Address(contract.address)
         )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
@@ -475,7 +493,7 @@ class TestDataDecoderService(DbAsyncConn):
             Web3()
             .eth.contract(abi=example_not_matched_abi)
             .functions.claimOwner()
-            .build_transaction({"gas": 0, "gasPrice": 0, "to": NULL_ADDRESS})["data"]
+            .build_transaction(get_empty_tx_params())["data"]
         )
 
         fallback_abi = [
@@ -498,7 +516,7 @@ class TestDataDecoderService(DbAsyncConn):
         await contract_fallback.create(session)
 
         fn_name, arguments = await decoder_service.decode_transaction(
-            example_not_matched_data, address=contract_fallback.address
+            example_not_matched_data, address=Address(contract_fallback.address)
         )
         self.assertEqual(fn_name, "fallback")
         self.assertEqual(arguments, {})

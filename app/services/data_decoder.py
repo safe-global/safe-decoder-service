@@ -1,11 +1,11 @@
 import logging
 from functools import cache
-from typing import Any, AsyncIterator, NotRequired, Sequence, TypedDict, cast
+from typing import Any, AsyncIterator, NotRequired, TypedDict, cast
 
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
-from eth_typing import ABIFunction, Address, HexStr
+from eth_typing import Address, ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from safe_eth.eth.contracts import get_multi_send_contract
@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
+from web3.types import ABI, ABIFunction
 
 from ..datasources.db.database import get_engine
 from ..datasources.db.models import Abi, Contract
@@ -37,7 +38,7 @@ class ParameterDecoded(TypedDict):
     name: str
     type: str
     value: Any
-    value_decoded: NotRequired["ParameterDecoded"]
+    value_decoded: NotRequired[list["MultisendDecoded"] | "DataDecoded" | None]
 
 
 class DataDecoded(TypedDict):
@@ -47,7 +48,7 @@ class DataDecoded(TypedDict):
 
 class MultisendDecoded(TypedDict):
     operation: int
-    to: Address
+    to: ChecksumAddress
     value: str
     data: HexStr | None
     data_decoded: DataDecoded | None
@@ -81,9 +82,7 @@ class DataDecoderService:
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
-        self.multisend_abis: list[Sequence[ABIFunction]] = [
-            m async for m in self.get_multisend_abis()
-        ]
+        self.multisend_abis: list[ABI] = [m async for m in self.get_multisend_abis()]
         self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = (
             await self._generate_selectors_with_abis_from_abis(
                 self.get_multisend_abis()
@@ -91,20 +90,20 @@ class DataDecoderService:
         )
 
     def _generate_selectors_with_abis_from_abi(
-        self, abi: Sequence[ABIFunction]
+        self, abi: ABI
     ) -> dict[bytes, ABIFunction]:
         """
         :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
         return {
-            function_abi_to_4byte_selector(fn_abi): fn_abi
+            function_abi_to_4byte_selector(cast(dict[str, Any], fn_abi)): fn_abi
             for fn_abi in abi
             if fn_abi["type"] == "function"
         }
 
     async def _generate_selectors_with_abis_from_abis(
-        self, abis: AsyncIterator[Sequence[ABIFunction]]
+        self, abis: AsyncIterator[ABI]
     ) -> dict[bytes, ABIFunction]:
         """
         :param abis: Contract ABIs. Last ABIs on the Sequence have preference if there's a collision on the
@@ -119,19 +118,17 @@ class DataDecoderService:
             ).items()
         }
 
-    async def get_supported_abis(
-        self, session: AsyncSession
-    ) -> AsyncIterator[Sequence[ABIFunction]]:
+    async def get_supported_abis(self, session: AsyncSession) -> AsyncIterator[ABI]:
         """
         :return: Every ABI in the database
         """
         return Abi.get_abis_sorted_by_relevance(session)
 
-    async def get_multisend_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
+    async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
     @alru_cache(maxsize=2048)
-    async def get_contract_abi(self, address: Address) -> list[ABIFunction] | None:
+    async def get_contract_abi(self, address: Address) -> ABI | None:
         """
         Retrieves the ABI for the contract at the given address.
 
@@ -155,12 +152,13 @@ class DataDecoderService:
         if abi:
             return next(
                 (
-                    dict(fn_abi, name="fallback")
+                    cast(ABIFunction, dict(fn_abi, name="fallback"))
                     for fn_abi in abi
                     if fn_abi.get("type") == "fallback"
                 ),
                 None,
             )
+        return None
 
     @alru_cache(maxsize=2048)
     async def get_contract_abi_selectors_with_functions(
@@ -173,6 +171,7 @@ class DataDecoderService:
         abi = await self.get_contract_abi(address)
         if abi:
             return self._generate_selectors_with_abis_from_abi(abi)
+        return None
 
     async def get_abi_function(
         self, data: bytes, address: Address | None = None
@@ -201,6 +200,7 @@ class DataDecoderService:
         # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
         elif address:
             return await self.get_contract_fallback_function(address)
+        return None
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -241,7 +241,7 @@ class DataDecoderService:
         try:
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
-            decoded = decode_abi(types, cast(HexBytes, params))
+            decoded = decode_abi(types, params)
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
         except (ValueError, DecodingError) as exc:
@@ -250,7 +250,9 @@ class DataDecoderService:
 
         return fn_abi["name"], list(zip(names, types, values))
 
-    async def decode_multisend_data(self, data: bytes | str) -> list[MultisendDecoded]:
+    async def decode_multisend_data(
+        self, data: bytes | str
+    ) -> list[MultisendDecoded] | None:
         """
         Decodes Multisend raw data to Multisend dictionary
 
@@ -264,9 +266,9 @@ class DataDecoderService:
                     operation=multisend_tx.operation.value,
                     to=multisend_tx.to,
                     value=str(multisend_tx.value),
-                    data=multisend_tx.data.hex() if multisend_tx.data else None,
+                    data=HexStr(multisend_tx.data.hex()) if multisend_tx.data else None,
                     data_decoded=await self.get_data_decoded(
-                        multisend_tx.data, address=multisend_tx.to
+                        multisend_tx.data, address=cast(Address, multisend_tx.to)
                     ),
                 )
                 for multisend_tx in multisend_txs
@@ -277,6 +279,7 @@ class DataDecoderService:
                 HexBytes(data).hex(),
                 exc_info=True,
             )
+        return None
 
     async def get_data_decoded(
         self, data: bytes | str, address: Address | None = None
@@ -374,7 +377,7 @@ class DataDecoderService:
         }
         return fn_name, decoded_transactions
 
-    def add_abi(self, abi: ABIFunction) -> bool:
+    def add_abi(self, abi: ABI) -> bool:
         """
         Add a new abi without rebuilding the entire decoder
 
