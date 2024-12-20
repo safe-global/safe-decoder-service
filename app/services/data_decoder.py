@@ -71,25 +71,17 @@ class DataDecoderService:
         Initialize the data decoder service, loading the ABIs from the database and storing the 4byte selectors
         in memory
         """
-        self.session = session
         logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
         self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
             await self._generate_selectors_with_abis_from_abis(
-                await self.get_supported_abis()
+                await self.get_supported_abis(session)
             )
         )
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
-        self.session = None
-
-    @cached_property
-    def multisend_abis(self) -> list[Sequence[ABIFunction]]:
-        return [get_multi_send_contract(self.dummy_w3).abi]
-
-    @cached_property
-    def multisend_fn_selectors_with_abis(self) -> dict[bytes, ABIFunction]:
-        return self._generate_selectors_with_abis_from_abis_sync(self.multisend_abis)
+        self.multisend_abis: list[Sequence[ABIFunction]] = [m async for m in self.get_multisend_abis()]
+        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = await self._generate_selectors_with_abis_from_abis(self.get_multisend_abis())
 
     def _generate_selectors_with_abis_from_abi(
         self, abi: Sequence[ABIFunction]
@@ -120,29 +112,16 @@ class DataDecoderService:
             ).items()
         }
 
-    def _generate_selectors_with_abis_from_abis_sync(
-        self, abis: Sequence[ABIFunction]
-    ) -> dict[bytes, ABIFunction]:
-        """
-        :param abis: Contract ABIs. Last ABIs on the Sequence have preference if there's a collision on the
-        selector
-        :return: Dictionary with function selector as bytes and the function abi
-        """
-        return {
-            fn_selector: fn_abi
-            for supported_abi in abis
-            for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(
-                supported_abi
-            ).items()
-        }
-
-    async def get_supported_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
+    async def get_supported_abis(self, session: AsyncSession) -> AsyncIterator[Sequence[ABIFunction]]:
         """
         :return: Every ABI in the database
         """
-        return Abi.get_abis_sorted_by_relevance(self.session)
+        return Abi.get_abis_sorted_by_relevance(session)
 
-    @lru_cache(maxsize=2048)
+    async def get_multisend_abis(self) -> AsyncIterator[Sequence[ABIFunction]]:
+        yield get_multi_send_contract(self.dummy_w3).abi
+
+    # @lru_cache(maxsize=2048)
     async def get_contract_abi(self, address: Address) -> list[ABIFunction] | None:
         """
         Retrieves the ABI for the contract at the given address.
@@ -150,15 +129,16 @@ class DataDecoderService:
         :param address: Contract address
         :return: List of ABI data if found, `None` otherwise.
         """
-        return Contract.get_abis_sorted_by_relevance(self.session, HexBytes(address))
+        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+            return await Contract.get_abi_by_contract_address(session, HexBytes(address))
 
-    @lru_cache(maxsize=2048)
-    def get_contract_fallback_function(self, address: Address) -> ABIFunction | None:
+    # @lru_cache(maxsize=2048)
+    async def get_contract_fallback_function(self, address: Address) -> ABIFunction | None:
         """
         :param address: Contract address
         :return: Fallback ABIFunction if found, `None` otherwise.
         """
-        abi = self.get_contract_abi(address)
+        abi = await self.get_contract_abi(address)
         if abi:
             return next(
                 (
@@ -169,19 +149,19 @@ class DataDecoderService:
                 None,
             )
 
-    @lru_cache(maxsize=2048)
-    def get_contract_abi_selectors_with_functions(
+    # @lru_cache(maxsize=2048)
+    async def get_contract_abi_selectors_with_functions(
         self, address: Address
     ) -> dict[bytes, ABIFunction] | None:
         """
         :param address: Contract address
         :return: Dictionary of function selects with ABIFunction if found, `None` otherwise
         """
-        abi = self.get_contract_abi(address)
+        abi = await self.get_contract_abi(address)
         if abi:
             return self._generate_selectors_with_abis_from_abi(abi)
 
-    def get_abi_function(
+    async def get_abi_function(
         self, data: bytes, address: Address | None = None
     ) -> ABIFunction | None:
         """
@@ -195,7 +175,7 @@ class DataDecoderService:
             # Try to use specific ABI if address provided
             if address:
                 contract_selectors_with_abis = (
-                    self.get_contract_abi_selectors_with_functions(address)
+                    await self.get_contract_abi_selectors_with_functions(address)
                 )
                 if (
                     contract_selectors_with_abis
@@ -207,7 +187,7 @@ class DataDecoderService:
             return self.fn_selectors_with_abis[selector]
         # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
         elif address:
-            return self.get_contract_fallback_function(address)
+            return await self.get_contract_fallback_function(address)
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
         """
@@ -223,7 +203,7 @@ class DataDecoderService:
             value_decoded = str(value_decoded)
         return value_decoded
 
-    def _decode_data(
+    async def _decode_data(
         self, data: bytes | str, address: Address | None = None
     ) -> tuple[str, list[tuple[str, str, Any]]]:
         """
@@ -242,7 +222,7 @@ class DataDecoderService:
 
         data = HexBytes(data)
         params = data[4:]
-        fn_abi = self.get_abi_function(data, address)
+        fn_abi = await self.get_abi_function(data, address)
         if not fn_abi:
             raise CannotDecode(data.hex())
         try:
@@ -257,7 +237,7 @@ class DataDecoderService:
 
         return fn_abi["name"], list(zip(names, types, values))
 
-    def decode_multisend_data(self, data: bytes | str) -> list[MultisendDecoded]:
+    async def decode_multisend_data(self, data: bytes | str) -> list[MultisendDecoded]:
         """
         Decodes Multisend raw data to Multisend dictionary
 
@@ -272,7 +252,7 @@ class DataDecoderService:
                     to=multisend_tx.to,
                     value=str(multisend_tx.value),
                     data=multisend_tx.data.hex() if multisend_tx.data else None,
-                    data_decoded=self.get_data_decoded(
+                    data_decoded=await self.get_data_decoded(
                         multisend_tx.data, address=multisend_tx.to
                     ),
                 )
@@ -285,7 +265,7 @@ class DataDecoderService:
                 exc_info=True,
             )
 
-    def get_data_decoded(
+    async def get_data_decoded(
         self, data: bytes | str, address: Address | None = None
     ) -> DataDecoded | None:
         """
@@ -298,14 +278,14 @@ class DataDecoderService:
         if not data:
             return None
         try:
-            fn_name, parameters = self.decode_transaction_with_types(
+            fn_name, parameters = await self.decode_transaction_with_types(
                 data, address=address
             )
             return {"method": fn_name, "parameters": parameters}
         except DataDecoderException:
             return None
 
-    def decode_parameters_data(
+    async def decode_parameters_data(
         self, data: bytes, parameters: list[ParameterDecoded]
     ) -> list[ParameterDecoded]:
         """
@@ -331,14 +311,14 @@ class DataDecoderService:
             # function execTransaction(address to, uint256 value, bytes calldata data...)
             # selector is `0x6a761202` and parameters[2] is data
             try:
-                parameters[2]["value_decoded"] = self.get_data_decoded(
+                parameters[2]["value_decoded"] = await self.get_data_decoded(
                     data, address=parameters[0]["value"]
                 )
             except DataDecoderException:
                 logger.warning("Cannot decode `execTransaction`", exc_info=True)
         return parameters
 
-    def decode_transaction_with_types(
+    async def decode_transaction_with_types(
         self, data: bytes | str, address: Address | None = None
     ) -> tuple[str, list[ParameterDecoded]]:
         """
@@ -352,16 +332,16 @@ class DataDecoderService:
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
         data = HexBytes(data)
-        fn_name, raw_parameters = self._decode_data(data, address=address)
+        fn_name, raw_parameters = await self._decode_data(data, address=address)
         # Parameters are returned as tuple, convert it to a dictionary
         parameters = [
             ParameterDecoded(name=name, type=argument_type, value=value)
             for name, argument_type, value in raw_parameters
         ]
-        nested_parameters = self.decode_parameters_data(data, parameters)
+        nested_parameters = await self.decode_parameters_data(data, parameters)
         return fn_name, nested_parameters
 
-    def decode_transaction(
+    async def decode_transaction(
         self, data: bytes | str, address: Address | None = None
     ) -> tuple[str, dict[str, Any]]:
         """
@@ -373,7 +353,7 @@ class DataDecoderService:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
-        fn_name, decoded_transactions_with_types = self.decode_transaction_with_types(
+        fn_name, decoded_transactions_with_types = await self.decode_transaction_with_types(
             data, address=address
         )
         decoded_transactions = {
