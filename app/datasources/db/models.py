@@ -10,7 +10,7 @@ from sqlmodel import (
 )
 from sqlmodel.sql._expression_select_cls import SelectBase
 
-from app.datasources.db.utils import get_md5_abi_hash
+from .utils import get_md5_abi_hash
 
 
 class SqlQueryBase:
