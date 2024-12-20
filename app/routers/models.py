@@ -24,7 +24,7 @@ class AbiPublic(BaseModel):
 
     @field_validator("abi_hash")
     @classmethod
-    def convert_bytes_to_hex(cls, abi_hash):
+    def convert_bytes_to_hex(cls, abi_hash: bytes):
         """
         Convert bytes to hex
 
@@ -49,7 +49,7 @@ class ContractsPublic(BaseModel):
 
     @field_validator("address")
     @classmethod
-    def convert_to_checksum_address(cls, address):
+    def convert_to_checksum_address(cls, address: bytes):
         """
         Convert bytes address to checksum address
 

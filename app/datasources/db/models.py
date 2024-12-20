@@ -12,6 +12,7 @@ from sqlmodel import (
 )
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3.types import ABI
+from sqlmodel.sql._expression_select_cls import SelectBase
 
 from .utils import get_md5_abi_hash
 
