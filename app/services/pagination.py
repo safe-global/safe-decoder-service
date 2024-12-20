@@ -18,7 +18,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     results: list[T]
 
 
-class PaginationParams(BaseModel):
+class PaginationQueryParams(BaseModel):
     limit: int | None = Query(None, ge=1)
     offset: int | None = Query(0, ge=0)
 
@@ -85,6 +85,7 @@ class GenericPagination:
     def serialize(self, url: URL, results: list[Any], count: int) -> PaginatedResponse:
         """
         Get serialized page of results.
+
         :param url:
         :param results:
         :param count:
