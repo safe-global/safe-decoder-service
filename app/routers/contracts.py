@@ -9,7 +9,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from ..datasources.db.database import get_database_session
 from ..datasources.db.models import Contract
 from ..services.contract import ContractService
-from ..services.pagination import GenericPagination, PaginatedResponse, PaginationParams
+from ..services.pagination import (
+    GenericPagination,
+    PaginatedResponse,
+    PaginationQueryParams,
+)
 from .models import ContractsPublic
 
 router = APIRouter(
@@ -22,7 +26,7 @@ router = APIRouter(
 async def list_contracts(
     request: Request,
     address: str,
-    pagination_params: PaginationParams = Depends(),
+    pagination_params: PaginationQueryParams = Depends(),
     chain_ids: Annotated[list[int] | None, Query()] = None,
     session: AsyncSession = Depends(get_database_session),
 ) -> PaginatedResponse[Contract]:
