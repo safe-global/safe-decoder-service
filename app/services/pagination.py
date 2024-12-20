@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from sqlalchemy import func
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.datastructures import URL
 
 T = TypeVar("T")
@@ -59,8 +60,9 @@ class GenericPagination:
             return str(url.include_query_params(limit=self.limit, offset=prev_offset))
         return None
 
-    async def get_page(self, session, query) -> list[Any]:
+    async def get_page(self, session: AsyncSession, query) -> list[Any]:
         """
+        Get from database the requested page
 
         :param session:
         :param query:
@@ -69,8 +71,9 @@ class GenericPagination:
         queryset = await session.exec(query.offset(self.offset).limit(self.limit))
         return queryset.all()
 
-    async def get_count(self, session, query) -> int:
+    async def get_count(self, session: AsyncSession, query) -> int:
         """
+        Get from database the count of rows that fit the query
 
         :param session:
         :param query:
@@ -79,7 +82,7 @@ class GenericPagination:
         count_query = await session.exec(select(func.count()).where(query._whereclause))
         return count_query.one()
 
-    def serialize(self, url: URL, results: list[T], count: int) -> PaginatedResponse:
+    def serialize(self, url: URL, results: list[Any], count: int) -> PaginatedResponse:
         """
         Get serialized page of results.
         :param url:
