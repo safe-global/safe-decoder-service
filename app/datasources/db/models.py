@@ -13,7 +13,7 @@ from sqlmodel import (
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3.types import ABI
 
-from app.datasources.db.utils import get_md5_abi_hash
+from .utils import get_md5_abi_hash
 
 
 class SqlQueryBase:

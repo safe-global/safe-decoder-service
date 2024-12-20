@@ -4,12 +4,8 @@ from fastapi import Request
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-<<<<<<< HEAD
-from ..datasources.db.models import Contract
-=======
 from app.datasources.db.models import Contract
 from app.services.pagination import GenericPagination, PaginatedResponse
->>>>>>> 2433738 (Add pagination)
 
 
 class ContractService:
