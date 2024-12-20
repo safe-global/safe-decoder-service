@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.config import settings
+from ...config import settings
 
 pool_classes = {
     NullPool.__name__: NullPool,
