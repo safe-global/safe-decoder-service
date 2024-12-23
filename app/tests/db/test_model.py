@@ -43,12 +43,12 @@ class TestModel(DbAsyncConn):
     @database_session
     async def test_abi_get_abis_sorted_by_relevance(self, session: AsyncSession):
         abi_jsons = [
-            {"name": "A Test Project with relevance 10"},
             {"name": "A Test Project with relevance 100"},
+            {"name": "A Test Project with relevance 10"},
         ]
-        abi = Abi(abi_hash=b"A Test Abi", abi_json=abi_jsons[0], relevance=10)
+        abi = Abi(abi_hash=b"A Test Abi", abi_json=abi_jsons[0], relevance=100)
         await abi.create(session)
-        abi = Abi(abi_hash=b"A Test Abi2", abi_json=abi_jsons[1], relevance=100)
+        abi = Abi(abi_hash=b"A Test Abi2", abi_json=abi_jsons[1], relevance=10)
         await abi.create(session)
         results = abi.get_abis_sorted_by_relevance(session)
         result = await anext(results)

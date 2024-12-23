@@ -2,6 +2,7 @@ from typing import cast
 
 from eth_typing import Address
 from hexbytes import HexBytes
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.contracts import (
     get_erc20_contract,
     get_multi_send_contract,
@@ -415,7 +416,9 @@ class TestDataDecoderService(DbAsyncConn):
             Web3()
             .eth.contract(abi=example_abi)
             .functions.buyDroid(4, 10)
-            .build_transaction(get_empty_tx_params())["data"]
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
         )
 
         decoder_service = DataDecoderService()
@@ -493,7 +496,9 @@ class TestDataDecoderService(DbAsyncConn):
             Web3()
             .eth.contract(abi=example_not_matched_abi)
             .functions.claimOwner()
-            .build_transaction(get_empty_tx_params())["data"]
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
         )
 
         fallback_abi = [

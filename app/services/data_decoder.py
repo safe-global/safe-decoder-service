@@ -1,6 +1,6 @@
 import logging
 from functools import cache
-from typing import Any, AsyncIterator, NotRequired, TypedDict, cast
+from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
 
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
@@ -38,7 +38,7 @@ class ParameterDecoded(TypedDict):
     name: str
     type: str
     value: Any
-    value_decoded: NotRequired[list["MultisendDecoded"] | "DataDecoded" | None]
+    value_decoded: NotRequired[Union[list["MultisendDecoded"], "DataDecoded", None]]
 
 
 class DataDecoded(TypedDict):
