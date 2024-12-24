@@ -172,6 +172,8 @@ class DataDecoderService:
         """
         abi = await self.get_contract_abi(address)
         if abi:
+            # TODO We should return that there's a fullMatch for this `data` and `address`, so we are sure
+            # we are decoding the `data` correctly
             return self._generate_selectors_with_abis_from_abi(abi)
         return None
 
