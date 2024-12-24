@@ -1,3 +1,5 @@
+from typing import AsyncIterator, cast
+
 from sqlmodel import (
     JSON,
     Column,
@@ -5,26 +7,29 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     UniqueConstraint,
+    col,
     select,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
+from web3.types import ABI
 
 
 class SqlQueryBase:
 
     @classmethod
-    async def get_all(cls, session):
+    async def get_all(cls, session: AsyncSession):
         result = await session.exec(select(cls))
         return result.all()
 
-    async def _save(self, session):
+    async def _save(self, session: AsyncSession):
         session.add(self)
         await session.commit()
         return self
 
-    async def update(self, session):
+    async def update(self, session: AsyncSession):
         return await self._save(session)
 
-    async def create(self, session):
+    async def create(self, session: AsyncSession):
         return await self._save(session)
 
 
@@ -47,6 +52,17 @@ class Abi(SqlQueryBase, SQLModel, table=True):
 
     source: AbiSource | None = Relationship(back_populates="abis")
     contracts: list["Contract"] = Relationship(back_populates="abi")
+
+    @classmethod
+    async def get_abis_sorted_by_relevance(
+        cls, session: AsyncSession
+    ) -> AsyncIterator[ABI]:
+        """
+        :return: Abi JSON, with the ones with less relevance first
+        """
+        results = await session.exec(select(cls.abi_json).order_by(col(cls.relevance)))
+        for result in results:
+            yield cast(ABI, result)
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
@@ -78,3 +94,18 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     )
     project: Project | None = Relationship(back_populates="contracts")
     chain_id: int = Field(default=None)
+
+    @classmethod
+    async def get_abi_by_contract_address(
+        cls, session: AsyncSession, address: bytes
+    ) -> ABI | None:
+        # TODO Add chain_id filter to support multichain
+        results = await session.exec(
+            select(Abi.abi_json)
+            .join(cls)
+            .where(cls.address == address)
+            .where(cls.abi_id == Abi.abi_hash)
+        )
+        if result := results.first():
+            return cast(ABI, result)
+        return None
