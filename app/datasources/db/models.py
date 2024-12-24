@@ -58,7 +58,7 @@ class Abi(SqlQueryBase, SQLModel, table=True):
         cls, session: AsyncSession
     ) -> AsyncIterator[ABI]:
         """
-        :returns: Abi JSON, with the ones with less relevance first
+        :return: Abi JSON, with the ones with less relevance first
         """
         results = await session.exec(select(cls.abi_json).order_by(col(cls.relevance)))
         for result in results:
