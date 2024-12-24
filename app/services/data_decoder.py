@@ -16,7 +16,7 @@ from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_da
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.types import ABI, ABIFunction
 
-from ..datasources.db.database import get_engine
+from ..datasources.db.database import database_session
 from ..datasources.db.models import Abi, Contract
 
 logger = logging.getLogger(__name__)
@@ -55,10 +55,10 @@ class MultisendDecoded(TypedDict):
 
 
 @cache
-async def get_data_decoder_service() -> "DataDecoderService":
-    async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-        data_decoder_service = DataDecoderService()
-        await data_decoder_service.init(session)
+@database_session
+async def get_data_decoder_service(session: AsyncSession) -> "DataDecoderService":
+    data_decoder_service = DataDecoderService()
+    await data_decoder_service.init(session)
     return data_decoder_service
 
 
@@ -128,17 +128,19 @@ class DataDecoderService:
         yield get_multi_send_contract(self.dummy_w3).abi
 
     @alru_cache(maxsize=2048)
-    async def get_contract_abi(self, address: Address) -> ABI | None:
+    @database_session
+    async def get_contract_abi(
+        self, address: Address, session: AsyncSession | None = None
+    ) -> ABI | None:
         """
         Retrieves the ABI for the contract at the given address.
 
         :param address: Contract address
+        :param session: Database session, provided by the decorator
         :return: List of ABI data if found, `None` otherwise.
         """
-        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-            return await Contract.get_abi_by_contract_address(
-                session, HexBytes(address)
-            )
+        assert session is not None
+        return await Contract.get_abi_by_contract_address(session, HexBytes(address))
 
     @alru_cache(maxsize=2048)
     async def get_contract_fallback_function(

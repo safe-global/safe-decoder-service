@@ -99,6 +99,7 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     async def get_abi_by_contract_address(
         cls, session: AsyncSession, address: bytes
     ) -> ABI | None:
+        # TODO Add chain_id filter to support multichain
         results = await session.exec(
             select(Abi.abi_json)
             .join(cls)
