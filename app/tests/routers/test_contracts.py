@@ -26,7 +26,7 @@ class TestRouterContract(DbAsyncConn):
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
         address = HexBytes(address_expected)
         contract = Contract(
-            address=address, name="A Test Contracts", chain_id=1, abi_id=abi.abi_hash
+            address=address, name="A Test Contracts", chain_id=1, abi=abi
         )
         await contract.create(session)
         response = self.client.get(
@@ -47,7 +47,7 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(results[0]["project"], None)
         # Test filter by chain_id
         contract = Contract(
-            address=address, name="A Test Contracts", chain_id=5, abi_id=abi.abi_hash
+            address=address, name="A Test Contracts", chain_id=5, abi=abi
         )
         await contract.create(session)
 
@@ -74,7 +74,7 @@ class TestRouterContract(DbAsyncConn):
                 address=address,
                 name="A Test Contracts",
                 chain_id=chain_id,
-                abi_id=abi.abi_hash,
+                abi=abi,
             )
             await contract.create(session)
 

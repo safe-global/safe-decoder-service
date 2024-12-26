@@ -92,9 +92,7 @@ class Contract(SqlQueryBase, SQLModel, table=True):
     trusted_for_delegate: bool = Field(nullable=False, default=False)
     proxy: bool = Field(nullable=False, default=False)
     fetch_retries: int = Field(nullable=False, default=0)
-    abi_id: bytes | None = Field(
-        nullable=True, default=None, foreign_key="abi.abi_hash"
-    )
+    abi_id: int | None = Field(nullable=True, default=None, foreign_key="abi.id")
     abi: Abi | None = Relationship(
         back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
     )
@@ -134,7 +132,7 @@ class Contract(SqlQueryBase, SQLModel, table=True):
             select(Abi.abi_json)
             .join(cls)
             .where(cls.address == address)
-            .where(cls.abi_id == Abi.abi_hash)
+            .where(cls.abi_id == Abi.id)
         )
         if result := results.first():
             return cast(ABI, result)
