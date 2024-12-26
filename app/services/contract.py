@@ -3,7 +3,7 @@ from typing import Sequence, Tuple
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.models import Contract
-from app.services.pagination import GenericPagination, PaginatedResponse
+from app.services.pagination import GenericPagination
 
 
 class ContractService:

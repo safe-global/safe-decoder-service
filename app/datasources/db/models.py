@@ -1,4 +1,4 @@
-from typing import AsyncIterator, cast, Sequence
+from typing import AsyncIterator, cast
 
 from sqlmodel import (
     JSON,
@@ -11,8 +11,8 @@ from sqlmodel import (
     select,
 )
 from sqlmodel.ext.asyncio.session import AsyncSession
-from web3.types import ABI
 from sqlmodel.sql._expression_select_cls import SelectBase
+from web3.types import ABI
 
 from .utils import get_md5_abi_hash
 
