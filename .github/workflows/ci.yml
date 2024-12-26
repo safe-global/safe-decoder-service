@@ -76,6 +76,11 @@ jobs:
         pip install -r requirements/dev.txt coveralls
       env:
         PIP_USE_MIRRORS: true
+    - name: Run database migrations
+      run: |
+        alembic upgrade head
+      env:
+        ENV_FILE: .env.test
     - name: Run mypy
       run: mypy .
     - name: Run tests and coverage

@@ -9,5 +9,7 @@ docker compose -f docker-compose.yml up --no-start redis db rabbitmq
 docker compose -f docker-compose.yml start redis db rabbitmq
 
 sleep 10
-
+# Run migrations
+alembic upgrade head
+# Run tests
 pytest -rxXs
