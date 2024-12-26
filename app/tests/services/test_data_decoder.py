@@ -16,7 +16,7 @@ from web3 import Web3
 from web3.types import ABI
 
 from ...datasources.db.database import database_session
-from ...datasources.db.models import Abi, Contract
+from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
     CannotDecode,
     DataDecoderService,
@@ -42,6 +42,8 @@ class TestDataDecoderService(DbAsyncConn):
     @staticmethod
     async def _store_safe_contract_abi(session: AsyncSession):
         dummy_web3 = Web3()
+        source = AbiSource(name="local", url="")
+        await source.create(session)
         erc20_contract = get_erc20_contract(dummy_web3)
         safe_v1_1_1_contract = get_safe_V1_1_1_contract(dummy_web3)
         safe_v1_4_1_contract = get_safe_V1_4_1_contract(dummy_web3)
@@ -49,35 +51,60 @@ class TestDataDecoderService(DbAsyncConn):
 
         # Add Safe Contract Abi and decode it
         for abi in (
-            Abi(abi_hash=b"ERC20Contract", abi_json=erc20_contract.abi, relevance=150),
+            Abi(
+                abi_hash=b"ERC20Contract",
+                abi_json=erc20_contract.abi,
+                relevance=150,
+                source_id=source.id,
+            ),
             Abi(
                 abi_hash=b"SafeContractV1_1_1_ABI",
                 abi_json=safe_v1_1_1_contract.abi,
                 relevance=100,
+                source_id=source.id,
             ),
             Abi(
                 abi_hash=b"SafeContractV1_4_1_ABI",
                 abi_json=safe_v1_4_1_contract.abi,
                 relevance=100,
+                source_id=source.id,
             ),
             Abi(
                 abi_hash=b"MultiSendContractABI",
                 abi_json=multisend_contract.abi,
                 relevance=100,
+                source_id=source.id,
             ),
             Abi(
                 abi_hash=b"GnosisProtocolABI",
                 abi_json=gnosis_protocol_abi,
                 relevance=50,
+                source_id=source.id,
             ),
             Abi(
                 abi_hash=b"FleetFactoryDeterministic",
                 abi_json=fleet_factory_deterministic_abi,
                 relevance=50,
+                source_id=source.id,
             ),
-            Abi(abi_hash=b"FleetFactory", abi_json=fleet_factory_abi, relevance=50),
-            Abi(abi_hash=b"cTokenABI", abi_json=ctoken_abi, relevance=50),
-            Abi(abi_hash=b"comptrollerABI", abi_json=comptroller_abi, relevance=50),
+            Abi(
+                abi_hash=b"FleetFactory",
+                abi_json=fleet_factory_abi,
+                relevance=50,
+                source_id=source.id,
+            ),
+            Abi(
+                abi_hash=b"cTokenABI",
+                abi_json=ctoken_abi,
+                relevance=50,
+                source_id=source.id,
+            ),
+            Abi(
+                abi_hash=b"comptrollerABI",
+                abi_json=comptroller_abi,
+                relevance=50,
+                source_id=source.id,
+            ),
         ):
             await abi.create(session)
 
@@ -432,9 +459,15 @@ class TestDataDecoderService(DbAsyncConn):
         fn_name, arguments = await decoder_service.decode_transaction(example_data)
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
-
+        source = AbiSource(name="local", url="")
+        await source.create(session)
         # Test load a new DbTxDecoder
-        abi = Abi(abi_hash=b"ExampleABI", abi_json=example_abi, relevance=100)
+        abi = Abi(
+            abi_hash=b"ExampleABI",
+            abi_json=example_abi,
+            relevance=100,
+            source_id=source.id,
+        )
         await abi.create(session)
         decoder_service = DataDecoderService()
         await decoder_service.init(session)
@@ -467,7 +500,12 @@ class TestDataDecoderService(DbAsyncConn):
             ],
         )
 
-        abi = Abi(abi_hash=b"SwappedABI", abi_json=swapped_abi, relevance=100)
+        abi = Abi(
+            abi_hash=b"SwappedABI",
+            abi_json=swapped_abi,
+            relevance=100,
+            source_id=source.id,
+        )
         await abi.create(session)
         contract = Contract(address=b"c", abi=abi, name="SwappedContract", chain_id=1)
         await contract.create(session)
@@ -507,9 +545,13 @@ class TestDataDecoderService(DbAsyncConn):
 
         decoder_service = DataDecoderService()
         await decoder_service.init(session)
-
+        source = AbiSource(name="local", url="")
+        await source.create(session)
         contract_fallback_abi = Abi(
-            abi_hash=b"SwappedABI", abi_json=fallback_abi, relevance=100
+            abi_hash=b"SwappedABI",
+            abi_json=fallback_abi,
+            relevance=100,
+            source_id=source.id,
         )
         await contract_fallback_abi.create(session)
         contract_fallback = Contract(

@@ -16,7 +16,11 @@ class TestModel(DbAsyncConn):
     @database_session
     async def test_contract_get_abi_by_contract_address(self, session: AsyncSession):
         abi_json = {"name": "A Test Project with relevance 10"}
-        abi = Abi(abi_hash=b"A Test Abi", abi_json=abi_json, relevance=10)
+        source = AbiSource(name="local", url="")
+        await source.create(session)
+        abi = Abi(
+            abi_hash=b"A Test Abi", abi_json=abi_json, relevance=10, source_id=source.id
+        )
         await abi.create(session)
         contract = Contract(address=b"a", name="A test contract", chain_id=1, abi=abi)
         await contract.create(session)
@@ -51,9 +55,21 @@ class TestModel(DbAsyncConn):
             {"name": "A Test Project with relevance 100"},
             {"name": "A Test Project with relevance 10"},
         ]
-        abi = Abi(abi_hash=b"A Test Abi", abi_json=abi_jsons[0], relevance=100)
+        source = AbiSource(name="A Test Source", url="https://test.com")
+        await source.create(session)
+        abi = Abi(
+            abi_hash=b"A Test Abi",
+            abi_json=abi_jsons[0],
+            relevance=100,
+            source_id=source.id,
+        )
         await abi.create(session)
-        abi = Abi(abi_hash=b"A Test Abi2", abi_json=abi_jsons[1], relevance=10)
+        abi = Abi(
+            abi_hash=b"A Test Abi2",
+            abi_json=abi_jsons[1],
+            relevance=10,
+            source_id=source.id,
+        )
         await abi.create(session)
         results = abi.get_abis_sorted_by_relevance(session)
         result = await anext(results)
