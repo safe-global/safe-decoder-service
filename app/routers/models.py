@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, field_validator
 
 from safe_eth.eth.utils import ChecksumAddress, fast_to_checksum_address
@@ -18,6 +20,7 @@ class ProjectPublic(BaseModel):
 class AbiPublic(BaseModel):
     abi_json: list[dict] | dict | None
     abi_hash: bytes | str
+    modified: datetime
 
     class Config:
         from_attributes = True
@@ -43,6 +46,7 @@ class ContractsPublic(BaseModel):
     chain_id: int
     project: ProjectPublic | None
     abi: AbiPublic | None
+    modified: datetime
 
     class Config:
         from_attributes = True

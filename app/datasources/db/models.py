@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import AsyncIterator, cast
 
 from sqlmodel import (
@@ -36,6 +37,27 @@ class SqlQueryBase:
         return await self._save(session)
 
 
+class TimeStampedSQLModel(SQLModel):
+    """
+    An abstract base class model that provides self-updating
+    ``created`` and ``modified`` fields.
+
+    """
+
+    created: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )
+
+    modified: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={
+            "onupdate": lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        },
+    )
+
+
 class AbiSource(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
@@ -44,7 +66,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
     abis: list["Abi"] = Relationship(back_populates="source")
 
 
-class Abi(SqlQueryBase, SQLModel, table=True):
+class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
     relevance: int | None = Field(nullable=False, default=0)
@@ -79,7 +101,7 @@ class Project(SqlQueryBase, SQLModel, table=True):
     contracts: list["Contract"] = Relationship(back_populates="project")
 
 
-class Contract(SqlQueryBase, SQLModel, table=True):
+class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("address", "chain_id", name="address_chain_unique"),
     )
