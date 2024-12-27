@@ -112,7 +112,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     display_name: str | None = None
     description: str | None = None
     trusted_for_delegate: bool = Field(nullable=False, default=False)
-    proxy: bool = Field(nullable=False, default=False)
+    implementation: bytes | None = None
     fetch_retries: int = Field(nullable=False, default=0)
     abi_id: int | None = Field(nullable=True, default=None, foreign_key="abi.id")
     abi: Abi | None = Relationship(

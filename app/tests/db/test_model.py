@@ -8,7 +8,9 @@ from app.tests.db.db_async_conn import DbAsyncConn
 class TestModel(DbAsyncConn):
     @database_session
     async def test_contract(self, session: AsyncSession):
-        contract = Contract(address=b"a", name="A test contract", chain_id=1)
+        contract = Contract(
+            address=b"a", name="A test contract", chain_id=1, implementation=b"a"
+        )
         await contract.create(session)
         result = await contract.get_all(session)
         self.assertEqual(result[0], contract)
