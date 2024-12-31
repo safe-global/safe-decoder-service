@@ -65,12 +65,35 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
     abis: list["Abi"] = Relationship(back_populates="source")
 
+    @classmethod
+    async def get_or_create(
+        cls, session: AsyncSession, name: str, url: str
+    ) -> tuple["AbiSource", bool]:
+        """
+        Checks if an AbiSource with the given 'name' and 'url' exists.
+        If found, returns it with False. If not, creates and returns it with True.
+
+        :param session: The database session.
+        :param name: The name to check or create.
+        :param url: The URL to check or create.
+        :return: A tuple containing the AbiSource object and a boolean indicating
+                 whether it was created (True) or already exists (False).
+        """
+        query = select(cls).where(cls.name == name, cls.url == url)
+        results = await session.exec(query)
+        if result := results.first():
+            return result, False
+        else:
+            new_item = cls(name=name, url=url)
+            await new_item.create(session)
+            return new_item, True
+
 
 class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
     relevance: int | None = Field(nullable=False, default=0)
-    abi_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    abi_json: list[dict] | dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
         nullable=False, default=None, foreign_key="abisource.id"
     )
@@ -92,6 +115,30 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     async def create(self, session):
         self.abi_hash = get_md5_abi_hash(self.abi_json)
         return await self._save(session)
+
+    @classmethod
+    async def get_abi(
+        cls,
+        session: AsyncSession,
+        abi_json: list[dict] | dict,
+    ):
+        """
+        Checks if an Abi exists based on the 'abi_json' by its calculated 'abi_hash'.
+        If it exists, returns the existing Abi. If not,
+        returns None.
+
+        :param session: The database session.
+        :param abi_json: The ABI JSON to check.
+        :return: The Abi object if it exists, or None if it doesn't.
+        """
+        abi_hash = get_md5_abi_hash(abi_json)
+        query = select(cls).where(cls.abi_hash == abi_hash)
+        result = await session.exec(query)
+
+        if existing_abi := result.first():
+            return existing_abi
+
+        return None
 
 
 class Project(SqlQueryBase, SQLModel, table=True):

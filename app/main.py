@@ -8,6 +8,7 @@ from . import VERSION
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, default
+from .services.abis import AbiService
 from .services.events import EventsService
 
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
     """
     queue_provider = QueueProvider()
     consume_task = None
+    abi_service = AbiService()
     try:
         loop = asyncio.get_running_loop()
         try:
@@ -31,6 +33,7 @@ async def lifespan(app: FastAPI):
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
+        await abi_service.load_local_abis_in_database()
         yield
     finally:
         if consume_task:
