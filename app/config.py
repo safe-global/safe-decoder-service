@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     BLOCKSCOUT_API_KEY: str = ""
     BLOCKSCOUT_MAX_REQUESTS: int = 1000
     SOURCIFY_API_KEY: str = ""
-    SOURCIFY_MAX_REQUESTS: int = 2
+    SOURCIFY_MAX_REQUESTS: int = 100
 
 
 settings = Settings()

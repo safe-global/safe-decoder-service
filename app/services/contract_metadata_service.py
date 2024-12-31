@@ -1,43 +1,40 @@
-import asyncio
 import logging
 from functools import cache
-from typing import Optional, Type
 
 from eth_typing import ChecksumAddress
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import (
-    BlockscoutClient,
+    AsyncBlockscoutClient,
+    AsyncSourcifyClient,
     BlockScoutConfigurationProblem,
     ContractMetadata,
-    EtherscanClient,
     EtherscanClientConfigurationProblem,
-    SourcifyClient,
+    EtherscanRateLimitError,
     SourcifyClientConfigurationProblem,
 )
-from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-class PoolContractClient:
+@cache
+def get_contract_metadata_service():
+    return ContractMetadataService(settings.ETHERSCAN_API_KEY)
 
-    def __init__(
-        self,
-        client_class: (
-            Type[EtherscanClient] | Type[BlockscoutClient] | Type[SourcifyClient]
-        ),
-        api_key,
-        max_requests: int,
-    ):
-        self.client_class = client_class
-        self.api_key = api_key
-        self.semaphore = asyncio.Semaphore(max_requests)
 
-    def _get_etherscan_client(self, chain_id: int) -> Optional[EtherscanClient]:
+class ContractMetadataService:
+    def __init__(self, etherscan_api_key: str):
+        self.etherscan_api_key = etherscan_api_key
+
+    def _get_etherscan_client(self, chain_id: int) -> AsyncEtherscanClientV2 | None:
         try:
-            return EtherscanClient(EthereumNetwork(chain_id), api_key=self.api_key)
+            return AsyncEtherscanClientV2(
+                EthereumNetwork(chain_id),
+                api_key=self.etherscan_api_key,
+                max_requests=settings.ETHERSCAN_MAX_REQUESTS,
+            )
         except EtherscanClientConfigurationProblem:
             logger.warning(
                 "Etherscan client is not available for current network %s",
@@ -45,9 +42,11 @@ class PoolContractClient:
             )
             return None
 
-    def _get_blockscout_client(self, chain_id: int) -> Optional[BlockscoutClient]:
+    def _get_blockscout_client(self, chain_id: int) -> AsyncBlockscoutClient | None:
         try:
-            return BlockscoutClient(EthereumNetwork(chain_id))
+            return AsyncBlockscoutClient(
+                EthereumNetwork(chain_id), max_requests=settings.BLOCKSCOUT_MAX_REQUESTS
+            )
         except BlockScoutConfigurationProblem:
             logger.warning(
                 "Blockscout client is not available for current network %s",
@@ -55,9 +54,11 @@ class PoolContractClient:
             )
             return None
 
-    def _get_sourcify_client(self, chain_id: int) -> Optional[SourcifyClient]:
+    def _get_sourcify_client(self, chain_id: int) -> AsyncSourcifyClient | None:
         try:
-            return SourcifyClient(EthereumNetwork(chain_id))
+            return AsyncSourcifyClient(
+                EthereumNetwork(chain_id), max_requests=settings.SOURCIFY_MAX_REQUESTS
+            )
         except SourcifyClientConfigurationProblem:
             logger.warning(
                 "Sourcify client is not available for current network %s",
@@ -66,79 +67,45 @@ class PoolContractClient:
             return None
 
     @cache
-    def get_client(
+    def enabled_clients(
         self, chain_id: int
-    ) -> EtherscanClient | BlockscoutClient | SourcifyClient | None:
-        if self.client_class is EtherscanClient:
-            return self._get_etherscan_client(chain_id)
-        elif self.client_class is BlockscoutClient:
-            return self._get_blockscout_client(chain_id)
-        elif self.client_class is SourcifyClient:
-            return self._get_sourcify_client(chain_id)
+    ) -> list[AsyncEtherscanClientV2 | AsyncBlockscoutClient | AsyncSourcifyClient]:
+        """
+        Return a list of available chains for the provided chain_id.
+        First etherscan, second sourcify, third blockscout.
 
-        return None
-
-    async def get_contract_metadata(
-        self, contract_address: ChecksumAddress | str, chain_id: int
-    ) -> Optional[ContractMetadata]:
-        if not (client := self.get_client(chain_id)):
-            return None
-        async with self.semaphore:
-            contract_metadata = client.get_contract_metadata(
-                fast_to_checksum_address(contract_address)
-            )
-            return contract_metadata
-
-
-@cache
-def get_contract_metadata_service():
-    return ContractMetadataService()
-
-
-class ContractMetadataService:
-    def __init__(self):
-        self.etherscan_client = PoolContractClient(
-            EtherscanClient,
-            api_key=settings.ETHERSCAN_API_KEY,
-            max_requests=settings.ETHERSCAN_MAX_REQUESTS,
-        )
-        self.blockscout_client = PoolContractClient(
-            BlockscoutClient,
-            api_key=settings.BLOCKSCOUT_API_KEY,
-            max_requests=settings.BLOCKSCOUT_MAX_REQUESTS,
-        )
-        self.sourcify_client = PoolContractClient(
-            SourcifyClient,
-            api_key=settings.SOURCIFY_API_KEY,
-            max_requests=settings.SOURCIFY_MAX_REQUESTS,
-        )
-        self.enabled_clients = [
-            client
-            for client in (
-                self.sourcify_client,
-                self.etherscan_client,
-                self.blockscout_client,
-            )
-            if client
-        ]
+        :param chain_id:
+        :return:
+        """
+        enabled_clients: list[
+            AsyncEtherscanClientV2 | AsyncBlockscoutClient | AsyncSourcifyClient
+        ] = []
+        if etherscan_client := self._get_etherscan_client(chain_id):
+            enabled_clients.append(etherscan_client)
+        if sourcify_client := self._get_sourcify_client(chain_id):
+            enabled_clients.append(sourcify_client)
+        if blockscout_client := self._get_blockscout_client(chain_id):
+            enabled_clients.append(blockscout_client)
+        return enabled_clients
 
     async def get_contract_metadata(
-        self, contract_address: ChecksumAddress | str, chain_id: int
-    ) -> Optional[ContractMetadata]:
+        self, contract_address: ChecksumAddress, chain_id: int
+    ) -> ContractMetadata | None:
         """
         Get contract metadata from every enabled client
 
+        :param chain_id:
         :param contract_address: Contract address
         :return: Contract Metadata if found from any client, otherwise None
         """
-        for client in self.enabled_clients:
+        for client in self.enabled_clients(chain_id):
             try:
-                contract_metadata = await client.get_contract_metadata(
-                    contract_address, chain_id
+                contract_metadata = await client.async_get_contract_metadata(
+                    contract_address
                 )
                 if contract_metadata:
                     return contract_metadata
-            except IOError:
+            except (IOError, EtherscanRateLimitError):
                 logger.debug(
                     "Cannot get metadata for contract=%s on network=%s using client=%s",
                     contract_address,
