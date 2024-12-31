@@ -1,4 +1,6 @@
+import enum
 import logging
+from dataclasses import dataclass
 from functools import cache
 
 from eth_typing import ChecksumAddress
@@ -17,6 +19,20 @@ from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class ClientSource(enum.Enum):
+    ETHERSCAN = "Etherscan"
+    SOURCIFY = "Sourcify"
+    BLOCKSCOUT = "Blockscout"
+
+
+@dataclass
+class EnhancedContractMetadata:
+    address: ChecksumAddress
+    metadata: ContractMetadata | None
+    source: ClientSource | None
+    chain_id: int
 
 
 @cache
@@ -88,9 +104,21 @@ class ContractMetadataService:
             enabled_clients.append(blockscout_client)
         return enabled_clients
 
+    @staticmethod
+    @cache
+    def get_client_enum(
+        client: AsyncEtherscanClientV2 | AsyncSourcifyClient | AsyncBlockscoutClient,
+    ) -> ClientSource:
+        if isinstance(client, AsyncEtherscanClientV2):
+            return ClientSource.ETHERSCAN
+        elif isinstance(client, AsyncSourcifyClient):
+            return ClientSource.SOURCIFY
+        elif isinstance(client, AsyncBlockscoutClient):
+            return ClientSource.BLOCKSCOUT
+
     async def get_contract_metadata(
         self, contract_address: ChecksumAddress, chain_id: int
-    ) -> ContractMetadata | None:
+    ) -> EnhancedContractMetadata:
         """
         Get contract metadata from every enabled client
 
@@ -104,7 +132,14 @@ class ContractMetadataService:
                     contract_address
                 )
                 if contract_metadata:
-                    return contract_metadata
+
+                    return EnhancedContractMetadata(
+                        address=contract_address,
+                        metadata=contract_metadata,
+                        source=self.get_client_enum(client),
+                        chain_id=chain_id,
+                    )
+
             except (IOError, EtherscanRateLimitError):
                 logger.debug(
                     "Cannot get metadata for contract=%s on network=%s using client=%s",
@@ -113,4 +148,14 @@ class ContractMetadataService:
                     client.__class__.__name__,
                 )
 
-        return None
+        return EnhancedContractMetadata(
+            address=contract_address, metadata=None, source=None, chain_id=chain_id
+        )
+
+    async def process_contract_metadata(
+        self, metadata: EnhancedContractMetadata
+    ) -> bool:
+        # TODO process and insert ABI if exist otherwise update the fetch retries
+        if metadata:
+            return True
+        return False

@@ -57,32 +57,43 @@ class TestContractMetadataService(unittest.IsolatedAsyncioTestCase):
         blockscout_get_contract_metadata_mock.return_value = blockscout_metadata_mock
 
         random_address = Account.create().address
+        contract_data = await self.contract_metadata_service.get_contract_metadata(
+            random_address, chain_id
+        )
         self.assertEqual(
-            await self.contract_metadata_service.get_contract_metadata(
-                random_address, chain_id
-            ),
+            contract_data.metadata,
             etherscan_metadata_mock,
         )
+        self.assertEqual(contract_data.source.value, "Etherscan")
+
         etherscan_get_contract_metadata_mock.return_value = None
+        contract_data = await self.contract_metadata_service.get_contract_metadata(
+            random_address, chain_id
+        )
+        self.assertEqual(contract_data.address, random_address)
         self.assertEqual(
-            await self.contract_metadata_service.get_contract_metadata(
-                random_address, chain_id
-            ),
+            contract_data.metadata,
             sourcify_metadata_mock,
         )
+        self.assertEqual(contract_data.source.value, "Sourcify")
+
         sourcify_get_contract_metadata_mock.side_effect = IOError
+        contract_data = await self.contract_metadata_service.get_contract_metadata(
+            random_address, chain_id
+        )
         self.assertEqual(
-            await self.contract_metadata_service.get_contract_metadata(
-                random_address, chain_id
-            ),
+            contract_data.metadata,
             blockscout_metadata_mock,
         )
+        self.assertEqual(contract_data.source.value, "Blockscout")
 
         blockscout_get_contract_metadata_mock.side_effect = IOError
+        contract_data = await self.contract_metadata_service.get_contract_metadata(
+            random_address, chain_id
+        )
+        self.assertIsNotNone(contract_data)
         self.assertIsNone(
-            await self.contract_metadata_service.get_contract_metadata(
-                random_address, chain_id
-            )
+            contract_data.metadata,
         )
 
     async def test_multichain_contract_metadata(self):
@@ -97,7 +108,9 @@ class TestContractMetadataService(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertIsNotNone(metadata_gnosis_chain)
-        self.assertEqual(metadata_gnosis_chain, metadata_mainnet)
+        self.assertEqual(metadata_gnosis_chain.metadata, metadata_mainnet.metadata)
+        self.assertEqual(metadata_mainnet.chain_id, 1)
+        self.assertEqual(metadata_gnosis_chain.chain_id, 100)
 
     @mock.patch.object(AsyncBlockscoutClient, "__init__", return_value=None)
     @mock.patch.object(AsyncSourcifyClient, "__init__", return_value=None)
