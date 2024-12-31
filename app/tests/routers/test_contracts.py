@@ -42,9 +42,11 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(results[0]["address"], address_expected)
         self.assertEqual(results[0]["abi"]["abi_json"], mock_abi_json)
         self.assertEqual(results[0]["abi"]["abi_hash"], "0xb4b61541")
+        self.assertEqual(results[0]["abi"]["modified"], abi.modified.isoformat())
         self.assertEqual(results[0]["display_name"], None)
         self.assertEqual(results[0]["chain_id"], 1)
         self.assertEqual(results[0]["project"], None)
+        self.assertEqual(results[0]["modified"], contract.modified.isoformat())
         # Test filter by chain_id
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=5, abi=abi

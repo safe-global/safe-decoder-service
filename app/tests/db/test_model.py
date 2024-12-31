@@ -8,7 +8,9 @@ from app.tests.db.db_async_conn import DbAsyncConn
 class TestModel(DbAsyncConn):
     @database_session
     async def test_contract(self, session: AsyncSession):
-        contract = Contract(address=b"a", name="A test contract", chain_id=1)
+        contract = Contract(
+            address=b"a", name="A test contract", chain_id=1, implementation=b"a"
+        )
         await contract.create(session)
         result = await contract.get_all(session)
         self.assertEqual(result[0], contract)
@@ -92,3 +94,24 @@ class TestModel(DbAsyncConn):
         result = await abi.get_all(session)
         self.assertEqual(result[0], abi)
         self.assertEqual(result[0].source, abi_source)
+
+    @database_session
+    async def test_timestamped_model(self, session: AsyncSession):
+        contract = Contract(address=b"a", name="A test contract", chain_id=1)
+        contract_created_date = contract.created
+        contract_modified_date = contract.modified
+        await contract.create(session)
+        result = await contract.get_all(session)
+        self.assertEqual(result[0], contract)
+        self.assertEqual(result[0].created, contract_created_date)
+        self.assertEqual(result[0].modified, contract_modified_date)
+
+        contract_modified_name = "A test contract updated"
+        contract.name = contract_modified_name
+        await contract.update(session)
+        result_updated = await contract.get_all(session)
+
+        self.assertEqual(result_updated[0].name, contract_modified_name)
+        self.assertEqual(result_updated[0].created, contract_created_date)
+        self.assertNotEqual(result_updated[0].modified, contract_modified_date)
+        self.assertTrue(contract_modified_date < result_updated[0].modified)
