@@ -30,7 +30,7 @@ from ...services.data_decoder import (
     UnexpectedProblemDecoding,
     get_data_decoder_service,
 )
-from ..db.db_async_conn import DbAsyncConn
+from ..datasources.db.db_async_conn import DbAsyncConn
 from .mocks_data_decoder import (
     exec_transaction_data_mock,
     exec_transaction_decoded_mock,

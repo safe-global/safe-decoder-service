@@ -73,7 +73,7 @@ class AbiService:
         abi_jsons: list[Sequence[ABIFunction | ABIEvent]],
         relevance: int,
         abi_source: AbiSource,
-    ):
+    ) -> None:
         for abi_json in abi_jsons:
             abi = await Abi.get_abi(session, cast(list[dict], abi_json))
             if abi is None:
@@ -82,7 +82,7 @@ class AbiService:
                 ).create(session)
 
     @database_session
-    async def load_local_abis_in_database(self, session: AsyncSession):
+    async def load_local_abis_in_database(self, session: AsyncSession) -> None:
         abi_source, _ = await AbiSource.get_or_create(
             session, "localstorage", "decoder-service"
         )
