@@ -2,8 +2,10 @@ import enum
 import logging
 from dataclasses import dataclass
 from functools import cache
+from typing import cast
 
 from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import (
     AsyncBlockscoutClient,
@@ -15,8 +17,10 @@ from safe_eth.eth.clients import (
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
+from app.datasources.db.models import Abi, AbiSource, Contract
 
 logger = logging.getLogger(__name__)
 
@@ -152,10 +156,33 @@ class ContractMetadataService:
             address=contract_address, metadata=None, source=None, chain_id=chain_id
         )
 
+    @staticmethod
     async def process_contract_metadata(
-        self, metadata: EnhancedContractMetadata
-    ) -> bool:
-        # TODO process and insert ABI if exist otherwise update the fetch retries
-        if metadata:
-            return True
-        return False
+        session: AsyncSession, contract_metadata: EnhancedContractMetadata
+    ) -> None:
+        contract, _ = await Contract.get_or_create(
+            session=session,
+            address=HexBytes(contract_metadata.address),
+            chain_id=contract_metadata.chain_id,
+        )
+        if contract_metadata.metadata:
+            if contract_metadata.source:
+                source = await AbiSource.get_abi_source(
+                    session, name=cast(str, contract_metadata.source.value)
+                )
+                if source is None:
+                    logging.error(
+                        f"Abi source {contract_metadata.source.value} does not exist"
+                    )
+                    return None
+            abi, _ = await Abi.get_or_create_abi(
+                session,
+                abi_json=contract_metadata.metadata.abi,
+                source_id=source.id,
+            )
+            contract.abi_id = abi.id
+            contract.name = contract_metadata.metadata.name
+        else:
+            contract.fetch_retries += 1
+
+        await contract.update(session=session)
