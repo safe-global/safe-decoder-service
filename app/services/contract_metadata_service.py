@@ -219,7 +219,7 @@ class ContractMetadataService:
         redis = get_redis()
         cache_key = f"get_contract_retries:{contract_address}:{chain_id}:{retries}"
         # Try from cache first
-        cached_retries = await redis.get(cache_key)
+        cached_retries = cast(str, redis.get(cache_key))
         if cached_retries:
             return bool(int(cached_retries))
         else:
