@@ -21,8 +21,9 @@ from app.services.contract_metadata_service import (
     ContractMetadataService,
     EnhancedContractMetadata,
 )
-from app.tests.db.db_async_conn import DbAsyncConn
-from app.tests.mocks.contract_metadata_mocks import (
+
+from ..datasources.db.db_async_conn import DbAsyncConn
+from ..mocks.contract_metadata_mocks import (
     blockscout_metadata_mock,
     etherscan_metadata_mock,
     sourcify_metadata_mock,

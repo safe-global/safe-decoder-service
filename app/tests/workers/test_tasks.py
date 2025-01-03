@@ -9,8 +9,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Contract
-from app.tests.db.db_async_conn import DbAsyncConn
 from app.workers.tasks import get_contract_metadata_task, redis_broker, test_task
+
+from ..datasources.db.db_async_conn import DbAsyncConn
 
 
 class TestTasks(unittest.TestCase):
