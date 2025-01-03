@@ -39,7 +39,9 @@ async def get_contract_metadata_task(
 ) -> None:
     contract_metadata_service = get_contract_metadata_service()
     # Just try the first time, following retries should be scheduled
-    if contract_metadata_service.should_attempt_download(session, address, chain_id, 0):
+    if await contract_metadata_service.should_attempt_download(
+        session, address, chain_id, 0
+    ):
         logging.info(
             f"Downloading contract metadata for {address} and chain {chain_id}"
         )

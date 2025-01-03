@@ -215,7 +215,7 @@ class TestContractMetadataService(DbAsyncConn):
             )
         )
         contract.fetch_retries += 1
-        contract.update(session)
+        await contract.update(session)
         self.assertFalse(
             await ContractMetadataService.should_attempt_download(
                 session, fast_to_checksum_address(random_address), 1, 0

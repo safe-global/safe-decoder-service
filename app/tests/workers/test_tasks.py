@@ -2,7 +2,6 @@ import json
 import unittest
 from typing import Any, Awaitable
 
-import pytest
 from dramatiq.worker import Worker
 from hexbytes import HexBytes
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -54,12 +53,20 @@ class TestTasks(unittest.TestCase):
 
 class TestAsyncTasks(DbAsyncConn):
 
-    @pytest.mark.skip("Failing due dramatiq AsyncIO")
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.worker = Worker(redis_broker)
+        self.worker.start()
+
+    async def asyncTearDown(self):
+        await super().asyncTearDown()
+        self.worker.stop()
+
     @database_session
     async def test_get_contract_metadata_task(self, session: AsyncSession):
         contract_address = "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
         chain_id = 100
-        get_contract_metadata_task.send(contract_address, chain_id)
+        get_contract_metadata_task.fn(contract_address, chain_id)
         contract = await Contract.get_contract(
             session, HexBytes(contract_address), chain_id
         )
