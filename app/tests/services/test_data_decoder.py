@@ -15,6 +15,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3.types import ABI
 
+from app.datasources.abis.compound import comptroller_abi, ctoken_abi
+from app.datasources.abis.gnosis_protocol import (
+    fleet_factory_abi,
+    fleet_factory_deterministic_abi,
+    gnosis_protocol_abi,
+)
+
 from ...datasources.db.database import database_session
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -23,14 +30,7 @@ from ...services.data_decoder import (
     UnexpectedProblemDecoding,
     get_data_decoder_service,
 )
-from ...utils.abis import (
-    comptroller_abi,
-    ctoken_abi,
-    fleet_factory_abi,
-    fleet_factory_deterministic_abi,
-    gnosis_protocol_abi,
-)
-from ..db.db_async_conn import DbAsyncConn
+from ..datasources.db.db_async_conn import DbAsyncConn
 from .mocks_data_decoder import (
     exec_transaction_data_mock,
     exec_transaction_decoded_mock,

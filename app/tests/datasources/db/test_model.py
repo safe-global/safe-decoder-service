@@ -2,7 +2,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
-from app.tests.db.db_async_conn import DbAsyncConn
+
+from .db_async_conn import DbAsyncConn
 
 
 class TestModel(DbAsyncConn):
@@ -59,6 +60,8 @@ class TestModel(DbAsyncConn):
         ]
         source = AbiSource(name="A Test Source", url="https://test.com")
         await source.create(session)
+        abi_by_abi_json = await Abi.get_abi(session, abi_jsons[0])
+        self.assertIsNone(abi_by_abi_json)
         abi = Abi(
             abi_hash=b"A Test Abi",
             abi_json=abi_jsons[0],
@@ -66,6 +69,8 @@ class TestModel(DbAsyncConn):
             source_id=source.id,
         )
         await abi.create(session)
+        abi_by_abi_json = await Abi.get_abi(session, abi_jsons[0])
+        self.assertEqual(abi_by_abi_json, abi)
         abi = Abi(
             abi_hash=b"A Test Abi2",
             abi_json=abi_jsons[1],
@@ -94,6 +99,20 @@ class TestModel(DbAsyncConn):
         result = await abi.get_all(session)
         self.assertEqual(result[0], abi)
         self.assertEqual(result[0].source, abi_source)
+
+        abi_source = AbiSource(name="A Test Source2", url="https://test-2.com")
+        created_abi_source, created = await AbiSource.get_or_create(
+            session, name="A Test Source2", url="https://test-2.com"
+        )
+        self.assertEqual(created_abi_source.name, abi_source.name)
+        self.assertEqual(created_abi_source.url, abi_source.url)
+        self.assertTrue(created)
+        retrieved_abi_source, created = await AbiSource.get_or_create(
+            session, name="A Test Source2", url="https://test-2.com"
+        )
+        self.assertEqual(retrieved_abi_source.name, abi_source.name)
+        self.assertEqual(retrieved_abi_source.url, abi_source.url)
+        self.assertFalse(created)
 
     @database_session
     async def test_timestamped_model(self, session: AsyncSession):

@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from ...datasources.db.database import database_session
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
-from ..db.db_async_conn import DbAsyncConn
+from ..datasources.db.db_async_conn import DbAsyncConn
 from ..mocks.abi_mock import mock_abi_json
 
 
