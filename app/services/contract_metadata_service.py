@@ -20,6 +20,7 @@ from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
+from app.datasources.cache.redis import get_redis
 from app.datasources.db.models import Abi, AbiSource, Contract
 
 logger = logging.getLogger(__name__)
@@ -159,12 +160,20 @@ class ContractMetadataService:
     @staticmethod
     async def process_contract_metadata(
         session: AsyncSession, contract_metadata: EnhancedContractMetadata
-    ) -> None:
+    ) -> bool:
+        """
+        Store ABI and contract if exists, otherwise update contract fetch_retries.
+
+        :param session:
+        :param contract_metadata:
+        :return:
+        """
         contract, _ = await Contract.get_or_create(
             session=session,
             address=HexBytes(contract_metadata.address),
             chain_id=contract_metadata.chain_id,
         )
+        with_metadata: bool
         if contract_metadata.metadata:
             if contract_metadata.source:
                 source = await AbiSource.get_abi_source(
@@ -174,7 +183,7 @@ class ContractMetadataService:
                     logging.error(
                         f"Abi source {contract_metadata.source.value} does not exist"
                     )
-                    return None
+                    return False
             abi, _ = await Abi.get_or_create_abi(
                 session,
                 abi_json=contract_metadata.metadata.abi,
@@ -182,7 +191,43 @@ class ContractMetadataService:
             )
             contract.abi_id = abi.id
             contract.name = contract_metadata.metadata.name
+            with_metadata = True
         else:
             contract.fetch_retries += 1
+            with_metadata = False
 
         await contract.update(session=session)
+        return with_metadata
+
+    @staticmethod
+    async def should_attempt_download(
+        session: AsyncSession,
+        contract_address: ChecksumAddress,
+        chain_id: int,
+        retries: int,
+    ):
+        """
+        Return True if fetch retries is less than the number of retries, False otherwise.
+        False is being cached to avoid query the database in the future for the same number of retries.
+
+        :param session:
+        :param contract_address:
+        :param chain_id:
+        :param retries:
+        :return:
+        """
+        redis = get_redis()
+        cache_key = f"get_contract_retries:{contract_address}:{chain_id}:{retries}"
+        # Try from cache first
+        cached_retries = await redis.get(cache_key)
+        if cached_retries:
+            return bool(int(cached_retries))
+        else:
+            contract = await Contract.get_contract(
+                session, address=HexBytes(contract_address), chain_id=chain_id
+            )
+            if contract and contract.fetch_retries > retries:
+                redis.set(cache_key, 0)
+                return False
+            else:
+                return True

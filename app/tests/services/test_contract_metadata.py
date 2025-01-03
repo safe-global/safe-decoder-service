@@ -12,6 +12,7 @@ from safe_eth.eth.clients import (
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.utils import fast_to_checksum_address
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
 from app.datasources.db.models import AbiSource, Contract
@@ -148,7 +149,7 @@ class TestContractMetadataService(DbAsyncConn):
         self.assertEqual(len(enabled_clients), 0)
 
     @database_session
-    async def test_process_contract_metadata(self, session):
+    async def test_process_contract_metadata(self, session: AsyncSession):
         # New contract and abi
         random_address = Account.create().address
         await AbiSource.get_or_create(session, "Etherscan", "")
@@ -200,3 +201,28 @@ class TestContractMetadataService(DbAsyncConn):
         # Refresh was necessary to reuse the same session
         await session.refresh(new_contract)
         self.assertEqual(new_contract.abi.abi_json, blockscout_metadata_mock.abi)
+
+    @database_session
+    async def test_should_attempt_download(self, session: AsyncSession):
+        random_address = Account.create().address
+        contract = await Contract(address=HexBytes(random_address), chain_id=1).create(
+            session
+        )
+        self.assertTrue(
+            await ContractMetadataService.should_attempt_download(
+                session, fast_to_checksum_address(random_address), 1, 0
+            )
+        )
+        contract.fetch_retries += 1
+        contract.update(session)
+        self.assertFalse(
+            await ContractMetadataService.should_attempt_download(
+                session, fast_to_checksum_address(random_address), 1, 0
+            )
+        )
+        await Contract(address=HexBytes(random_address), chain_id=100).create(session)
+        self.assertTrue(
+            await ContractMetadataService.should_attempt_download(
+                session, fast_to_checksum_address(random_address), 100, 0
+            )
+        )

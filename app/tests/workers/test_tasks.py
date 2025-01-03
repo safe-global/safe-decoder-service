@@ -2,9 +2,15 @@ import json
 import unittest
 from typing import Any, Awaitable
 
+import pytest
 from dramatiq.worker import Worker
+from hexbytes import HexBytes
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.workers.tasks import redis_broker, test_task
+from app.datasources.db.database import database_session
+from app.datasources.db.models import Contract
+from app.tests.db.db_async_conn import DbAsyncConn
+from app.workers.tasks import get_contract_metadata_task, redis_broker, test_task
 
 
 class TestTasks(unittest.TestCase):
@@ -43,3 +49,17 @@ class TestTasks(unittest.TestCase):
         redis_tasks = redis_broker.client.lrange("dramatiq:default", 0, -1)
         assert isinstance(redis_tasks, list)
         self.assertEqual(len(redis_tasks), 0)
+
+
+class TestAsyncTasks(DbAsyncConn):
+
+    @pytest.mark.skip("Failing due dramatiq AsyncIO")
+    @database_session
+    async def test_get_contract_metadata_task(self, session: AsyncSession):
+        contract_address = "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
+        chain_id = 100
+        get_contract_metadata_task.send(contract_address, chain_id)
+        contract = await Contract.get_contract(
+            session, HexBytes(contract_address), chain_id
+        )
+        self.assertIsNotNone(contract)
