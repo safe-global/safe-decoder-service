@@ -15,7 +15,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
-from app.datasources.db.models import AbiSource, Contract
+from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
     ClientSource,
     ContractMetadataService,
@@ -228,6 +228,32 @@ class TestContractMetadataService(DbAsyncConn):
                 session, fast_to_checksum_address(random_address), 1, 0
             )
         )
+        # Should be cached and don't reach the dataqbase
+        with mock.patch.object(Contract, "get_contract") as mocked_get_contract:
+            self.assertFalse(
+                await ContractMetadataService.should_attempt_download(
+                    session, fast_to_checksum_address(random_address), 1, 0
+                )
+            )
+            mocked_get_contract.assert_not_called()
+
+        # Should be false if contract has abi_id
+        source, _ = await AbiSource.get_or_create(session, "Etherscan", "")
+        abi = Abi(
+            abi_hash=b"A Test Abi",
+            abi_json=etherscan_metadata_mock.abi,
+            relevance=10,
+            source_id=source.id,
+        )
+        await abi.create(session)
+        contract.abi_id = abi.id
+        await contract.update(session)
+        self.assertFalse(
+            await ContractMetadataService.should_attempt_download(
+                session, fast_to_checksum_address(random_address), 1, 10
+            )
+        )
+
         await Contract(address=HexBytes(random_address), chain_id=100).create(session)
         self.assertTrue(
             await ContractMetadataService.should_attempt_download(

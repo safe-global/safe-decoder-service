@@ -205,9 +205,9 @@ class ContractMetadataService:
         contract_address: ChecksumAddress,
         chain_id: int,
         retries: int,
-    ):
+    ) -> bool:
         """
-        Return True if fetch retries is less than the number of retries, False otherwise.
+        Return True if fetch retries is less than the number of retries and there is not ABI, False otherwise.
         False is being cached to avoid query the database in the future for the same number of retries.
 
         :param session:
@@ -217,7 +217,7 @@ class ContractMetadataService:
         :return:
         """
         redis = get_redis()
-        cache_key = f"get_contract_retries:{contract_address}:{chain_id}:{retries}"
+        cache_key = f"should_attempt_download:{contract_address}:{chain_id}:{retries}"
         # Try from cache first
         cached_retries = cast(str, redis.get(cache_key))
         if cached_retries:
@@ -226,8 +226,9 @@ class ContractMetadataService:
             contract = await Contract.get_contract(
                 session, address=HexBytes(contract_address), chain_id=chain_id
             )
-            if contract and contract.fetch_retries > retries:
+
+            if contract and (contract.fetch_retries > retries or contract.abi_id):
                 redis.set(cache_key, 0)
                 return False
-            else:
-                return True
+
+            return True
