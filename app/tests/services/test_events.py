@@ -1,5 +1,6 @@
+import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from app.services.events import EventsService
 
@@ -7,28 +8,53 @@ from app.services.events import EventsService
 class TestEventsService(unittest.TestCase):
 
     def test_is_event_valid(self):
-        valid_event = {"chainId": "123", "type": "transaction"}
-        self.assertTrue(EventsService().is_event_valid(valid_event))
+        valid_event = {
+            "chainId": "123",
+            "type": "EXECUTED_MULTISIG_TRANSACTION",
+            "to": "0x6ED857dc1da2c41470A95589bB482152000773e9",
+        }
+        self.assertTrue(EventsService._is_processable_event(valid_event))
+
+        valid_event = {
+            "chainId": "123",
+            "type": "transaction",
+            "to": "0x6ed857dc1da2c41470A95589bB482152000773e9",
+        }
+        self.assertFalse(EventsService._is_processable_event(valid_event))
+
+        valid_event = {
+            "chainId": "123",
+            "type": "EXECUTED_MULTISIG_TRANSACTION",
+            "to": "0x123456789",
+        }
+        self.assertFalse(EventsService._is_processable_event(valid_event))
+
+        valid_event = {
+            "chainId": "chainId",
+            "type": "EXECUTED_MULTISIG_TRANSACTION",
+            "to": "0x6ED857dc1da2c41470A95589bB482152000773e9",
+        }
+        self.assertFalse(EventsService._is_processable_event(valid_event))
 
         invalid_event_missing_chain_id = {"type": "transaction"}
-        self.assertFalse(EventsService().is_event_valid(invalid_event_missing_chain_id))
+        self.assertFalse(
+            EventsService._is_processable_event(invalid_event_missing_chain_id)
+        )
 
         invalid_event_missing_type = {"chainId": "123"}
-        self.assertFalse(EventsService().is_event_valid(invalid_event_missing_type))
+        self.assertFalse(
+            EventsService._is_processable_event(invalid_event_missing_type)
+        )
 
         invalid_event_invalid_chain_id = {"chainId": 123, "type": "transaction"}
-        self.assertFalse(EventsService().is_event_valid(invalid_event_invalid_chain_id))
+        self.assertFalse(
+            EventsService._is_processable_event(invalid_event_invalid_chain_id)
+        )
 
         invalid_event_invalid_type = {"chainId": "123", "type": 123}
-        self.assertFalse(EventsService().is_event_valid(invalid_event_invalid_type))
-
-    @patch("logging.error")
-    def test_process_event_valid_message(self, mock_log):
-        valid_message = '{"chainId": "123", "type": "transaction"}'
-
-        EventsService().process_event(valid_message)
-
-        mock_log.assert_not_called()
+        self.assertFalse(
+            EventsService._is_processable_event(invalid_event_invalid_type)
+        )
 
     @patch("logging.error")
     def test_process_event_invalid_json(self, mock_log):
@@ -40,10 +66,20 @@ class TestEventsService(unittest.TestCase):
             'Unsupported message. Cannot parse as JSON: {"chainId": "123", "type": "transaction"'
         )
 
-        invalid_message_invalid_type = '{"chainId": "123", "type": 123}'
+    @patch("app.workers.tasks.get_contract_metadata_task.send")
+    def test_process_event_calls_send(self, mock_get_contract_metadata_task):
+        mock_get_contract_metadata_task.send = MagicMock()
 
-        EventsService().process_event(invalid_message_invalid_type)
+        valid_message = json.dumps(
+            {
+                "chainId": "1",
+                "type": "EXECUTED_MULTISIG_TRANSACTION",
+                "to": "0x6ED857dc1da2c41470A95589bB482152000773e9",
+            }
+        )
 
-        mock_log.assert_called_with(
-            'Unsupported message. A valid message should have at least \'chainId\' and \'type\': {"chainId": "123", "type": 123}'
+        EventsService().process_event(valid_message)
+
+        mock_get_contract_metadata_task.assert_called_once_with(
+            "0x6ED857dc1da2c41470A95589bB482152000773e9", 1
         )
