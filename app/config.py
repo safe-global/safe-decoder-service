@@ -32,8 +32,8 @@ class Settings(BaseSettings):
         7 * 24 * 60 * 60
     )  # Admin token expires in 1 week
     ETHERSCAN_API_KEY: str = ""
-    ETHERSCAN_MAX_REQUESTS: int = 1000
-    BLOCKSCOUT_MAX_REQUESTS: int = 1000
+    ETHERSCAN_MAX_REQUESTS: int = 1
+    BLOCKSCOUT_MAX_REQUESTS: int = 1
     SOURCIFY_MAX_REQUESTS: int = 100
 
 
