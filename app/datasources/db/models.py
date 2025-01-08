@@ -88,6 +88,14 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
             await new_item.create(session)
             return new_item, True
 
+    @classmethod
+    async def get_abi_source(cls, session: AsyncSession, name: str):
+        query = select(cls).where(cls.name == name)
+        results = await session.exec(query)
+        if result := results.first():
+            return result
+        return None
+
 
 class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -140,6 +148,32 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
 
         return None
 
+    @classmethod
+    async def get_or_create_abi(
+        cls,
+        session: AsyncSession,
+        abi_json: list[dict] | dict,
+        source_id: int | None,
+        relevance: int | None = 0,
+    ) -> tuple["Abi", bool]:
+        """
+        Checks if an Abi with the given 'abi_json' exists.
+        If found, returns it with False. If not, creates and returns it with True.
+
+        :param session: The database session.
+        :param abi_json: The ABI JSON to check.
+        :param relevance:
+        :param source_id:
+        :return: A tuple containing the Abi object and a boolean indicating
+                 whether it was created (True) or already exists (False).
+        """
+        if abi := await cls.get_abi(session, abi_json):
+            return abi, False
+        else:
+            new_item = cls(abi_json=abi_json, relevance=relevance, source_id=source_id)
+            await new_item.create(session)
+            return new_item, True
+
 
 class Project(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -155,7 +189,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     address: bytes = Field(nullable=False, index=True)
-    name: str = Field(nullable=False)
+    name: str | None = None
     display_name: str | None = None
     description: str | None = None
     trusted_for_delegate: bool = Field(nullable=False, default=False)
@@ -191,6 +225,45 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             )
 
         return query
+
+    @classmethod
+    async def get_contract(cls, session: AsyncSession, address: bytes, chain_id: int):
+        query = (
+            select(cls).where(cls.address == address).where(cls.chain_id == chain_id)
+        )
+        results = await session.exec(query)
+        if result := results.first():
+            return result
+        return None
+
+    @classmethod
+    async def get_or_create(
+        cls,
+        session: AsyncSession,
+        address: bytes,
+        chain_id: int,
+        **kwargs,
+    ) -> tuple["Contract", bool]:
+        """
+        Update or create the given params.
+
+        :param session: The database session.
+        :param address:
+        :param chain_id:
+        :param kwargs:
+        :return: A tuple containing the Contract object and a boolean indicating
+                 whether it was created (True) or already exists (False).
+        """
+        if contract := await cls.get_contract(session, address, chain_id):
+            return contract, False
+        else:
+            contract = cls(address=address, chain_id=chain_id)
+            # Add optional fields
+            for key, value in kwargs.items():
+                setattr(contract, key, value)
+
+            await contract.create(session)
+            return contract, True
 
     @classmethod
     async def get_abi_by_contract_address(

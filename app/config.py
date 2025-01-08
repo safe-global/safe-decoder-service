@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     ADMIN_TOKEN_EXPIRATION_SECONDS: int = (
         7 * 24 * 60 * 60
     )  # Admin token expires in 1 week
+    ETHERSCAN_API_KEY: str = ""
+    ETHERSCAN_MAX_REQUESTS: int = 1
+    BLOCKSCOUT_MAX_REQUESTS: int = 1
+    SOURCIFY_MAX_REQUESTS: int = 100
 
 
 settings = Settings()

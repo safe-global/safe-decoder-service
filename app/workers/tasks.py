@@ -4,8 +4,12 @@ import dramatiq
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import AsyncIO
 from periodiq import PeriodiqMiddleware
+from safe_eth.eth.utils import fast_to_checksum_address
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
+from app.datasources.db.database import database_session
+from app.services.contract_metadata_service import get_contract_metadata_service
 
 redis_broker = RedisBroker(url=settings.REDIS_URL)
 redis_broker.add_middleware(PeriodiqMiddleware(skip_delay=60))
@@ -26,3 +30,34 @@ def test_task(message: str) -> None:
     """
     logging.info(f"Message processed! -> {message}")
     return
+
+
+@dramatiq.actor
+@database_session
+async def get_contract_metadata_task(
+    address: str, chain_id: int, session: AsyncSession
+) -> None:
+    contract_metadata_service = get_contract_metadata_service()
+    # Just try the first time, following retries should be scheduled
+    if await contract_metadata_service.should_attempt_download(
+        session, address, chain_id, 0
+    ):
+        logging.info(
+            f"Downloading contract metadata for {address} and chain {chain_id}"
+        )
+        contract_metadata = await contract_metadata_service.get_contract_metadata(
+            fast_to_checksum_address(address), chain_id
+        )
+        result = await contract_metadata_service.process_contract_metadata(
+            session, contract_metadata
+        )
+        if result:
+            logging.info(
+                f"Success download contract metadata for {address} and chain {chain_id}"
+            )
+        else:
+            logging.info(
+                f"Failed to download contract metadata for {address} and chain {chain_id}"
+            )
+    else:
+        logging.debug(f"Skipping contract with address {address} and chain {chain_id}")
