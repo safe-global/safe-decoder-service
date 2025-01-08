@@ -2,6 +2,10 @@ import json
 import logging
 from typing import Dict
 
+from safe_eth.eth.utils import fast_is_checksum_address
+
+from ..workers.tasks import get_contract_metadata_task
+
 
 class EventsService:
 
@@ -13,24 +17,31 @@ class EventsService:
         """
         try:
             tx_service_event = json.loads(message)
-
-            if self.is_event_valid(tx_service_event):
-                # TODO: process event!
-                pass
-            else:
-                logging.error(
-                    f"Unsupported message. A valid message should have at least 'chainId' and 'type': {message}"
-                )
+            if self._is_processable_event(tx_service_event):
+                chain_id = int(tx_service_event["chainId"])
+                contract_address = tx_service_event["to"]
+                get_contract_metadata_task.send(contract_address, chain_id)
         except json.JSONDecodeError:
             logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
 
-    def is_event_valid(self, tx_service_event: Dict) -> bool:
+    @staticmethod
+    def _is_processable_event(tx_service_event: Dict) -> bool:
         """
-        Validates if the event has the required fields 'chainId' and 'type' as strings.
+        Validates if the event has the required fields 'chainId', 'type', and 'to' as strings,
+        and if the event type and address meet the expected criteria.
 
         :param tx_service_event: The event object to validate.
-        :return: True if the event is valid (both 'chainId' and 'type' are strings), False otherwise.
+        :return: True if the event is valid, False otherwise.
         """
-        return isinstance(tx_service_event.get("chainId"), str) and isinstance(
-            tx_service_event.get("type"), str
+        chain_id = tx_service_event.get("chainId")
+        event_type = tx_service_event.get("type")
+        address = tx_service_event.get("to")
+
+        return (
+            isinstance(chain_id, str)
+            and chain_id.isdigit()
+            and isinstance(event_type, str)
+            and event_type == "EXECUTED_MULTISIG_TRANSACTION"
+            and isinstance(address, str)
+            and fast_is_checksum_address(address)
         )
