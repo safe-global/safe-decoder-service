@@ -176,7 +176,7 @@ class TestContractMetadataService(DbAsyncConn):
         self.assertEqual(contract.name, etherscan_metadata_mock.name)
         self.assertEqual(contract.abi.abi_json, etherscan_metadata_mock.abi)
         self.assertEqual(contract.chain_id, 1)
-        self.assertEqual(contract.fetch_retries, 0)
+        self.assertEqual(contract.fetch_retries, 1)
         # Same contract shouldn't be updated without abi
         contract_data.metadata = None
         await ContractMetadataService.process_contract_metadata(session, contract_data)

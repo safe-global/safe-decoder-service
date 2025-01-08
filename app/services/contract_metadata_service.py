@@ -193,9 +193,9 @@ class ContractMetadataService:
             contract.name = contract_metadata.metadata.name
             with_metadata = True
         else:
-            contract.fetch_retries += 1
             with_metadata = False
 
+        contract.fetch_retries += 1
         await contract.update(session=session)
         return with_metadata
 
