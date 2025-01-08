@@ -100,7 +100,14 @@ class TestContractMetadataService(DbAsyncConn):
             contract_data.metadata,
         )
 
-    async def test_multichain_contract_metadata(self):
+    @mock.patch.object(
+        AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
+    )
+    async def test_multichain_contract_metadata(
+        self,
+        etherscan_get_contract_metadata_mock: MagicMock,
+    ):
+        etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         contract_metadata_service = ContractMetadataService("")
         contract_address = fast_to_checksum_address(
             "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
