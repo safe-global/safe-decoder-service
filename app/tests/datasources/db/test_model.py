@@ -1,3 +1,5 @@
+from eth_account import Account
+from hexbytes import HexBytes
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
@@ -134,3 +136,30 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result_updated[0].created, contract_created_date)
         self.assertNotEqual(result_updated[0].modified, contract_modified_date)
         self.assertTrue(contract_modified_date < result_updated[0].modified)
+
+    @database_session
+    async def test_get_contracts_without_abi(self, session: AsyncSession):
+        random_address = HexBytes(Account.create().address)
+        abi_json = {"name": "A Test ABI"}
+        source = AbiSource(name="local", url="")
+        await source.create(session)
+        abi = Abi(abi_json=abi_json, source_id=source.id)
+        await abi.create(session)
+        # Should return the contract
+        expected_contract = await Contract(
+            address=random_address, name="A test contract", chain_id=1
+        ).create(session)
+        async for contract in Contract.get_contracts_without_abi(session, 0):
+            self.assertEqual(expected_contract, contract[0])
+
+        # Contracts with more retries shouldn't be returned
+        expected_contract.fetch_retries = 1
+        await expected_contract.update(session)
+        async for contract in Contract.get_contracts_without_abi(session, 0):
+            self.fail("Expected no contracts, but found one.")
+
+        # Contracts with abi shouldn't be returned
+        expected_contract.abi_id = abi.id
+        await expected_contract.update(session)
+        async for contract in Contract.get_contracts_without_abi(session, 10):
+            self.fail("Expected no contracts, but found one.")

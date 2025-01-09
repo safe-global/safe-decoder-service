@@ -38,12 +38,15 @@ def test_task(message: str) -> None:
 @dramatiq.actor
 @database_session
 async def get_contract_metadata_task(
-    session: AsyncSession, address: str, chain_id: int, max_retries: int = 0
+    session: AsyncSession,
+    address: str,
+    chain_id: int,
+    skip_attemp_download: bool = False,
 ) -> None:
     contract_metadata_service = get_contract_metadata_service()
     # Just try the first time, following retries should be scheduled
-    if await contract_metadata_service.should_attempt_download(
-        session, address, chain_id, max_retries
+    if skip_attemp_download or await contract_metadata_service.should_attempt_download(
+        session, address, chain_id, 0
     ):
         logger.info(
             "Downloading contract metadata for contract=%s and chain=%s",
@@ -83,12 +86,14 @@ async def get_contract_metadata_task(
         logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
 
 
-@dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
+@dramatiq.actor(periodic=cron("* * * * *"))  # Every midnight
 @database_session
 async def get_missing_contract_metadata_task(session: AsyncSession) -> None:
-    async for contract in Contract.get_contracts_without_abi(session):
+    async for contract in Contract.get_contracts_without_abi(
+        session, settings.CONTRACT_MAX_DOWNLOAD_RETRIES
+    ):
         get_contract_metadata_task.send(
             address=HexBytes(contract[0].address).hex(),
             chain_id=contract[0].chain_id,
-            max_retries=settings.CONTRACT_MAX_DOWNLOAD_RETRIES,
+            skip_attemp_download=True,
         )
