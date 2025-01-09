@@ -3,15 +3,16 @@ import logging
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import AsyncIO
-from periodiq import PeriodiqMiddleware
+from hexbytes import HexBytes
+from periodiq import PeriodiqMiddleware, cron
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from ..config import settings
-from ..datasources.db.database import database_session
-from ..services.contract_metadata_service import get_contract_metadata_service
-
 logger = logging.getLogger(__name__)
+from app.config import settings
+from app.datasources.db.database import database_session
+from app.datasources.db.models import Contract
+from app.services.contract_metadata_service import get_contract_metadata_service
 
 redis_broker = RedisBroker(url=settings.REDIS_URL)
 redis_broker.add_middleware(PeriodiqMiddleware(skip_delay=60))
@@ -37,12 +38,12 @@ def test_task(message: str) -> None:
 @dramatiq.actor
 @database_session
 async def get_contract_metadata_task(
-    address: str, chain_id: int, session: AsyncSession
+    session: AsyncSession, address: str, chain_id: int, max_retries: int = 0
 ) -> None:
     contract_metadata_service = get_contract_metadata_service()
     # Just try the first time, following retries should be scheduled
     if await contract_metadata_service.should_attempt_download(
-        session, address, chain_id, 0
+        session, address, chain_id, max_retries
     ):
         logger.info(
             "Downloading contract metadata for contract=%s and chain=%s",
@@ -80,3 +81,14 @@ async def get_contract_metadata_task(
             get_contract_metadata_task.send(proxy_implementation_address, chain_id)
     else:
         logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
+
+
+@dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
+@database_session
+async def get_missing_contract_metadata_task(session: AsyncSession) -> None:
+    async for contract in Contract.get_contracts_without_abi(session):
+        get_contract_metadata_task.send(
+            address=HexBytes(contract[0].address).hex(),
+            chain_id=contract[0].chain_id,
+            max_retries=settings.CONTRACT_MAX_DOWNLOAD_RETRIES,
+        )

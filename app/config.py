@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     ETHERSCAN_MAX_REQUESTS: int = 1
     BLOCKSCOUT_MAX_REQUESTS: int = 1
     SOURCIFY_MAX_REQUESTS: int = 100
+    CONTRACT_MAX_DOWNLOAD_RETRIES: int = (
+        90  # Task running once per day, means 3 months trying.
+    )
 
 
 settings = Settings()

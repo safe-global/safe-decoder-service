@@ -85,7 +85,7 @@ class TestAsyncTasks(DbAsyncConn):
         etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         contract_address = "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
         chain_id = 100
-        get_contract_metadata_task.fn(contract_address, chain_id)
+        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
         contract = await Contract.get_contract(
             session, HexBytes(contract_address), chain_id
         )

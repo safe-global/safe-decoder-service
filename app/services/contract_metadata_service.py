@@ -218,6 +218,7 @@ class ContractMetadataService:
         contract_address: ChecksumAddress,
         chain_id: int,
         retries: int,
+        contract: Contract | None = None,
     ) -> bool:
         """
         Return True if fetch retries is less than the number of retries and there is not ABI, False otherwise.
@@ -236,9 +237,10 @@ class ContractMetadataService:
         if cached_retries:
             return bool(int(cached_retries))
         else:
-            contract = await Contract.get_contract(
-                session, address=HexBytes(contract_address), chain_id=chain_id
-            )
+            if contract is None:
+                contract = await Contract.get_contract(
+                    session, address=HexBytes(contract_address), chain_id=chain_id
+                )
 
             if contract and (contract.fetch_retries > retries or contract.abi_id):
                 redis.set(cache_key, 0)
