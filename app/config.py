@@ -2,6 +2,7 @@
 Base settings file for FastApi application.
 """
 
+import logging
 import os
 import secrets
 
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
     TEST: bool = False
+    LOG_LEVEL: str = "INFO"
     REDIS_URL: str = "redis://"
     DATABASE_URL: str = "psql://postgres:"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
@@ -38,3 +40,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+logging.basicConfig(level=logging.getLevelName(settings.LOG_LEVEL))
