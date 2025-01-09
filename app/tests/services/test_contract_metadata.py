@@ -26,6 +26,7 @@ from ..datasources.db.db_async_conn import DbAsyncConn
 from ..mocks.contract_metadata_mocks import (
     blockscout_metadata_mock,
     etherscan_metadata_mock,
+    etherscan_proxy_metadata_mock,
     sourcify_metadata_mock,
 )
 
@@ -174,9 +175,30 @@ class TestContractMetadataService(DbAsyncConn):
         self.assertIsNotNone(contract)
         self.assertEqual(HexBytes(contract.address), HexBytes(random_address))
         self.assertEqual(contract.name, etherscan_metadata_mock.name)
+        self.assertIsNone(contract.implementation)
         self.assertEqual(contract.abi.abi_json, etherscan_metadata_mock.abi)
         self.assertEqual(contract.chain_id, 1)
         self.assertEqual(contract.fetch_retries, 1)
+
+        # New proxy contract
+        proxy_contract_data = EnhancedContractMetadata(
+            address=random_address,
+            metadata=etherscan_proxy_metadata_mock,
+            source=ClientSource.ETHERSCAN,
+            chain_id=1,
+        )
+        await ContractMetadataService.process_contract_metadata(
+            session, proxy_contract_data
+        )
+        proxy_contract = await Contract.get_contract(
+            session, address=HexBytes(random_address), chain_id=1
+        )
+        self.assertIsNotNone(proxy_contract)
+        self.assertEqual(
+            proxy_contract.implementation,
+            HexBytes("0x43506849d7c04f9138d1a2050bbf3a0c054402dd"),
+        )
+
         # Same contract shouldn't be updated without abi
         contract_data.metadata = None
         await ContractMetadataService.process_contract_metadata(session, contract_data)
@@ -259,4 +281,31 @@ class TestContractMetadataService(DbAsyncConn):
             await ContractMetadataService.should_attempt_download(
                 session, fast_to_checksum_address(random_address), 100, 0
             )
+        )
+
+    def test_get_proxy_implementation_address(self):
+        random_address = Account.create().address
+        proxy_contract_data = EnhancedContractMetadata(
+            address=random_address,
+            metadata=etherscan_proxy_metadata_mock,
+            source=ClientSource.ETHERSCAN,
+            chain_id=1,
+        )
+        proxy_implementation_address = (
+            ContractMetadataService.get_proxy_implementation_address(
+                proxy_contract_data
+            )
+        )
+        self.assertEqual(
+            proxy_implementation_address, "0x43506849D7C04F9138D1A2050bbF3A0c054402dd"
+        )
+
+        contract_data = EnhancedContractMetadata(
+            address=random_address,
+            metadata=etherscan_metadata_mock,
+            source=ClientSource.ETHERSCAN,
+            chain_id=1,
+        )
+        self.assertIsNone(
+            ContractMetadataService.get_proxy_implementation_address(contract_data)
         )
