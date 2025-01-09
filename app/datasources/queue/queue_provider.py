@@ -1,3 +1,4 @@
+import logging
 from asyncio import AbstractEventLoop
 from typing import Any, Callable
 
@@ -17,6 +18,8 @@ from .exceptions import (
     QueueProviderNotConnectedException,
     QueueProviderUnableToConnectException,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class QueueProvider:
@@ -41,9 +44,11 @@ class QueueProvider:
         :return:
         """
         try:
+            logger.info("Connecting to RabbitMQ")
             self._connection = await aio_pika.connect_robust(
                 url=settings.RABBITMQ_AMQP_URL, loop=loop
             )
+            logger.info("Connected to RabbitMQ")
         except aio_pika.exceptions.AMQPConnectionError as e:
             raise QueueProviderUnableToConnectException(e)
 
@@ -51,11 +56,13 @@ class QueueProvider:
         self._exchange = await channel.declare_exchange(
             settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.FANOUT, durable=True
         )
+        logger.info(f"Connected to {settings.RABBITMQ_AMQP_EXCHANGE} exchange")
         self._events_queue = await channel.declare_queue(
             settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME, durable=True
         )
         if self._events_queue:
             await self._events_queue.bind(self._exchange)
+        logger.info(f"Reading from {settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME} queue")
 
     async def connect(self, loop: AbstractEventLoop) -> None:
         """
@@ -82,9 +89,6 @@ class QueueProvider:
         :return:
         """
         if self._connection:
-            if self._events_queue and self._exchange:
-                await self._events_queue.unbind(exchange=self._exchange)
-                await self._events_queue.delete(if_unused=False, if_empty=False)
             await self._connection.close()
             self._exchange = None
             self._connection = None
