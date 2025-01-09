@@ -20,7 +20,9 @@ class EventsService:
             if self._is_processable_event(tx_service_event):
                 chain_id = int(tx_service_event["chainId"])
                 contract_address = tx_service_event["to"]
-                get_contract_metadata_task.send(contract_address, chain_id)
+                get_contract_metadata_task.send(
+                    address=contract_address, chain_id=chain_id
+                )
         except json.JSONDecodeError:
             logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
 
