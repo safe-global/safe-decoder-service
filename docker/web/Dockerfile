@@ -17,6 +17,7 @@ RUN set -ex \
     && apt-get install -y --no-install-recommends $buildDeps \
     && pip install -U --no-cache-dir wheel setuptools pip \
     && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir ipython \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
     && find /usr/local \
