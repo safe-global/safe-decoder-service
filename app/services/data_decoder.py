@@ -1,7 +1,7 @@
 import logging
-from functools import cache
 from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
 
+from aiocache import cached
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
@@ -54,7 +54,7 @@ class MultisendDecoded(TypedDict):
     data_decoded: DataDecoded | None
 
 
-@cache
+@cached(ttl=60 * 5)
 @database_session
 async def get_data_decoder_service(session: AsyncSession) -> "DataDecoderService":
     data_decoder_service = DataDecoderService()
