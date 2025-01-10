@@ -1,8 +1,14 @@
 from datetime import datetime
+from typing import Any, Union
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-from safe_eth.eth.utils import ChecksumAddress, fast_to_checksum_address
+from eth_typing import HexStr
+from safe_eth.eth.utils import (
+    ChecksumAddress,
+    fast_is_checksum_address,
+    fast_to_checksum_address,
+)
 
 
 class About(BaseModel):
@@ -63,3 +69,43 @@ class ContractsPublic(BaseModel):
         if isinstance(address, bytes):
             return fast_to_checksum_address(address)
         return address
+
+
+class DataDecoderInput(BaseModel):
+    data: str = Field(
+        ..., pattern=r"^0x[0-9a-fA-F]*$", description="0x-prefixed hexadecimal string"
+    )
+    to: str | None = Field(
+        None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
+    )
+    chainId: int | None = Field(
+        None, gt=0, description="Optional Chain ID as a positive integer"
+    )
+
+    @field_validator("to")
+    def validate_checksum_address(cls, value):
+        if value and not fast_is_checksum_address(value):
+            raise ValueError("Address is not checksumed")
+        return value
+
+
+class ParameterDecodedPublic(BaseModel):
+    name: str
+    type: str
+    value: Any
+    value_decoded: (
+        Union[list["MultisendDecodedPublic"], "DataDecodedPublic", None] | None
+    ) = None
+
+
+class DataDecodedPublic(BaseModel):
+    method: str
+    parameters: list[ParameterDecodedPublic]
+
+
+class MultisendDecodedPublic(BaseModel):
+    operation: int
+    to: ChecksumAddress
+    value: str
+    data: HexStr | None = None
+    data_decoded: DataDecodedPublic | None = None
