@@ -86,7 +86,7 @@ async def get_contract_metadata_task(
         logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
 
 
-@dramatiq.actor(periodic=cron("* * * * *"))  # Every midnight
+@dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
 @database_session
 async def get_missing_contract_metadata_task(session: AsyncSession) -> None:
     async for contract in Contract.get_contracts_without_abi(
