@@ -8,11 +8,13 @@ from periodiq import PeriodiqMiddleware, cron
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-logger = logging.getLogger(__name__)
 from app.config import settings
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Contract
 from app.services.contract_metadata_service import get_contract_metadata_service
+
+logger = logging.getLogger(__name__)
+
 
 redis_broker = RedisBroker(url=settings.REDIS_URL)
 redis_broker.add_middleware(PeriodiqMiddleware(skip_delay=60))
