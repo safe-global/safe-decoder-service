@@ -46,5 +46,19 @@ To create a new migration based on changes made to the model code, run the follo
  alembic revision --autogenerate -m "MIGRATION TITLE"
 ```
 
+### Querying the database via Python Shell in Docker
+To open an interactive Python shell within a Docker container and query the database, use the following command:
+```
+ docker exec -it safe-decoder-service-web-1 python -m IPython -i ./scripts/db_profile.py
+```
+Example usage:
+```
+In [11]: contracts = await Contract.get_all(session)
+
+In [12]: contracts[0].address
+Out[12]: b'J\xdb\xaa\xc7\xbc#\x9e%\x19\xcb\xfd#\x97\xe0\xf7Z\x1d\xe3U\xc8'
+
+```
+
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-decoder-service/graphs/contributors)
