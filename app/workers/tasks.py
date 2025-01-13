@@ -83,7 +83,9 @@ async def get_contract_metadata_task(
                 address,
                 chain_id,
             )
-            get_contract_metadata_task.send(proxy_implementation_address, chain_id)
+            get_contract_metadata_task.send(
+                address=proxy_implementation_address, chain_id=chain_id
+            )
     else:
         logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
 
