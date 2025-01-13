@@ -72,7 +72,7 @@ async def get_contract_metadata_task(
             contract_metadata
         ):
             logger.info(
-                "Downloading proxy implementation metadata from address=%s for contract=%s and chain=%s",
+                "Adding task to download proxy implementation metadata from address=%s for contract=%s and chain=%s",
                 proxy_implementation_address,
                 address,
                 chain_id,
