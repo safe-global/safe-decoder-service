@@ -7,9 +7,11 @@ from periodiq import PeriodiqMiddleware
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.config import settings
-from app.datasources.db.database import database_session
-from app.services.contract_metadata_service import get_contract_metadata_service
+from ..config import settings
+from ..datasources.db.database import database_session
+from ..services.contract_metadata_service import get_contract_metadata_service
+
+logger = logging.getLogger(__name__)
 
 redis_broker = RedisBroker(url=settings.REDIS_URL)
 redis_broker.add_middleware(PeriodiqMiddleware(skip_delay=60))
@@ -28,7 +30,7 @@ def test_task(message: str) -> None:
 
         async def test_task(message: str) -> None:
     """
-    logging.info(f"Message processed! -> {message}")
+    logger.info(f"Message processed! -> {message}")
     return
 
 
@@ -42,8 +44,10 @@ async def get_contract_metadata_task(
     if await contract_metadata_service.should_attempt_download(
         session, address, chain_id, 0
     ):
-        logging.info(
-            f"Downloading contract metadata for {address} and chain {chain_id}"
+        logger.info(
+            "Downloading contract metadata for contract=%s and chain=%s",
+            address,
+            chain_id,
         )
         contract_metadata = await contract_metadata_service.get_contract_metadata(
             fast_to_checksum_address(address), chain_id
@@ -52,12 +56,27 @@ async def get_contract_metadata_task(
             session, contract_metadata
         )
         if result:
-            logging.info(
-                f"Success download contract metadata for {address} and chain {chain_id}"
+            logger.info(
+                "Success download contract metadata for contract=%s and chain=%s",
+                address,
+                chain_id,
             )
         else:
-            logging.info(
-                f"Failed to download contract metadata for {address} and chain {chain_id}"
+            logger.info(
+                "Failed to download contract metadata for contract=%s and chain=%s",
+                address,
+                chain_id,
             )
+
+        if proxy_implementation_address := contract_metadata_service.get_proxy_implementation_address(
+            contract_metadata
+        ):
+            logger.info(
+                "Adding task to download proxy implementation metadata from address=%s for contract=%s and chain=%s",
+                proxy_implementation_address,
+                address,
+                chain_id,
+            )
+            get_contract_metadata_task.send(proxy_implementation_address, chain_id)
     else:
-        logging.debug(f"Skipping contract with address {address} and chain {chain_id}")
+        logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
