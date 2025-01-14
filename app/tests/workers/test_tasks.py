@@ -7,13 +7,16 @@ from unittest.mock import MagicMock
 from dramatiq.worker import Worker
 from eth_account import Account
 from hexbytes import HexBytes
+from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import AsyncEtherscanClientV2
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
-from app.datasources.db.models import Contract
+from app.datasources.db.models import AbiSource, Contract
 from app.workers.tasks import get_contract_metadata_task, redis_broker, test_task
 
+from ...datasources.cache.redis import get_redis
+from ...services.contract_metadata_service import ContractMetadataService
 from ..datasources.db.db_async_conn import DbAsyncConn
 from ..mocks.contract_metadata_mocks import (
     etherscan_metadata_mock,
@@ -75,22 +78,59 @@ class TestAsyncTasks(DbAsyncConn):
         while len(redis_tasks) > 0:
             redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
 
+    @mock.patch.object(ContractMetadataService, "enabled_clients")
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )
     @database_session
     async def test_get_contract_metadata_task(
-        self, etherscan_get_contract_metadata_mock: MagicMock, session: AsyncSession
+        self,
+        etherscan_get_contract_metadata_mock: MagicMock,
+        mock_enabled_clients: MagicMock,
+        session: AsyncSession,
     ):
-        etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         contract_address = "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
+        chain_id = 100
+        cache_key = f"should_attempt_download:{contract_address}:{chain_id}:0"
+        redis = get_redis()
+        redis.delete(cache_key)
+        await AbiSource(name="Etherscan", url="").create(session)
+        etherscan_get_contract_metadata_mock.return_value = None
+        mock_enabled_clients.return_value = [
+            AsyncEtherscanClientV2(EthereumNetwork(chain_id))
+        ]
+        # Should try one time
+        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        contract = await Contract.get_contract(
+            session, HexBytes(contract_address), chain_id
+        )
+        self.assertIsNotNone(contract)
+        self.assertIsNone(contract.abi_id)
+        self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 1)
+
+        # Shouldn't try second time
+        etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         chain_id = 100
         get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
         contract = await Contract.get_contract(
             session, HexBytes(contract_address), chain_id
         )
         self.assertIsNotNone(contract)
+        self.assertIsNone(contract.abi_id)
         self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 1)
+
+        # After reset cache and database retries should download the contract
+        contract.fetch_retries = 0
+        redis.delete(cache_key)
+        await contract.update(session)
+        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        await session.refresh(contract)
+        contract = await Contract.get_contract(
+            session, HexBytes(contract_address), chain_id
+        )
+        self.assertIsNotNone(contract)
+        self.assertIsNotNone(contract.abi_id)
+        self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 2)
 
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
