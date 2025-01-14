@@ -81,5 +81,5 @@ class TestEventsService(unittest.TestCase):
         EventsService().process_event(valid_message)
 
         mock_get_contract_metadata_task.assert_called_once_with(
-            "0x6ED857dc1da2c41470A95589bB482152000773e9", 1
+            address="0x6ED857dc1da2c41470A95589bB482152000773e9", chain_id=1
         )

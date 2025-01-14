@@ -279,3 +279,24 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         if result := results.first():
             return cast(ABI, result)
         return None
+
+    @classmethod
+    async def get_contracts_without_abi(
+        cls, session: AsyncSession, max_retries: int = 0
+    ):
+        """
+        Fetches contracts without an ABI and fewer retries than max_retries, streaming results in batches to reduce memory usage for large datasets.
+        More information about streaming results can be found here: https://docs.sqlalchemy.org/en/20/core/connections.html#streaming-with-a-dynamically-growing-buffer-using-stream-results
+
+        :param session:
+        :param max_retries:
+        :return:
+        """
+        query = (
+            select(cls)
+            .where(cls.abi_id == None)  # noqa: E711
+            .where(cls.fetch_retries <= max_retries)
+        )
+        result = await session.stream(query)
+        async for contract in result:
+            yield contract
