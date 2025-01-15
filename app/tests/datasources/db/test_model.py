@@ -191,9 +191,9 @@ class TestModel(DbAsyncConn):
         self.assertTrue(result)
         async for proxy_contract in Contract.get_proxy_contracts(session):
             self.assertEqual(
-                fast_to_checksum_address(proxy_contract[0].address), random_address
+                fast_to_checksum_address(proxy_contract.address), random_address
             )
             self.assertEqual(
-                fast_to_checksum_address(proxy_contract[0].implementation),
+                fast_to_checksum_address(proxy_contract.implementation),
                 "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
             )

@@ -316,5 +316,5 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         """
         query = select(cls).where(cls.implementation != None)  # noqa: E711
         result = await session.stream(query)
-        async for contract in result:
+        async for (contract,) in result:
             yield contract
