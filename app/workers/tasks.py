@@ -55,6 +55,7 @@ async def get_contract_metadata_task(
             address,
             chain_id,
         )
+        # TODO Check if contract is MultiSend. In that case, get the transaction and decode it
         contract_metadata = await contract_metadata_service.get_contract_metadata(
             fast_to_checksum_address(address), chain_id
         )

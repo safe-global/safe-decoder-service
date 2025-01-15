@@ -17,8 +17,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
-    ClientSource,
     ContractMetadataService,
+    ContractSource,
     EnhancedContractMetadata,
 )
 
@@ -165,7 +165,7 @@ class TestContractMetadataService(DbAsyncConn):
         contract_data = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_metadata_mock,
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         await ContractMetadataService.process_contract_metadata(session, contract_data)
@@ -184,7 +184,7 @@ class TestContractMetadataService(DbAsyncConn):
         proxy_contract_data = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_proxy_metadata_mock,
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         await ContractMetadataService.process_contract_metadata(
@@ -223,7 +223,7 @@ class TestContractMetadataService(DbAsyncConn):
 
         await AbiSource.get_or_create(session, "Blockscout", "")
         contract_data.metadata = blockscout_metadata_mock
-        contract_data.source = ClientSource.BLOCKSCOUT
+        contract_data.source = ContractSource.BLOCKSCOUT
         await ContractMetadataService.process_contract_metadata(session, contract_data)
         new_contract = await Contract.get_contract(
             session, address=HexBytes(contract_data.address), chain_id=1
@@ -288,7 +288,7 @@ class TestContractMetadataService(DbAsyncConn):
         proxy_contract_data = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_proxy_metadata_mock,
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         proxy_implementation_address = (
@@ -303,7 +303,7 @@ class TestContractMetadataService(DbAsyncConn):
         contract_data = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_metadata_mock,
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         self.assertIsNone(

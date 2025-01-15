@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import Dict
 
 from safe_eth.eth.utils import fast_is_checksum_address
 
@@ -27,13 +26,13 @@ class EventsService:
             logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
 
     @staticmethod
-    def _is_processable_event(tx_service_event: Dict) -> bool:
+    def _is_processable_event(tx_service_event: dict) -> bool:
         """
         Validates if the event has the required fields 'chainId', 'type', and 'to' as strings,
         and if the event type and address meet the expected criteria.
 
         :param tx_service_event: The event object to validate.
-        :return: True if the event is valid, False otherwise.
+        :return: `True` if the event is valid, `False` otherwise.
         """
         chain_id = tx_service_event.get("chainId")
         event_type = tx_service_event.get("type")
