@@ -1,3 +1,4 @@
+from copy import copy
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -319,7 +320,7 @@ class TestContractMetadataService(DbAsyncConn):
         await AbiSource(name="Etherscan", url="").create(session)
         contract_metadata = EnhancedContractMetadata(
             address=contract_address,
-            metadata=etherscan_proxy_metadata_mock,
+            metadata=copy(etherscan_proxy_metadata_mock),  # Avoid race condition
             source=ClientSource.ETHERSCAN,
             chain_id=1,
         )
