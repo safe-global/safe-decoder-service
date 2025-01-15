@@ -72,6 +72,8 @@ class TestAsyncTasks(DbAsyncConn):
     async def asyncTearDown(self):
         await super().asyncTearDown()
         self.worker.stop()
+        redis = get_redis()
+        redis.flushall()
 
     def _wait_tasks_execution(self):
         redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
