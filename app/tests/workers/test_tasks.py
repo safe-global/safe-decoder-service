@@ -1,3 +1,4 @@
+import asyncio
 import json
 import unittest
 from typing import Any, Awaitable
@@ -71,12 +72,16 @@ class TestAsyncTasks(DbAsyncConn):
 
     async def asyncTearDown(self):
         await super().asyncTearDown()
+        redis = get_redis()
+        redis.flushall()
         self.worker.stop()
 
-    def _wait_tasks_execution(self):
+    async def _wait_tasks_execution(self):
         redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
         while len(redis_tasks) > 0:
             redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
+        # TODO should check anyway the task status instead to randomly wait
+        await asyncio.sleep(2)
 
     @mock.patch.object(ContractMetadataService, "enabled_clients")
     @mock.patch.object(
@@ -139,6 +144,7 @@ class TestAsyncTasks(DbAsyncConn):
     async def test_get_contract_metadata_task_with_proxy(
         self, etherscan_get_contract_metadata_mock: MagicMock, session: AsyncSession
     ):
+        await AbiSource(name="Etherscan", url="").create(session)
         etherscan_get_contract_metadata_mock.side_effect = [
             etherscan_proxy_metadata_mock,
             etherscan_metadata_mock,
@@ -149,16 +155,18 @@ class TestAsyncTasks(DbAsyncConn):
 
         get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
 
-        self._wait_tasks_execution()
+        await self._wait_tasks_execution()
 
+        self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 2)
         contract = await Contract.get_contract(
             session, HexBytes(contract_address), chain_id
         )
         self.assertIsNotNone(contract)
+        self.assertEqual(
+            HexBytes(contract.implementation), HexBytes(proxy_implementation_address)
+        )
 
         proxy_implementation = await Contract.get_contract(
             session, HexBytes(proxy_implementation_address), chain_id
         )
         self.assertIsNotNone(proxy_implementation)
-
-        self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 2)

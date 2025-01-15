@@ -102,3 +102,14 @@ async def get_missing_contract_metadata_task(session: AsyncSession) -> None:
             chain_id=contract[0].chain_id,
             skip_attemp_download=True,
         )
+
+
+@dramatiq.actor(periodic=cron("0 5 * * *"))  # Every day at 5 am
+@database_session
+async def update_proxies_task(session: AsyncSession) -> None:
+    async for proxy_contract in Contract.get_proxy_contracts(session):
+        get_contract_metadata_task.send(
+            address=HexBytes(proxy_contract[0].address).hex(),
+            chain_id=proxy_contract[0].chain_id,
+            skip_attemp_download=True,
+        )

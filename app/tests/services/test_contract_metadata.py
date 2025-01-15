@@ -309,3 +309,47 @@ class TestContractMetadataService(DbAsyncConn):
         self.assertIsNone(
             ContractMetadataService.get_proxy_implementation_address(contract_data)
         )
+
+    @database_session
+    async def test_process_metadata_should_update_contracts(
+        self, session: AsyncSession
+    ):
+        contract_address = Account.create().address
+        chain_id = 1
+        await AbiSource(name="Etherscan", url="").create(session)
+        contract_metadata = EnhancedContractMetadata(
+            address=contract_address,
+            metadata=etherscan_proxy_metadata_mock,
+            source=ClientSource.ETHERSCAN,
+            chain_id=1,
+        )
+        result = await ContractMetadataService.process_contract_metadata(
+            session, contract_metadata
+        )
+        self.assertTrue(result)
+        contract = await Contract.get_contract(
+            session, address=HexBytes(contract_address), chain_id=chain_id
+        )
+        self.assertEqual(
+            fast_to_checksum_address(contract.address), contract_metadata.address
+        )
+        self.assertEqual(
+            fast_to_checksum_address(contract.implementation),
+            contract_metadata.metadata.implementation,  # type: ignore
+        )
+        # Process metadata should update the db contract information
+        implementation_address = fast_to_checksum_address(Account.create().address)
+        contract_metadata.metadata.implementation = implementation_address  # type: ignore
+        result = await ContractMetadataService.process_contract_metadata(
+            session, contract_metadata
+        )
+        self.assertTrue(result)
+        contract = await Contract.get_contract(
+            session, address=HexBytes(contract_address), chain_id=chain_id
+        )
+        self.assertEqual(
+            fast_to_checksum_address(contract.address), contract_metadata.address
+        )
+        self.assertEqual(
+            fast_to_checksum_address(contract.implementation), implementation_address
+        )

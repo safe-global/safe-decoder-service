@@ -305,3 +305,16 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         result = await session.stream(query)
         async for contract in result:
             yield contract
+
+    @classmethod
+    async def get_proxy_contracts(cls, session: AsyncSession):
+        """
+        Return all the contracts with implementation address, so proxy contracts.
+
+        :param session:
+        :return:
+        """
+        query = select(cls).where(cls.implementation != None)  # noqa: E711
+        result = await session.stream(query)
+        async for contract in result:
+            yield contract
