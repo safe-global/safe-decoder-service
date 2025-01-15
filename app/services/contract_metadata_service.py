@@ -27,7 +27,7 @@ from app.datasources.db.models import Abi, AbiSource, Contract
 logger = logging.getLogger(__name__)
 
 
-class ClientSource(enum.Enum):
+class ContractSource(enum.Enum):
     ETHERSCAN = "Etherscan"
     SOURCIFY = "Sourcify"
     BLOCKSCOUT = "Blockscout"
@@ -37,7 +37,7 @@ class ClientSource(enum.Enum):
 class EnhancedContractMetadata:
     address: ChecksumAddress
     metadata: ContractMetadata | None
-    source: ClientSource | None
+    source: ContractSource | None
     chain_id: int
 
 
@@ -93,34 +93,28 @@ class ContractMetadataService:
         self, chain_id: int
     ) -> list[AsyncEtherscanClientV2 | AsyncBlockscoutClient | AsyncSourcifyClient]:
         """
-        Return a list of available chains for the provided chain_id.
-        First etherscan, second sourcify, third blockscout.
-
         :param chain_id:
-        :return:
+        :return: List of available clients for the provided `chain_id`.
+            First Etherscan, second Sourcify, third Blockscout.
         """
-        enabled_clients: list[
-            AsyncEtherscanClientV2 | AsyncBlockscoutClient | AsyncSourcifyClient
-        ] = []
-        if etherscan_client := self._get_etherscan_client(chain_id):
-            enabled_clients.append(etherscan_client)
-        if sourcify_client := self._get_sourcify_client(chain_id):
-            enabled_clients.append(sourcify_client)
-        if blockscout_client := self._get_blockscout_client(chain_id):
-            enabled_clients.append(blockscout_client)
-        return enabled_clients
+        clients = (
+            self._get_etherscan_client(chain_id),
+            self._get_sourcify_client(chain_id),
+            self._get_blockscout_client(chain_id),
+        )
+        return [client for client in clients if client]
 
     @staticmethod
     @cache
     def get_client_enum(
         client: AsyncEtherscanClientV2 | AsyncSourcifyClient | AsyncBlockscoutClient,
-    ) -> ClientSource:
+    ) -> ContractSource:
         if isinstance(client, AsyncEtherscanClientV2):
-            return ClientSource.ETHERSCAN
-        elif isinstance(client, AsyncSourcifyClient):
-            return ClientSource.SOURCIFY
-        elif isinstance(client, AsyncBlockscoutClient):
-            return ClientSource.BLOCKSCOUT
+            return ContractSource.ETHERSCAN
+        if isinstance(client, AsyncSourcifyClient):
+            return ContractSource.SOURCIFY
+        if isinstance(client, AsyncBlockscoutClient):
+            return ContractSource.BLOCKSCOUT
 
     async def get_contract_metadata(
         self, contract_address: ChecksumAddress, chain_id: int
@@ -138,7 +132,6 @@ class ContractMetadataService:
                     contract_address
                 )
                 if contract_metadata:
-
                     return EnhancedContractMetadata(
                         address=contract_address,
                         metadata=contract_metadata,
@@ -174,7 +167,7 @@ class ContractMetadataService:
             address=HexBytes(contract_metadata.address),
             chain_id=contract_metadata.chain_id,
         )
-        with_metadata: bool
+
         if contract_metadata.metadata:
             if contract_metadata.source:
                 source = await AbiSource.get_abi_source(
@@ -196,13 +189,10 @@ class ContractMetadataService:
                 contract.implementation = HexBytes(
                     contract_metadata.metadata.implementation
                 )
-            with_metadata = True
-        else:
-            with_metadata = False
 
         contract.fetch_retries += 1
         await contract.update(session=session)
-        return with_metadata
+        return bool(contract_metadata.metadata)
 
     @staticmethod
     def get_proxy_implementation_address(
@@ -220,23 +210,21 @@ class ContractMetadataService:
         max_retries: int,
     ) -> bool:
         """
-        Return True if fetch retries is less than the number of retries and there is not ABI, False otherwise.
-        False is being cached to avoid query the database in the future for the same number of retries.
-
         :param session:
         :param contract_address:
         :param chain_id:
         :param max_retries:
-        :return:
+        :return: `True` if `fetch retries` are less than the number of `max_retries` and there is not ABI, `False` otherwise.
+            `False` is being cached to avoid query the database in the future for the same number of retries.
         """
         redis = get_redis()
         cache_key = (
             f"should_attempt_download:{contract_address}:{chain_id}:{max_retries}"
         )
         # Try from cache first
-        cached_retries = cast(str, redis.get(cache_key))
-        if cached_retries:
-            return bool(int(cached_retries))
+        cached_retries: bytes = cast(bytes, redis.get(cache_key))
+        if cached_retries is not None:
+            return bool(int(cached_retries.decode()))
         else:
             contract = await Contract.get_contract(
                 session, address=HexBytes(contract_address), chain_id=chain_id
