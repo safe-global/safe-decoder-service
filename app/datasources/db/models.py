@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import AsyncIterator, Self, cast
 
-from sqlalchemy import Row
+from sqlalchemy import DateTime, Row
 from sqlmodel import (
     JSON,
     Column,
@@ -46,15 +46,17 @@ class TimeStampedSQLModel(SQLModel):
     """
 
     created: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
+        sa_type=DateTime(timezone=True),  # type: ignore
     )
 
     modified: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
+        sa_type=DateTime(timezone=True),  # type: ignore
         sa_column_kwargs={
-            "onupdate": lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+            "onupdate": lambda: datetime.now(timezone.utc),
         },
     )
 
