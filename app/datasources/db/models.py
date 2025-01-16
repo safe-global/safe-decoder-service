@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import AsyncGenerator, AsyncIterator, cast
+from typing import AsyncIterator, Self, cast
 
-from sqlalchemy import DateTime, Row
+from sqlalchemy import DateTime
 from sqlmodel import (
     JSON,
     Column,
@@ -80,7 +80,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
         :param name: The name to check or create.
         :param url: The URL to check or create.
         :return: A tuple containing the AbiSource object and a boolean indicating
-                 whether it was created (True) or already exists (False).
+                 whether it was created `True` or already exists `False`.
         """
         query = select(cls).where(cls.name == name, cls.url == url)
         results = await session.exec(query)
@@ -168,7 +168,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :param relevance:
         :param source_id:
         :return: A tuple containing the Abi object and a boolean indicating
-                 whether it was created (True) or already exists (False).
+                 whether it was created `True` or already exists `False`.
         """
         if abi := await cls.get_abi(session, abi_json):
             return abi, False
@@ -218,7 +218,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         Return a statement to get contracts for the provided address and chain_id
 
         :param address:
-        :param chain_ids: list of chain_ids, None for all chains
+        :param chain_ids: list of chain_ids, `None` for all chains
         :return:
         """
         query = select(cls).where(cls.address == address)
@@ -286,7 +286,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_contracts_without_abi(
         cls, session: AsyncSession, max_retries: int = 0
-    ) -> AsyncGenerator["Contract", None]:
+    ) -> AsyncIterator[Self]:
         """
         Fetches contracts without an ABI and fewer retries than max_retries,
         streaming results in batches to reduce memory usage for large datasets.
@@ -307,16 +307,14 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield contract
 
     @classmethod
-    async def get_proxy_contracts(
-        cls, session: AsyncSession
-    ) -> AsyncGenerator["Contract", None]:
+    async def get_proxy_contracts(cls, session: AsyncSession) -> AsyncIterator[Self]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 
         :param session:
         :return:
         """
-        query = select(cls).where(cls.implementation != None)  # noqa: E711
+        query = select(cls).where(cls.implementation.isnot(None))  # type: ignore
         result = await session.stream(query)
         async for (contract,) in result:
             yield contract

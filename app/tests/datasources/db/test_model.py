@@ -8,8 +8,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
 from app.services.contract_metadata_service import (
-    ClientSource,
     ContractMetadataService,
+    ContractSource,
     EnhancedContractMetadata,
 )
 
@@ -184,7 +184,7 @@ class TestModel(DbAsyncConn):
         enhanced_contract_metadata = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_proxy_metadata_mock,
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         result = await ContractMetadataService.process_contract_metadata(

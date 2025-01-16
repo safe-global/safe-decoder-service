@@ -321,7 +321,7 @@ class TestContractMetadataService(DbAsyncConn):
         contract_metadata = EnhancedContractMetadata(
             address=contract_address,
             metadata=copy(etherscan_proxy_metadata_mock),  # Avoid race condition
-            source=ClientSource.ETHERSCAN,
+            source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
         result = await ContractMetadataService.process_contract_metadata(
