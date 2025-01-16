@@ -58,7 +58,6 @@ from app.datasources.abis.sight import (
 )
 from app.datasources.abis.snapshot import snapshot_delegate_registry_abi
 from app.datasources.abis.timelock import timelock_abi
-from app.datasources.db.database import database_session
 from app.datasources.db.models import Abi, AbiSource
 
 
@@ -81,7 +80,6 @@ class AbiService:
                     abi_json=abi_json, source_id=abi_source.id, relevance=relevance
                 ).create(session)
 
-    @database_session
     async def load_local_abis_in_database(self, session: AsyncSession) -> None:
         abi_source, _ = await AbiSource.get_or_create(
             session, "localstorage", "decoder-service"

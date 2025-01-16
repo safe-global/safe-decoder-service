@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from . import VERSION
+from .datasources.db.database import get_engine
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, default
@@ -33,7 +36,8 @@ async def lifespan(app: FastAPI):
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
-        await abi_service.load_local_abis_in_database()
+        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+            await abi_service.load_local_abis_in_database(session)
         yield
     finally:
         if consume_task:

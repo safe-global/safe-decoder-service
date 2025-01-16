@@ -6,6 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from ...datasources.db.database import database_session
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
+from ...utils import datetime_to_str
 from ..datasources.db.db_async_conn import DbAsyncConn
 from ..mocks.abi_mock import mock_abi_json
 
@@ -42,11 +43,11 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(results[0]["address"], address_expected)
         self.assertEqual(results[0]["abi"]["abi_json"], mock_abi_json)
         self.assertEqual(results[0]["abi"]["abi_hash"], "0xb4b61541")
-        self.assertEqual(results[0]["abi"]["modified"], abi.modified.isoformat())
+        self.assertEqual(results[0]["abi"]["modified"], datetime_to_str(abi.modified))
         self.assertEqual(results[0]["display_name"], None)
         self.assertEqual(results[0]["chain_id"], 1)
         self.assertEqual(results[0]["project"], None)
-        self.assertEqual(results[0]["modified"], contract.modified.isoformat())
+        self.assertEqual(results[0]["modified"], datetime_to_str(contract.modified))
         # Test filter by chain_id
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=5, abi=abi
