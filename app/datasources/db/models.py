@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import AsyncIterator, Self, cast
+from typing import AsyncGenerator, AsyncIterator, cast
 
 from sqlalchemy import DateTime, Row
 from sqlmodel import (
@@ -80,7 +80,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
         :param name: The name to check or create.
         :param url: The URL to check or create.
         :return: A tuple containing the AbiSource object and a boolean indicating
-                 whether it was created `True` or already exists `False`.
+                 whether it was created (True) or already exists (False).
         """
         query = select(cls).where(cls.name == name, cls.url == url)
         results = await session.exec(query)
@@ -168,7 +168,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :param relevance:
         :param source_id:
         :return: A tuple containing the Abi object and a boolean indicating
-                 whether it was created `True` or already exists `False`.
+                 whether it was created (True) or already exists (False).
         """
         if abi := await cls.get_abi(session, abi_json):
             return abi, False
@@ -218,7 +218,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         Return a statement to get contracts for the provided address and chain_id
 
         :param address:
-        :param chain_ids: list of chain_ids, `None` for all chains
+        :param chain_ids: list of chain_ids, None for all chains
         :return:
         """
         query = select(cls).where(cls.address == address)
@@ -307,7 +307,9 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield contract
 
     @classmethod
-    async def get_proxy_contracts(cls, session: AsyncSession):
+    async def get_proxy_contracts(
+        cls, session: AsyncSession
+    ) -> AsyncGenerator["Contract"]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 
