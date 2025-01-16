@@ -10,7 +10,7 @@ from . import VERSION
 from .datasources.db.database import get_engine
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
-from .routers import about, admin, contracts, default
+from .routers import about, admin, contracts, data_decoder, default
 from .services.abis import AbiService
 from .services.events import EventsService
 
@@ -62,5 +62,6 @@ api_v1_router = APIRouter(
 )
 api_v1_router.include_router(about.router)
 api_v1_router.include_router(contracts.router)
+api_v1_router.include_router(data_decoder.router)
 app.include_router(api_v1_router)
 app.include_router(default.router)
