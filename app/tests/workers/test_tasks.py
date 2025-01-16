@@ -9,6 +9,7 @@ from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import AsyncEtherscanClientV2
+from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
@@ -66,17 +67,24 @@ class TestAsyncTasks(DbAsyncConn):
 
     async def asyncSetUp(self):
         await super().asyncSetUp()
-        self.worker = Worker(redis_broker)
+        self.worker = Worker(redis_broker, worker_threads=1)
         self.worker.start()
 
     async def asyncTearDown(self):
         await super().asyncTearDown()
         self.worker.stop()
+        redis = get_redis()
+        redis.flushall()
 
     def _wait_tasks_execution(self):
+        # Ensure that all the messages on redis were consumed
         redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
         while len(redis_tasks) > 0:
             redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
+
+        # Wait for all the messages on the given queue to be processed.
+        # This method is only meant to be used in tests
+        self.worker.broker.join("default")
 
     @mock.patch.object(ContractMetadataService, "enabled_clients")
     @mock.patch.object(
@@ -139,6 +147,7 @@ class TestAsyncTasks(DbAsyncConn):
     async def test_get_contract_metadata_task_with_proxy(
         self, etherscan_get_contract_metadata_mock: MagicMock, session: AsyncSession
     ):
+        await AbiSource(name="Etherscan", url="").create(session)
         etherscan_get_contract_metadata_mock.side_effect = [
             etherscan_proxy_metadata_mock,
             etherscan_metadata_mock,
@@ -155,10 +164,14 @@ class TestAsyncTasks(DbAsyncConn):
             session, HexBytes(contract_address), chain_id
         )
         self.assertIsNotNone(contract)
-
+        self.assertEqual(
+            fast_to_checksum_address(contract.implementation),
+            proxy_implementation_address,
+        )
         proxy_implementation = await Contract.get_contract(
             session, HexBytes(proxy_implementation_address), chain_id
         )
         self.assertIsNotNone(proxy_implementation)
+        self.assertEqual(contract.implementation, proxy_implementation.address)
 
         self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 2)

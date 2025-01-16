@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import AsyncIterator, Self, cast
 
-from sqlalchemy import DateTime, Row
+from sqlalchemy import DateTime
 from sqlmodel import (
     JSON,
     Column,
@@ -286,7 +286,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_contracts_without_abi(
         cls, session: AsyncSession, max_retries: int = 0
-    ) -> AsyncIterator[Row[tuple[Self]]]:
+    ) -> AsyncIterator[Self]:
         """
         Fetches contracts without an ABI and fewer retries than max_retries,
         streaming results in batches to reduce memory usage for large datasets.
@@ -303,5 +303,18 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             .where(cls.fetch_retries <= max_retries)
         )
         result = await session.stream(query)
-        async for contract in result:
+        async for (contract,) in result:
+            yield contract
+
+    @classmethod
+    async def get_proxy_contracts(cls, session: AsyncSession) -> AsyncIterator[Self]:
+        """
+        Return all the contracts with implementation address, so proxy contracts.
+
+        :param session:
+        :return:
+        """
+        query = select(cls).where(cls.implementation.isnot(None))  # type: ignore
+        result = await session.stream(query)
+        async for (contract,) in result:
             yield contract

@@ -1,10 +1,19 @@
+from typing import cast
+
 from eth_account import Account
 from hexbytes import HexBytes
+from safe_eth.eth.utils import fast_to_checksum_address
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.datasources.db.database import database_session
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
+from app.services.contract_metadata_service import (
+    ContractMetadataService,
+    ContractSource,
+    EnhancedContractMetadata,
+)
 
+from ...mocks.contract_metadata_mocks import etherscan_proxy_metadata_mock
 from .db_async_conn import DbAsyncConn
 
 
@@ -150,7 +159,7 @@ class TestModel(DbAsyncConn):
             address=random_address, name="A test contract", chain_id=1
         ).create(session)
         async for contract in Contract.get_contracts_without_abi(session, 0):
-            self.assertEqual(expected_contract, contract[0])
+            self.assertEqual(expected_contract, contract)
 
         # Contracts with more retries shouldn't be returned
         expected_contract.fetch_retries = 1
@@ -163,3 +172,30 @@ class TestModel(DbAsyncConn):
         await expected_contract.update(session)
         async for contract in Contract.get_contracts_without_abi(session, 10):
             self.fail("Expected no contracts, but found one.")
+
+    @database_session
+    async def test_get_proxy_contracts(self, session: AsyncSession):
+        # Test empty case
+        async for proxy_contract in Contract.get_proxy_contracts(session):
+            self.fail("Expected no proxies, but found one.")
+
+        random_address = Account.create().address
+        await AbiSource(name="Etherscan", url="").create(session)
+        enhanced_contract_metadata = EnhancedContractMetadata(
+            address=random_address,
+            metadata=etherscan_proxy_metadata_mock,
+            source=ContractSource.ETHERSCAN,
+            chain_id=1,
+        )
+        result = await ContractMetadataService.process_contract_metadata(
+            session, enhanced_contract_metadata
+        )
+        self.assertTrue(result)
+        async for proxy_contract in Contract.get_proxy_contracts(session):
+            self.assertEqual(
+                fast_to_checksum_address(proxy_contract.address), random_address
+            )
+            self.assertEqual(
+                fast_to_checksum_address(cast(bytes, proxy_contract.implementation)),
+                "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
+            )
