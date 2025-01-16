@@ -1,3 +1,5 @@
+from typing import cast
+
 from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
@@ -157,7 +159,7 @@ class TestModel(DbAsyncConn):
             address=random_address, name="A test contract", chain_id=1
         ).create(session)
         async for contract in Contract.get_contracts_without_abi(session, 0):
-            self.assertEqual(expected_contract, contract[0])
+            self.assertEqual(expected_contract, contract)
 
         # Contracts with more retries shouldn't be returned
         expected_contract.fetch_retries = 1
@@ -194,6 +196,6 @@ class TestModel(DbAsyncConn):
                 fast_to_checksum_address(proxy_contract.address), random_address
             )
             self.assertEqual(
-                fast_to_checksum_address(proxy_contract.implementation),
+                fast_to_checksum_address(cast(bytes, proxy_contract.implementation)),
                 "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
             )

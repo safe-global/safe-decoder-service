@@ -286,7 +286,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_contracts_without_abi(
         cls, session: AsyncSession, max_retries: int = 0
-    ) -> AsyncIterator[Row[tuple[Self]]]:
+    ) -> AsyncGenerator["Contract", None]:
         """
         Fetches contracts without an ABI and fewer retries than max_retries,
         streaming results in batches to reduce memory usage for large datasets.
@@ -303,13 +303,13 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             .where(cls.fetch_retries <= max_retries)
         )
         result = await session.stream(query)
-        async for contract in result:
+        async for (contract,) in result:
             yield contract
 
     @classmethod
     async def get_proxy_contracts(
         cls, session: AsyncSession
-    ) -> AsyncGenerator["Contract"]:
+    ) -> AsyncGenerator["Contract", None]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 

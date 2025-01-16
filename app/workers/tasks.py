@@ -97,8 +97,8 @@ async def get_missing_contract_metadata_task():
             session, settings.CONTRACT_MAX_DOWNLOAD_RETRIES
         ):
             get_contract_metadata_task.send(
-                address=HexBytes(contract[0].address).hex(),
-                chain_id=contract[0].chain_id,
+                address=HexBytes(contract.address).hex(),
+                chain_id=contract.chain_id,
                 skip_attemp_download=True,
             )
 
