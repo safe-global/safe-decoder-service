@@ -75,7 +75,7 @@ class DataDecoderInput(BaseModel):
     data: str = Field(
         ..., pattern=r"^0x[0-9a-fA-F]*$", description="0x-prefixed hexadecimal string"
     )
-    to: str | None = Field(
+    to: ChecksumAddress | None = Field(
         None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
     )
     chainId: int | None = Field(
