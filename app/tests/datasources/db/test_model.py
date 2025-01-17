@@ -38,10 +38,27 @@ class TestModel(DbAsyncConn):
         await abi.create(session)
         contract = Contract(address=b"a", name="A test contract", chain_id=1, abi=abi)
         await contract.create(session)
-        result = await contract.get_abi_by_contract_address(session, contract.address)
+        result = await contract.get_abi_by_contract_address(
+            session, contract.address, 1
+        )
         self.assertEqual(result, abi_json)
 
-        self.assertIsNone(await contract.get_abi_by_contract_address(session, b"b"))
+        # Check chain_id not matching
+        result = await contract.get_abi_by_contract_address(
+            session, contract.address, 2
+        )
+        self.assertIsNone(result)
+
+        # Ignoring chain_id
+        result = await contract.get_abi_by_contract_address(
+            session, contract.address, None
+        )
+        self.assertEqual(result, abi_json)
+
+        # Check address not matching
+        self.assertIsNone(
+            await contract.get_abi_by_contract_address(session, b"b", None)
+        )
 
     @database_session
     async def test_project(self, session: AsyncSession):

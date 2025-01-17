@@ -270,15 +270,24 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
 
     @classmethod
     async def get_abi_by_contract_address(
-        cls, session: AsyncSession, address: bytes
+        cls, session: AsyncSession, address: bytes, chain_id: int | None
     ) -> ABI | None:
-        # TODO Add chain_id filter to support multichain
-        results = await session.exec(
+        """
+        :return: Json ABI given the contract `address` and `chain_id`. If `chain_id` is not given,
+            sort the ABIs by `chain_id` and return the first one.
+        """
+        query = (
             select(Abi.abi_json)
             .join(cls)
             .where(cls.address == address)
             .where(cls.abi_id == Abi.id)
         )
+        if chain_id is not None:
+            query = query.where(cls.chain_id == chain_id)
+        else:
+            query = query.order_by(col(cls.chain_id))
+
+        results = await session.exec(query)
         if result := results.first():
             return cast(ABI, result)
         return None
