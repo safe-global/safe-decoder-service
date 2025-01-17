@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 EXPOSE 8888/tcp
 ARG APP_HOME=/app
@@ -11,15 +11,19 @@ RUN set -ex \
 		build-essential \
         git \
 		libssl-dev \
+        curl \
 		" \
     && apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends $buildDeps \
+    && curl https://sh.rustup.rs -sSf | sh -s -- -y \
+	&& export PATH="$PATH:$HOME/.cargo/bin" \
     && pip install -U --no-cache-dir wheel setuptools pip \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir ipython \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
+    && rustup self uninstall -y \
     && find /usr/local \
         \( -type d -a -name test -o -name tests \) \
         -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
