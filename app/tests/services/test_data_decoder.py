@@ -520,7 +520,7 @@ class TestDataDecoderService(DbAsyncConn):
 
     @database_session
     async def test_db_tx_decoder_multichain(self, session: AsyncSession):
-        # Both ABIs generate the same function selector, but they have different parameter names, so
+        # Both ABIs generate the same function selector, but with differently ordered parameter names, so
         # decoding will be different
         example_abi = cast(
             ABI,
