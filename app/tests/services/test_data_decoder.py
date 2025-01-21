@@ -109,6 +109,7 @@ class TestDataDecoderService(DbAsyncConn):
             await abi.create(session)
 
     async def test_get_data_decoder_service(self):
+        get_data_decoder_service.cache_clear()
         data_decoder_service = await get_data_decoder_service()
         assert data_decoder_service.fn_selectors_with_abis == {}
 
@@ -515,8 +516,6 @@ class TestDataDecoderService(DbAsyncConn):
         )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
-        # self.assertIn((contract.address,), decoder_service.cache_abis_by_address)
-        # self.assertIn( (contract.address,), decoder_service.cache_contract_abi_selectors_with_functions_by_address, )
 
     @database_session
     async def test_db_tx_decoder_multichain(self, session: AsyncSession):

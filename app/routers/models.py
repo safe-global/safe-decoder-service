@@ -78,8 +78,11 @@ class DataDecoderInput(BaseModel):
     to: ChecksumAddress | None = Field(
         None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
     )
-    chainId: int | None = Field(
-        None, gt=0, description="Optional Chain ID as a positive integer"
+    chain_id: int | None = Field(
+        None,
+        gt=0,
+        description="Optional Chain ID as a positive integer",
+        alias="chainId",
     )
 
     @field_validator("to")
