@@ -14,9 +14,10 @@ async def data_decoder(
     input_data: DataDecoderInput,
 ) -> DataDecoded:
     data_decoder_service = await get_data_decoder_service()
-    # TODO: Add chainId to get_data_decoded
     data_decoded = await data_decoder_service.get_data_decoded(
-        data=input_data.data, address=input_data.to
+        input_data.data,
+        address=input_data.to,
+        chain_id=input_data.chain_id,
     )
 
     if data_decoded is None:
