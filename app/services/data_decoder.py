@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
 
 from async_lru import alru_cache
@@ -43,6 +44,15 @@ class ParameterDecoded(TypedDict):
 class DataDecoded(TypedDict):
     method: str
     parameters: list[ParameterDecoded]
+
+
+class DecodingAccuracyEnum(Enum):
+    FULL_MATCH = "FULL_MATCH"  # Matched contract and chain id
+    PARTIAL_MATCH = "PARTIAL_MATCH"  # Matched contract
+    ONLY_FUNCTION_MATCH = (
+        "ONLY_FUNCTION_MATCH"  # Matched function from another contract
+    )
+    NO_MATCH = "NO_MATCH"  # Selector cannot be decoded
 
 
 class MultisendDecoded(TypedDict):
@@ -430,6 +440,36 @@ class DataDecoderService:
             d["name"]: d["value"] for d in decoded_transactions_with_types
         }
         return fn_name, decoded_transactions
+
+    async def get_decoding_accuracy(
+        self,
+        data: bytes | str,
+        address: Address | None = None,
+        chain_id: int | None = None,
+    ) -> DecodingAccuracyEnum:
+        """
+        Get decoding accuracy:
+            - FULL_MATCH: Contract `address` and `chain_id` matching
+            - PARTIAL_MATCH: Only contract `address` matching
+            - ONLY_FUNCTION_MATCH: Match with a function of another contract
+            - NO_MATCH: Cannot decode `data`
+
+        :param data:
+        :param address:
+        :param chain_id:
+        :return: DecodingAccuracyEnum
+        """
+        selector = HexBytes(data)[:4]
+        if selector not in self.fn_selectors_with_abis:
+            return DecodingAccuracyEnum.NO_MATCH
+        if address is not None:
+            if chain_id is not None and await self.get_contract_abi(
+                address, chain_id=chain_id
+            ):
+                return DecodingAccuracyEnum.FULL_MATCH
+            if await self.get_contract_abi(address, None):
+                return DecodingAccuracyEnum.PARTIAL_MATCH
+        return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
     def add_abi(self, abi: ABI) -> bool:
         """
