@@ -10,6 +10,8 @@ from safe_eth.eth.utils import (
     fast_to_checksum_address,
 )
 
+from ..services.data_decoder import DecodingAccuracyEnum
+
 
 class About(BaseModel):
     version: str
@@ -104,6 +106,7 @@ class ParameterDecodedPublic(BaseModel):
 class DataDecodedPublic(BaseModel):
     method: str
     parameters: list[ParameterDecodedPublic]
+    accuracy: DecodingAccuracyEnum
 
 
 class MultisendDecodedPublic(BaseModel):

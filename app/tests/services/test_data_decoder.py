@@ -1,5 +1,3 @@
-from typing import cast
-
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -13,7 +11,6 @@ from safe_eth.eth.utils import get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
-from web3.types import ABI
 
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
 from app.datasources.abis.gnosis_protocol import (
@@ -27,11 +24,14 @@ from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
     CannotDecode,
     DataDecoderService,
+    DecodingAccuracyEnum,
     UnexpectedProblemDecoding,
     get_data_decoder_service,
 )
 from ..datasources.db.db_async_conn import DbAsyncConn
 from .mocks_data_decoder import (
+    example_abi,
+    example_swapped_abi,
     exec_transaction_data_mock,
     exec_transaction_decoded_mock,
     insufficient_data_bytes_mock,
@@ -416,30 +416,6 @@ class TestDataDecoderService(DbAsyncConn):
 
     @database_session
     async def test_db_tx_decoder(self, session: AsyncSession):
-        example_abi = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
@@ -476,34 +452,9 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
 
-        # Swap ABI parameters
-        swapped_abi = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
         abi = Abi(
             abi_hash=b"SwappedABI",
-            abi_json=swapped_abi,
+            abi_json=example_swapped_abi,
             relevance=100,
             source_id=source.id,
         )
@@ -519,57 +470,6 @@ class TestDataDecoderService(DbAsyncConn):
 
     @database_session
     async def test_db_tx_decoder_multichain(self, session: AsyncSession):
-        # Both ABIs generate the same function selector, but with differently ordered parameter names, so
-        # decoding will be different
-        example_abi = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
-        # Swap ABI parameters
-        example_abi_reversed = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
@@ -582,6 +482,8 @@ class TestDataDecoderService(DbAsyncConn):
         source = AbiSource(name="local", url="")
         await source.create(session)
 
+        # Both ABIs generate the same function selector, but with differently ordered parameter names, so
+        # decoding will be different
         abi = Abi(
             abi_hash=b"ExampleABI",
             abi_json=example_abi,
@@ -592,7 +494,7 @@ class TestDataDecoderService(DbAsyncConn):
 
         abi_reversed = Abi(
             abi_hash=b"ExampleABIReversed",
-            abi_json=example_abi_reversed,
+            abi_json=example_swapped_abi,
             relevance=100,
             source_id=source.id,
         )
@@ -615,28 +517,44 @@ class TestDataDecoderService(DbAsyncConn):
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=1
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=Address(contract.address), chain_id=2
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=2
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments_reversed)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
         # If chain_id is not matching, lower chain_id contract must be used
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=5
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=5
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.PARTIAL_MATCH)
 
         # If chain_id is not provided, lower chain_id contract must be used
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=None
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=None
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.PARTIAL_MATCH)
 
         # If no contract is matching but abi is on the database, it should be decoded using the more relevant ABI
         contract.address = b"b"
@@ -648,8 +566,12 @@ class TestDataDecoderService(DbAsyncConn):
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=1
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
         # Init a new service to remove caches
         decoder_service = DataDecoderService()
@@ -658,8 +580,12 @@ class TestDataDecoderService(DbAsyncConn):
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=contract_address, chain_id=1
+        )
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments_reversed)
+        self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
     @database_session
     async def test_decode_fallback_calls_db_tx_decoder(self, session: AsyncSession):
@@ -710,4 +636,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
         self.assertEqual(fn_name, "fallback")
         self.assertEqual(arguments, {})
-        # self.assertIn((contract_fallback.address,), decoder_service.cache_abis_by_address)
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_not_matched_data, address=Address(contract_fallback.address)
+        )
+        self.assertEqual(accuracy, DecodingAccuracyEnum.NO_MATCH)

@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi.testclient import TestClient
 
 from hexbytes import HexBytes
@@ -7,14 +5,14 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import get_empty_tx_params
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
-from web3.types import ABI
 
 from ...datasources.db.database import database_session
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
-from ...services.data_decoder import get_data_decoder_service
+from ...services.data_decoder import DecodingAccuracyEnum, get_data_decoder_service
 from ..datasources.db.db_async_conn import DbAsyncConn
+from ..services.mocks_data_decoder import example_abi, example_swapped_abi
 
 
 class TestRouterAbout(DbAsyncConn):
@@ -54,6 +52,7 @@ class TestRouterAbout(DbAsyncConn):
         self.assertEqual(
             response.json(),
             {
+                "accuracy": DecodingAccuracyEnum.ONLY_FUNCTION_MATCH.name,
                 "method": "addOwnerWithThreshold",
                 "parameters": [
                     {
@@ -87,54 +86,6 @@ class TestRouterAbout(DbAsyncConn):
 
     @database_session
     async def test_view_data_decoder_with_chain_id(self, session: AsyncSession):
-        example_abi = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
-        example_swapped_abi = cast(
-            ABI,
-            [
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "numberOfDroids",
-                            "type": "uint256",
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "droidId",
-                            "type": "uint256",
-                        },
-                    ],
-                    "name": "buyDroid",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                },
-            ],
-        )
-
         source = AbiSource(name="local", url="")
         await source.create(session)
 
@@ -185,6 +136,7 @@ class TestRouterAbout(DbAsyncConn):
         self.assertEqual(
             response.json(),
             {
+                "accuracy": DecodingAccuracyEnum.ONLY_FUNCTION_MATCH.name,
                 "method": "buyDroid",
                 "parameters": [
                     {
@@ -218,6 +170,7 @@ class TestRouterAbout(DbAsyncConn):
         self.assertEqual(
             response.json(),
             {
+                "accuracy": DecodingAccuracyEnum.FULL_MATCH.name,
                 "method": "buyDroid",
                 "parameters": [
                     {
@@ -228,6 +181,37 @@ class TestRouterAbout(DbAsyncConn):
                     },
                     {
                         "name": "droidId",
+                        "type": "uint256",
+                        "value": "10",
+                        "value_decoded": None,
+                    },
+                ],
+            },
+        )
+
+        response = self.client.post(
+            "/api/v1/data-decoder/",
+            json={
+                "data": example_data,
+                "to": contract_address,
+                "chainId": 3,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "accuracy": DecodingAccuracyEnum.PARTIAL_MATCH.name,
+                "method": "buyDroid",
+                "parameters": [
+                    {
+                        "name": "droidId",
+                        "type": "uint256",
+                        "value": "4",
+                        "value_decoded": None,
+                    },
+                    {
+                        "name": "numberOfDroids",
                         "type": "uint256",
                         "value": "10",
                         "value_decoded": None,
