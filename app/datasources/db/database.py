@@ -1,10 +1,12 @@
 import logging
-from collections.abc import AsyncGenerator
+import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import cache, wraps
+from typing import Generator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
-    AsyncSession,
     async_scoped_session,
     async_sessionmaker,
     create_async_engine,
@@ -12,12 +14,15 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 
 from ...config import settings
-from .session_scope import get_session_context, set_scoped_session_context
+
+logger = logging.getLogger(__name__)
 
 pool_classes = {
     NullPool.__name__: NullPool,
     AsyncAdaptedQueuePool.__name__: AsyncAdaptedQueuePool,
 }
+
+_session_context: ContextVar[str] = ContextVar("session_context")
 
 
 @cache
@@ -41,51 +46,55 @@ def get_engine() -> AsyncEngine:
         )
 
 
-async def get_database_session() -> AsyncGenerator:
-    async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-        yield session
-
-
-def database_session(func):
+@contextmanager
+def set_database_session_context(
+    session_id: str | None = None,
+) -> Generator[None, None, None]:
     """
-    Decorator that creates a new database session for the given function
+    Set session context var, at the end of the context removes it.
+    This context was done to be used with `async_scoped_session` and define a context scope.
 
-    :param func:
+    :param session_id:
     :return:
+    """
+    _session_id: str = session_id or str(uuid.uuid4())
+    token = _session_context.set(_session_id)
+    try:
+        yield
+    finally:
+        _session_context.reset(token)
+
+
+def get_database_session_context() -> str:
+    """
+    Function created to get the session context and be used as scope function on `async_scoped_session`.
+
+    :return: session_id for the current context
+    """
+    return _session_context.get()
+
+
+def db_session_context(func):
+    """
+    Wraps the decorated function inside `set_database_session_context` context.
+    At the end remove the session.
     """
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+        with set_database_session_context():
             try:
-                return await func(*args, **kwargs, session=session)
-            except Exception as e:
-                # Rollback errors
-                await session.rollback()
-                logging.error(f"Error occurred: {e}")
-                raise
+                return await func(*args, **kwargs)
+            finally:
+                logger.debug(
+                    f"Removing session context: {get_database_session_context()}"
+                )
+                await db_session.remove()
 
     return wrapper
 
 
 async_session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
 db_session = async_scoped_session(
-    session_factory=async_session_factory, scopefunc=get_session_context
+    session_factory=async_session_factory, scopefunc=get_database_session_context
 )
-
-
-def db_session_context(func):
-    """
-    A decorator that applies the `set_scoped_context` context manager to a function.
-    If no session_id is provided, a new UUID will be generated.
-    """
-
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        with set_scoped_session_context():
-            try:
-                return await func(*args, **kwargs)
-            finally:
-                await db_session.remove()
-
-    return wrapper

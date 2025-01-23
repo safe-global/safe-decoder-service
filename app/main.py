@@ -6,8 +6,7 @@ from urllib.request import Request
 from fastapi import APIRouter, FastAPI
 
 from . import VERSION
-from .datasources.db.database import db_session
-from .datasources.db.session_scope import set_scoped_session_context
+from .datasources.db.database import db_session, set_database_session_context
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -36,7 +35,7 @@ async def lifespan(app: FastAPI):
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
-        with set_scoped_session_context("LoadAbisOnStartup"):
+        with set_database_session_context("LoadAbisOnStartup"):
             await abi_service.load_local_abis_in_database()
         yield
     finally:
@@ -68,7 +67,7 @@ app.include_router(default.router)
 
 @app.middleware("http")
 async def set_session_middleware(request: Request, call_next):
-    with set_scoped_session_context():
+    with set_database_session_context():
         try:
             response = await call_next(request)
         finally:
