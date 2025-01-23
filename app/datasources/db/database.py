@@ -51,8 +51,8 @@ def set_database_session_context(
     session_id: str | None = None,
 ) -> Generator[None, None, None]:
     """
-    Set session context var, at the end of the context removes it.
-    This context was done to be used with `async_scoped_session` and define a context scope.
+    Set session context var, at the end of the context it will be removed.
+    This context is designed to be used with `async_scoped_session` to define a context scope.
 
     :param session_id:
     :return:
@@ -67,7 +67,8 @@ def set_database_session_context(
 
 def get_database_session_context() -> str:
     """
-    Function created to get the session context and be used as scope function on `async_scoped_session`.
+    Function created to get the session id context var.
+    Used as a scope function on `async_scoped_session´.
 
     :return: session_id for the current context
     """
@@ -76,8 +77,8 @@ def get_database_session_context() -> str:
 
 def db_session_context(func):
     """
-    Wraps the decorated function inside `set_database_session_context` context.
-    At the end remove the session.
+    Wrap the decorated function in the `set_database_session_context' context.    At the end remove the session.
+    Remove the session at the end of the context.
     """
 
     @wraps(func)
