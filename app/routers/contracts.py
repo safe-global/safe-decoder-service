@@ -27,6 +27,17 @@ async def list_contracts(
     pagination_params: PaginationQueryParams = Depends(),
     chain_ids: Annotated[list[int] | None, Query()] = None,
 ) -> PaginatedResponse[Contract]:
+    """
+    List all contracts for all the chains, or for the provided chains
+    Empty responses indicate that no contract was found
+
+    :param request:
+    :param address:
+    :param pagination_params:
+    :param chain_ids:
+    :param session:
+    :return:
+    """
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksumed")
 
