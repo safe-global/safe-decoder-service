@@ -22,7 +22,6 @@ async def data_decoder(
     input_data: DataDecoderInput,
 ) -> DataDecodedPublic:
     data_decoder_service = await get_data_decoder_service()
-    # TODO: Add chainId to get_data_decoded
     data_decoded = await data_decoder_service.get_data_decoded(
         input_data.data,
         address=cast(Address, input_data.to),
