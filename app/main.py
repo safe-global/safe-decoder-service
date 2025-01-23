@@ -77,6 +77,9 @@ async def set_session_context(request: Request, call_next):
     with set_database_session_context():
         try:
             response = await call_next(request)
+        except Exception as e:
+            raise e
         finally:
             await db_session.remove()
-            return response
+
+    return response
