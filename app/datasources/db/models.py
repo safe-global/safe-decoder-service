@@ -211,7 +211,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     chain_id: int = Field(default=None)
 
     @classmethod
-    def get_contracts_query(
+    def get_contracts_with_abi_query(
         cls, address: bytes, chain_ids: list[int] | None = None
     ) -> SelectBase["Contract"]:
         """
@@ -221,7 +221,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         :param chain_ids: list of chain_ids, `None` for all chains
         :return:
         """
-        query = select(cls).where(cls.address == address)
+        query = select(cls).where(cls.address == address, cls.abi_id.isnot(None))  # type: ignore
         if chain_ids:
             query = query.where(col(cls.chain_id).in_(chain_ids)).order_by(
                 col(cls.chain_id).desc()

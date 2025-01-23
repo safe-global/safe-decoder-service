@@ -20,16 +20,22 @@ class TestRouterContract(DbAsyncConn):
 
     @database_session
     async def test_view_contracts(self, session: AsyncSession):
+        address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
+        address = HexBytes(address_expected)
+        contract = Contract(address=address, name="A Test Contracts", chain_id=1)
+        await contract.create(session)
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 0)
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
         await source.create(session)
         abi = Abi(abi_json=mock_abi_json, source_id=source.id)
         await abi.create(session)
-        address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
-        address = HexBytes(address_expected)
-        contract = Contract(
-            address=address, name="A Test Contracts", chain_id=1, abi=abi
-        )
-        await contract.create(session)
+        contract.abi_id = abi.id
+        await contract.update(session)
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
