@@ -65,10 +65,10 @@ def set_database_session_context(
         _session_context.reset(token)
 
 
-def get_database_session_context() -> str:
+def _get_database_session_context() -> str:
     """
     Function created to get the session id context var.
-    Used as a scope function on `async_scoped_session´.
+    Used as a scope function on `async_scoped_session`.
 
     :return: session_id for the current context
     """
@@ -77,7 +77,8 @@ def get_database_session_context() -> str:
 
 def db_session_context(func):
     """
-    Wrap the decorated function in the `set_database_session_context' context.    At the end remove the session.
+    Wrap the decorated function in the `set_database_session_context` context.
+    Decorated function will share the same database session.
     Remove the session at the end of the context.
     """
 
@@ -88,7 +89,7 @@ def db_session_context(func):
                 return await func(*args, **kwargs)
             finally:
                 logger.debug(
-                    f"Removing session context: {get_database_session_context()}"
+                    f"Removing session context: {_get_database_session_context()}"
                 )
                 await db_session.remove()
 
@@ -97,5 +98,5 @@ def db_session_context(func):
 
 async_session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
 db_session = async_scoped_session(
-    session_factory=async_session_factory, scopefunc=get_database_session_context
+    session_factory=async_session_factory, scopefunc=_get_database_session_context
 )
