@@ -215,7 +215,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         cls, address: bytes, chain_ids: list[int] | None = None
     ) -> SelectBase["Contract"]:
         """
-        Return a statement to get contracts for the provided address and chain_id
+        Return a statement to get contracts with abi for the provided address and chain_id
 
         :param address:
         :param chain_ids: list of chain_ids, `None` for all chains
