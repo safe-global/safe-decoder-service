@@ -53,7 +53,7 @@ class ContractsPublic(BaseModel):
     display_name: str | None
     chain_id: int
     project: ProjectPublic | None
-    abi: AbiPublic | None
+    abi: AbiPublic
     modified: datetime
 
     class Config:
