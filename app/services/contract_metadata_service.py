@@ -18,7 +18,6 @@ from safe_eth.eth.clients import (
 )
 from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
 from safe_eth.eth.utils import fast_to_checksum_address
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
 from app.datasources.cache.redis import get_redis
@@ -153,17 +152,15 @@ class ContractMetadataService:
 
     @staticmethod
     async def process_contract_metadata(
-        session: AsyncSession, contract_metadata: EnhancedContractMetadata
+        contract_metadata: EnhancedContractMetadata,
     ) -> bool:
         """
         Store ABI and contract if exists, otherwise update contract fetch_retries.
 
-        :param session:
         :param contract_metadata:
         :return:
         """
         contract, _ = await Contract.get_or_create(
-            session=session,
             address=HexBytes(contract_metadata.address),
             chain_id=contract_metadata.chain_id,
         )
@@ -171,7 +168,7 @@ class ContractMetadataService:
         if contract_metadata.metadata:
             if contract_metadata.source:
                 source = await AbiSource.get_abi_source(
-                    session, name=cast(str, contract_metadata.source.value)
+                    name=cast(str, contract_metadata.source.value)
                 )
                 if source is None:
                     logging.error(
@@ -179,7 +176,6 @@ class ContractMetadataService:
                     )
                     return False
             abi, _ = await Abi.get_or_create_abi(
-                session,
                 abi_json=contract_metadata.metadata.abi,
                 source_id=source.id,
             )
@@ -191,7 +187,7 @@ class ContractMetadataService:
                 )
 
         contract.fetch_retries += 1
-        await contract.update(session=session)
+        await contract.update()
         return bool(contract_metadata.metadata)
 
     @staticmethod
@@ -204,13 +200,11 @@ class ContractMetadataService:
 
     @staticmethod
     async def should_attempt_download(
-        session: AsyncSession,
         contract_address: ChecksumAddress,
         chain_id: int,
         max_retries: int,
     ) -> bool:
         """
-        :param session:
         :param contract_address:
         :param chain_id:
         :param max_retries:
@@ -227,7 +221,7 @@ class ContractMetadataService:
             return bool(int(cached_retries.decode()))
         else:
             contract = await Contract.get_contract(
-                session, address=HexBytes(contract_address), chain_id=chain_id
+                address=HexBytes(contract_address), chain_id=chain_id
             )
 
             if contract and (contract.fetch_retries > max_retries or contract.abi_id):

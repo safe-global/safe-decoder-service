@@ -16,7 +16,6 @@ from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_da
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
 from web3.types import ABI, ABIFunction
 
-from ..datasources.db.database import database_session
 from ..datasources.db.models import Abi, Contract
 
 logger = logging.getLogger(__name__)
@@ -64,10 +63,9 @@ class MultisendDecoded(TypedDict):
 
 
 @alru_cache
-@database_session
-async def get_data_decoder_service(session: AsyncSession) -> "DataDecoderService":
+async def get_data_decoder_service() -> "DataDecoderService":
     data_decoder_service = DataDecoderService()
-    await data_decoder_service.init(session)
+    await data_decoder_service.init()
     return data_decoder_service
 
 
@@ -81,7 +79,7 @@ class DataDecoderService:
     multisend_abis: list[ABI]
     multisend_fn_selectors_with_abis: dict[bytes, ABIFunction]
 
-    async def init(self, session: AsyncSession) -> None:
+    async def init(self) -> None:
         """
         Initialize the data decoder service, loading the ABIs from the database and storing the 4byte selectors
         in memory
@@ -89,7 +87,7 @@ class DataDecoderService:
         logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
         self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
             await self._generate_selectors_with_abis_from_abis(
-                await self.get_supported_abis(session)
+                await self.get_supported_abis()
             )
         )
         logger.info(
@@ -131,35 +129,29 @@ class DataDecoderService:
             ).items()
         }
 
-    async def get_supported_abis(self, session: AsyncSession) -> AsyncIterator[ABI]:
+    async def get_supported_abis(self) -> AsyncIterator[ABI]:
         """
         :return: Every ABI in the database
         """
-        return Abi.get_abis_sorted_by_relevance(session)
+        return Abi.get_abis_sorted_by_relevance()
 
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
     @alru_cache(maxsize=2048)
-    @database_session
     async def get_contract_abi(
         self,
         address: Address,
         chain_id: int | None,
-        session: AsyncSession | None = None,
     ) -> ABI | None:
         """
         Retrieves the ABI for the contract at the given address.
 
         :param address: Contract address
         :param chain_id: Chain id for the contract
-        :param session: Database session, provided by the decorator
         :return: List of ABI data if found, `None` otherwise.
         """
-        assert session is not None
-        return await Contract.get_abi_by_contract_address(
-            session, HexBytes(address), chain_id
-        )
+        return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
 
     @alru_cache(maxsize=2048)
     async def get_contract_fallback_function(

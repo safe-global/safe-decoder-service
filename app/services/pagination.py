@@ -5,8 +5,9 @@ from pydantic import BaseModel
 
 from sqlalchemy import func
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.datastructures import URL
+
+from app.datasources.db.database import db_session
 
 T = TypeVar("T")
 
@@ -34,6 +35,7 @@ class GenericPagination:
         self.max_page_size = max_page_size
         self.limit = min(limit, max_page_size) if limit else default_page_size
         self.offset = offset if offset else 0
+        self.session = db_session()
 
     def get_next_page(self, url: URL, count: int) -> str | None:
         """
@@ -60,18 +62,19 @@ class GenericPagination:
             return str(url.include_query_params(limit=self.limit, offset=prev_offset))
         return None
 
-    async def get_page(self, session: AsyncSession, query) -> list[Any]:
+    async def get_page(self, query) -> list[Any]:
         """
         Get from database the requested page
 
-        :param session:
         :param query:
         :return:
         """
-        queryset = await session.exec(query.offset(self.offset).limit(self.limit))
-        return queryset.all()
+        queryset = await self.session.execute(
+            query.offset(self.offset).limit(self.limit)
+        )
+        return queryset.scalars().all()
 
-    async def get_count(self, session: AsyncSession, query) -> int:
+    async def get_count(self, query) -> int:
         """
         Get from database the count of rows that fit the query
 
@@ -79,8 +82,10 @@ class GenericPagination:
         :param query:
         :return:
         """
-        count_query = await session.exec(select(func.count()).where(query._whereclause))
-        return count_query.one()
+        count_query = await self.session.execute(
+            select(func.count()).where(query._whereclause)
+        )
+        return count_query.scalars().one()
 
     def serialize(self, url: URL, results: list[Any], count: int) -> PaginatedResponse:
         """

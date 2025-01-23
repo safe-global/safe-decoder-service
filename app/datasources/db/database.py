@@ -2,11 +2,17 @@ import logging
 from collections.abc import AsyncGenerator
 from functools import cache, wraps
 
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_scoped_session,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ...config import settings
+from .session_scope import get_session_context, set_scoped_session_context
 
 pool_classes = {
     NullPool.__name__: NullPool,
@@ -58,5 +64,28 @@ def database_session(func):
                 await session.rollback()
                 logging.error(f"Error occurred: {e}")
                 raise
+
+    return wrapper
+
+
+async_session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
+db_session = async_scoped_session(
+    session_factory=async_session_factory, scopefunc=get_session_context
+)
+
+
+def session_context_decorator(func):
+    """
+    A decorator that applies the `set_scoped_context` context manager to a function.
+    If no session_id is provided, a new UUID will be generated.
+    """
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        with set_scoped_session_context():
+            try:
+                return await func(*args, **kwargs)
+            finally:
+                await db_session.remove()
 
     return wrapper

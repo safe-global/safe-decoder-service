@@ -1,7 +1,5 @@
 from typing import Sequence, Tuple
 
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 from app.datasources.db.models import Contract
 from app.services.pagination import GenericPagination
 
@@ -12,17 +10,16 @@ class ContractService:
         self.pagination = pagination
 
     @staticmethod
-    async def get_all(session: AsyncSession) -> Sequence[Contract]:
+    async def get_all() -> Sequence[Contract]:
         """
         Get all contracts
 
-        :param session: passed by the decorator
         :return:
         """
-        return await Contract.get_all(session)
+        return await Contract.get_all()
 
     async def get_contracts(
-        self, session: AsyncSession, address: bytes, chain_ids: list[int] | None
+        self, address: bytes, chain_ids: list[int] | None
     ) -> Tuple[list[Contract], int]:
         """
         Get the contract by address and/or chain_ids
@@ -33,9 +30,9 @@ class ContractService:
         :return:
         """
         page = await self.pagination.get_page(
-            session, Contract.get_contracts_query(address, chain_ids)
+            Contract.get_contracts_query(address, chain_ids)
         )
         count = await self.pagination.get_count(
-            session, Contract.get_contracts_query(address, chain_ids)
+            Contract.get_contracts_query(address, chain_ids)
         )
         return page, count
