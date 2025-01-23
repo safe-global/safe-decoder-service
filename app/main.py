@@ -66,11 +66,17 @@ app.include_router(default.router)
 
 
 @app.middleware("http")
-async def set_session_middleware(request: Request, call_next):
+async def set_session_context(request: Request, call_next):
+    """
+    Set the session context for the current request.
+
+    :param request:
+    :param call_next:
+    :return:
+    """
     with set_database_session_context():
         try:
             response = await call_next(request)
         finally:
-            # free memory after every request
             await db_session.remove()
             return response
