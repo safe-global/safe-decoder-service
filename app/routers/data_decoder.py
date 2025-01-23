@@ -1,6 +1,14 @@
+from typing import cast
+
 from fastapi import APIRouter, HTTPException
 
-from app.routers.models import DataDecodedPublic, DataDecoderInput
+from eth_typing import Address
+
+from app.routers.models import (
+    DataDecodedPublic,
+    DataDecoderInput,
+    ParameterDecodedPublic,
+)
 from app.services.data_decoder import get_data_decoder_service
 
 router = APIRouter(
@@ -17,7 +25,7 @@ async def data_decoder(
     # TODO: Add chainId to get_data_decoded
     data_decoded = await data_decoder_service.get_data_decoded(
         input_data.data,
-        address=input_data.to,
+        address=cast(Address, input_data.to),
         chain_id=input_data.chain_id,
     )
 
@@ -28,12 +36,12 @@ async def data_decoder(
 
     decoding_accuracy = await data_decoder_service.get_decoding_accuracy(
         input_data.data,
-        address=input_data.to,
+        address=cast(Address, input_data.to),
         chain_id=input_data.chain_id,
     )
 
     return DataDecodedPublic(
         method=data_decoded["method"],
-        parameters=data_decoded["parameters"],
+        parameters=cast(list[ParameterDecodedPublic], data_decoded["parameters"]),
         accuracy=decoding_accuracy,
     )

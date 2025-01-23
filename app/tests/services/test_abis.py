@@ -1,5 +1,6 @@
 from collections import Counter
 
+from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource
 from ...services.abis import AbiService
 from ...tests.datasources.db.db_async_conn import DbAsyncConn
@@ -11,6 +12,7 @@ class TestAbiService(DbAsyncConn):
         await super().asyncSetUp()
         self.abi_service = AbiService()
 
+    @db_session_context
     async def test_load_local_abis_in_database(self):
         self.assertEqual(await AbiSource.get_all(), [])
         self.assertEqual(await Abi.get_all(), [])

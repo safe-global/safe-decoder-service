@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from hexbytes import HexBytes
 
-from ...datasources.db.database import session_context_decorator
+from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...utils import datetime_to_str
@@ -17,7 +17,7 @@ class TestRouterContract(DbAsyncConn):
     def setUpClass(cls):
         cls.client = TestClient(app)
 
-    @session_context_decorator
+    @db_session_context
     async def test_view_contracts(self):
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
         await source.create()
@@ -63,7 +63,7 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["chain_id"], 5)
 
-    @session_context_decorator
+    @db_session_context
     async def test_contracts_pagination(self):
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
         await source.create()

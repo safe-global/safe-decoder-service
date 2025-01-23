@@ -13,9 +13,8 @@ from safe_eth.eth.clients import (
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.utils import fast_to_checksum_address
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.datasources.db.database import database_session
+from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
     ContractMetadataService,
@@ -158,20 +157,20 @@ class TestContractMetadataService(DbAsyncConn):
         enabled_clients = contract_metadata_service.enabled_clients(chain_id)
         self.assertEqual(len(enabled_clients), 0)
 
-    @database_session
-    async def test_process_contract_metadata(self, session: AsyncSession):
+    @db_session_context
+    async def test_process_contract_metadata(self):
         # New contract and abi
         random_address = Account.create().address
-        await AbiSource.get_or_create(session, "Etherscan", "")
+        await AbiSource.get_or_create("Etherscan", "")
         contract_data = EnhancedContractMetadata(
             address=random_address,
             metadata=etherscan_metadata_mock,
             source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
-        await ContractMetadataService.process_contract_metadata(session, contract_data)
+        await ContractMetadataService.process_contract_metadata(contract_data)
         contract = await Contract.get_contract(
-            session, address=HexBytes(random_address), chain_id=1
+            address=HexBytes(random_address), chain_id=1
         )
         self.assertIsNotNone(contract)
         self.assertEqual(HexBytes(contract.address), HexBytes(random_address))
@@ -188,11 +187,9 @@ class TestContractMetadataService(DbAsyncConn):
             source=ContractSource.ETHERSCAN,
             chain_id=1,
         )
-        await ContractMetadataService.process_contract_metadata(
-            session, proxy_contract_data
-        )
+        await ContractMetadataService.process_contract_metadata(proxy_contract_data)
         proxy_contract = await Contract.get_contract(
-            session, address=HexBytes(random_address), chain_id=1
+            address=HexBytes(random_address), chain_id=1
         )
         self.assertIsNotNone(proxy_contract)
         self.assertEqual(
@@ -202,85 +199,83 @@ class TestContractMetadataService(DbAsyncConn):
 
         # Same contract shouldn't be updated without abi
         contract_data.metadata = None
-        await ContractMetadataService.process_contract_metadata(session, contract_data)
+        await ContractMetadataService.process_contract_metadata(contract_data)
         contract = await Contract.get_contract(
-            session, address=HexBytes(random_address), chain_id=1
+            address=HexBytes(random_address), chain_id=1
         )
         self.assertEqual(contract.abi.abi_json, etherscan_metadata_mock.abi)
         # Should increment fetch_retries when abi was not downloaded
         contract_data.address = Account.create().address
-        await ContractMetadataService.process_contract_metadata(session, contract_data)
+        await ContractMetadataService.process_contract_metadata(contract_data)
         contract = await Contract.get_contract(
-            session, address=HexBytes(contract_data.address), chain_id=1
+            address=HexBytes(contract_data.address), chain_id=1
         )
         self.assertIsNone(contract.abi_id)
         self.assertEqual(contract.fetch_retries, 1)
-        await ContractMetadataService.process_contract_metadata(session, contract_data)
+        await ContractMetadataService.process_contract_metadata(contract_data)
         contract = await Contract.get_contract(
-            session, address=HexBytes(contract_data.address), chain_id=1
+            address=HexBytes(contract_data.address), chain_id=1
         )
         self.assertIsNone(contract.abi_id)
         self.assertEqual(contract.fetch_retries, 2)
 
-        await AbiSource.get_or_create(session, "Blockscout", "")
+        await AbiSource.get_or_create("Blockscout", "")
         contract_data.metadata = blockscout_metadata_mock
         contract_data.source = ContractSource.BLOCKSCOUT
-        await ContractMetadataService.process_contract_metadata(session, contract_data)
+        await ContractMetadataService.process_contract_metadata(contract_data)
         new_contract = await Contract.get_contract(
-            session, address=HexBytes(contract_data.address), chain_id=1
+            address=HexBytes(contract_data.address), chain_id=1
         )
         # Refresh was necessary to reuse the same session
-        await session.refresh(new_contract)
+        await db_session.refresh(new_contract)
         self.assertEqual(new_contract.abi.abi_json, blockscout_metadata_mock.abi)
 
-    @database_session
-    async def test_should_attempt_download(self, session: AsyncSession):
+    @db_session_context
+    async def test_should_attempt_download(self):
         random_address = Account.create().address
-        contract = await Contract(address=HexBytes(random_address), chain_id=1).create(
-            session
-        )
+        contract = await Contract(address=HexBytes(random_address), chain_id=1).create()
         self.assertTrue(
             await ContractMetadataService.should_attempt_download(
-                session, fast_to_checksum_address(random_address), 1, 0
+                fast_to_checksum_address(random_address), 1, 0
             )
         )
         contract.fetch_retries += 1
-        await contract.update(session)
+        await contract.update()
         self.assertFalse(
             await ContractMetadataService.should_attempt_download(
-                session, fast_to_checksum_address(random_address), 1, 0
+                fast_to_checksum_address(random_address), 1, 0
             )
         )
         # Should be cached and don't reach the dataqbase
         with mock.patch.object(Contract, "get_contract") as mocked_get_contract:
             self.assertFalse(
                 await ContractMetadataService.should_attempt_download(
-                    session, fast_to_checksum_address(random_address), 1, 0
+                    fast_to_checksum_address(random_address), 1, 0
                 )
             )
             mocked_get_contract.assert_not_called()
 
         # Should be false if contract has abi_id
-        source, _ = await AbiSource.get_or_create(session, "Etherscan", "")
+        source, _ = await AbiSource.get_or_create("Etherscan", "")
         abi = Abi(
             abi_hash=b"A Test Abi",
             abi_json=etherscan_metadata_mock.abi,
             relevance=10,
             source_id=source.id,
         )
-        await abi.create(session)
+        await abi.create()
         contract.abi_id = abi.id
-        await contract.update(session)
+        await contract.update()
         self.assertFalse(
             await ContractMetadataService.should_attempt_download(
-                session, fast_to_checksum_address(random_address), 1, 10
+                fast_to_checksum_address(random_address), 1, 10
             )
         )
 
-        await Contract(address=HexBytes(random_address), chain_id=100).create(session)
+        await Contract(address=HexBytes(random_address), chain_id=100).create()
         self.assertTrue(
             await ContractMetadataService.should_attempt_download(
-                session, fast_to_checksum_address(random_address), 100, 0
+                fast_to_checksum_address(random_address), 100, 0
             )
         )
 
@@ -311,13 +306,11 @@ class TestContractMetadataService(DbAsyncConn):
             ContractMetadataService.get_proxy_implementation_address(contract_data)
         )
 
-    @database_session
-    async def test_process_metadata_should_update_contracts(
-        self, session: AsyncSession
-    ):
+    @db_session_context
+    async def test_process_metadata_should_update_contracts(self):
         contract_address = Account.create().address
         chain_id = 1
-        await AbiSource(name="Etherscan", url="").create(session)
+        await AbiSource(name="Etherscan", url="").create()
         contract_metadata = EnhancedContractMetadata(
             address=contract_address,
             metadata=copy(etherscan_proxy_metadata_mock),  # Avoid race condition
@@ -325,11 +318,11 @@ class TestContractMetadataService(DbAsyncConn):
             chain_id=1,
         )
         result = await ContractMetadataService.process_contract_metadata(
-            session, contract_metadata
+            contract_metadata
         )
         self.assertTrue(result)
         contract = await Contract.get_contract(
-            session, address=HexBytes(contract_address), chain_id=chain_id
+            address=HexBytes(contract_address), chain_id=chain_id
         )
         self.assertEqual(
             fast_to_checksum_address(contract.address), contract_metadata.address
@@ -342,11 +335,11 @@ class TestContractMetadataService(DbAsyncConn):
         implementation_address = fast_to_checksum_address(Account.create().address)
         contract_metadata.metadata.implementation = implementation_address  # type: ignore
         result = await ContractMetadataService.process_contract_metadata(
-            session, contract_metadata
+            contract_metadata
         )
         self.assertTrue(result)
         contract = await Contract.get_contract(
-            session, address=HexBytes(contract_address), chain_id=chain_id
+            address=HexBytes(contract_address), chain_id=chain_id
         )
         self.assertEqual(
             fast_to_checksum_address(contract.address), contract_metadata.address

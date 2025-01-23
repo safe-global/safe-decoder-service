@@ -74,7 +74,7 @@ db_session = async_scoped_session(
 )
 
 
-def session_context_decorator(func):
+def db_session_context(func):
     """
     A decorator that applies the `set_scoped_context` context manager to a function.
     If no session_id is provided, a new UUID will be generated.

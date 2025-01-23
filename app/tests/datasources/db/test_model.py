@@ -4,7 +4,7 @@ from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
 
-from app.datasources.db.database import session_context_decorator
+from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
 from app.services.contract_metadata_service import (
     ContractMetadataService,
@@ -18,7 +18,7 @@ from .db_async_conn import DbAsyncConn
 
 class TestModel(DbAsyncConn):
 
-    @session_context_decorator
+    @db_session_context
     async def test_contract(self):
         contract = Contract(
             address=b"a", name="A test contract", chain_id=1, implementation=b"a"
@@ -27,7 +27,7 @@ class TestModel(DbAsyncConn):
         result = await contract.get_all()
         self.assertEqual(result[0], contract)
 
-    @session_context_decorator
+    @db_session_context
     async def test_contract_get_abi_by_contract_address(self):
         abi_json = {"name": "A Test Project with relevance 10"}
         source = AbiSource(name="local", url="")
@@ -52,14 +52,14 @@ class TestModel(DbAsyncConn):
         # Check address not matching
         self.assertIsNone(await contract.get_abi_by_contract_address(b"b", None))
 
-    @session_context_decorator
+    @db_session_context
     async def test_project(self):
         project = Project(description="A Test Project", logo_file="logo.jpg")
         await project.create()
         result = await project.get_all()
         self.assertEqual(result[0], project)
 
-    @session_context_decorator
+    @db_session_context
     async def test_abi(self):
         abi_source = AbiSource(name="A Test Source", url="https://test.com")
         abi_source = await abi_source.create()
@@ -72,7 +72,7 @@ class TestModel(DbAsyncConn):
         result = await abi.get_all()
         self.assertEqual(result[0], abi)
 
-    @session_context_decorator
+    @db_session_context
     async def test_abi_get_abis_sorted_by_relevance(self):
         abi_jsons = [
             {"name": "A Test Project with relevance 100"},
@@ -104,7 +104,7 @@ class TestModel(DbAsyncConn):
         result = await anext(results)
         self.assertEqual(result, abi_jsons[0])
 
-    @session_context_decorator
+    @db_session_context
     async def test_abi_source(self):
         abi_source = AbiSource(name="A Test Source", url="https://test.com")
         await abi_source.create()
@@ -134,7 +134,7 @@ class TestModel(DbAsyncConn):
         self.assertEqual(retrieved_abi_source.url, abi_source.url)
         self.assertFalse(created)
 
-    @session_context_decorator
+    @db_session_context
     async def test_timestamped_model(self):
         contract = Contract(address=b"a", name="A test contract", chain_id=1)
         contract_created_date = contract.created
@@ -155,7 +155,7 @@ class TestModel(DbAsyncConn):
         self.assertNotEqual(result_updated[0].modified, contract_modified_date)
         self.assertTrue(contract_modified_date < result_updated[0].modified)
 
-    @session_context_decorator
+    @db_session_context
     async def test_get_contracts_without_abi(self):
         random_address = HexBytes(Account.create().address)
         abi_json = {"name": "A Test ABI"}
@@ -182,7 +182,7 @@ class TestModel(DbAsyncConn):
         async for contract in Contract.get_contracts_without_abi(10):
             self.fail("Expected no contracts, but found one.")
 
-    @session_context_decorator
+    @db_session_context
     async def test_get_proxy_contracts(self):
         # Test empty case
         async for proxy_contract in Contract.get_proxy_contracts():

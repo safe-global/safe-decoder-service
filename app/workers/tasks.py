@@ -8,7 +8,7 @@ from periodiq import PeriodiqMiddleware, cron
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.config import settings
-from app.datasources.db.database import session_context_decorator
+from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.services.contract_metadata_service import get_contract_metadata_service
 
@@ -37,7 +37,7 @@ def test_task(message: str) -> None:
 
 
 @dramatiq.actor
-@session_context_decorator
+@db_session_context
 async def get_contract_metadata_task(
     address: str, chain_id: int, skip_attemp_download: bool = False
 ):
@@ -88,7 +88,7 @@ async def get_contract_metadata_task(
 
 
 @dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
-@session_context_decorator
+@db_session_context
 async def get_missing_contract_metadata_task():
     async for contract in Contract.get_contracts_without_abi(
         settings.CONTRACT_MAX_DOWNLOAD_RETRIES
@@ -101,7 +101,7 @@ async def get_missing_contract_metadata_task():
 
 
 @dramatiq.actor(periodic=cron("0 5 * * *"))  # Every day at 5 am
-@session_context_decorator
+@db_session_context
 async def update_proxies_task():
     async for proxy_contract in Contract.get_proxy_contracts():
         get_contract_metadata_task.send(

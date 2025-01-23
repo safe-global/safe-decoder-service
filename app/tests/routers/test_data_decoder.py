@@ -3,10 +3,9 @@ from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import get_empty_tx_params
-from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 
-from ...datasources.db.database import database_session
+from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
@@ -28,15 +27,13 @@ class TestRouterAbout(DbAsyncConn):
     def tearDown(self):
         get_data_decoder_service.cache_clear()
 
-    @database_session
-    async def test_view_data_decoder(self, session: AsyncSession):
+    @db_session_context
+    async def test_view_data_decoder(self):
         # Add safe abis for testing
         abi_service = AbiService()
         safe_abis = abi_service.get_safe_contracts_abis()
-        abi_source, _ = await AbiSource.get_or_create(
-            session, "localstorage", "decoder-service"
-        )
-        await abi_service._store_abis_in_database(session, safe_abis, 100, abi_source)
+        abi_source, _ = await AbiSource.get_or_create("localstorage", "decoder-service")
+        await abi_service._store_abis_in_database(safe_abis, 100, abi_source)
 
         # Add owner 0x1b9a0DA11a5caCE4e7035993Cbb2E4B1B3b164Cf with threshold 1
         add_owner_with_threshold_data = HexBytes(
@@ -84,10 +81,10 @@ class TestRouterAbout(DbAsyncConn):
         )
         self.assertEqual(response.status_code, 422)
 
-    @database_session
-    async def test_view_data_decoder_with_chain_id(self, session: AsyncSession):
+    @db_session_context
+    async def test_view_data_decoder_with_chain_id(self):
         source = AbiSource(name="local", url="")
-        await source.create(session)
+        await source.create()
 
         contract_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         abi = Abi(
@@ -96,14 +93,14 @@ class TestRouterAbout(DbAsyncConn):
             relevance=101,
             source_id=source.id,
         )
-        await abi.create(session)
+        await abi.create()
         contract = Contract(
             address=HexBytes(contract_address),
             abi=abi,
             name="SwappedContract",
             chain_id=1,
         )
-        await contract.create(session)
+        await contract.create()
 
         swapped_abi = Abi(
             abi_hash=b"SwappedABI",
@@ -111,14 +108,14 @@ class TestRouterAbout(DbAsyncConn):
             relevance=100,
             source_id=source.id,
         )
-        await swapped_abi.create(session)
+        await swapped_abi.create()
         contract = Contract(
             address=HexBytes(contract_address),
             abi=swapped_abi,
             name="SwappedContract",
             chain_id=2,
         )
-        await contract.create(session)
+        await contract.create()
 
         example_data = (
             Web3()
