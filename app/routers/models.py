@@ -98,14 +98,17 @@ class ParameterDecodedPublic(BaseModel):
     name: str
     type: str
     value: Any
-    value_decoded: (
-        Union[list["MultisendDecodedPublic"], "DataDecodedPublic", None] | None
-    ) = None
+    value_decoded: Union[
+        list["MultisendDecodedPublic"], "BaseDataDecodedPublic", None
+    ] = None
 
 
-class DataDecodedPublic(BaseModel):
+class BaseDataDecodedPublic(BaseModel):
     method: str
     parameters: list[ParameterDecodedPublic]
+
+
+class DataDecodedPublic(BaseDataDecodedPublic):
     accuracy: DecodingAccuracyEnum
 
 
@@ -114,4 +117,4 @@ class MultisendDecodedPublic(BaseModel):
     to: ChecksumAddress
     value: str
     data: HexStr | None = None
-    data_decoded: DataDecodedPublic | None = None
+    data_decoded: BaseDataDecodedPublic | None = None

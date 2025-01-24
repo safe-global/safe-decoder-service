@@ -29,6 +29,7 @@ from app.datasources.abis.balancer import balancer_bactions, balancer_exchange_p
 from app.datasources.abis.chainlink import chainlink_token_abi
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
 from app.datasources.abis.gnosis_protocol import (
+    cowswap_settlement_v2_abi,
     fleet_factory_abi,
     fleet_factory_deterministic_abi,
     gnosis_protocol_abi,
@@ -130,6 +131,7 @@ class AbiService:
             gnosis_protocol_abi,
             fleet_factory_deterministic_abi,
             fleet_factory_abi,
+            cowswap_settlement_v2_abi,
         ]
         idle_contracts = [idle_token_v3]
         initializable_admin_upgradeability_proxy_contracts = [
