@@ -1,7 +1,9 @@
 import secrets
+from typing import cast
 
 from fastapi import FastAPI
 
+from safe_eth.eth.utils import fast_to_checksum_address
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -48,6 +50,12 @@ class ContractAdmin(ModelView, model=Contract):
     column_list = [Contract.address, Contract.name, Contract.description]  # type: ignore
     form_include_pk = True
     icon = "fa-solid fa-file-contract"
+
+    column_formatters = {
+        cast(str, Contract.address): lambda m, a: fast_to_checksum_address(
+            cast(Contract, m).address
+        ),
+    }
 
     async def on_model_change(
         self, data: dict, model: Contract, is_created: bool, request: Request
