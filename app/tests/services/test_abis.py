@@ -20,14 +20,14 @@ class TestAbiService(DbAsyncConn):
         await self.abi_service.load_local_abis_in_database()
         self.assertEqual(len(await AbiSource.get_all()), 1)
         abis = await Abi.get_all()
-        self.assertEqual(len(abis), 152)
+        self.assertEqual(len(abis), 153)
         relevance_counts = Counter(abi.relevance for abi in abis)
         self.assertEqual(relevance_counts[100], 5)
         self.assertEqual(relevance_counts[90], 5)
-        self.assertEqual(relevance_counts[50], 142)
+        self.assertEqual(relevance_counts[50], 143)
 
         await self.abi_service.load_local_abis_in_database()
-        self.assertEqual(len(await Abi.get_all()), 152)
+        self.assertEqual(len(await Abi.get_all()), 153)
 
     def test_get_safe_contracts_abis(self):
         abis = self.abi_service.get_safe_contracts_abis()
@@ -43,4 +43,4 @@ class TestAbiService(DbAsyncConn):
 
     def test_get_third_parties_abis(self):
         abis = self.abi_service.get_third_parties_abis()
-        self.assertEqual(len(abis), 142)
+        self.assertEqual(len(abis), 143)
