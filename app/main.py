@@ -1,13 +1,12 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from urllib.request import Request
 
 from fastapi import APIRouter, FastAPI
 
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 from . import VERSION
-from .datasources.db.database import get_engine
+from .datasources.db.database import db_session, set_database_session_context
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -36,8 +35,8 @@ async def lifespan(app: FastAPI):
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
-        async with AsyncSession(get_engine(), expire_on_commit=False) as session:
-            await abi_service.load_local_abis_in_database(session)
+        with set_database_session_context("LoadAbisOnStartup"):
+            await abi_service.load_local_abis_in_database()
         yield
     finally:
         if consume_task:
@@ -53,7 +52,6 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
-
 admin.load_admin(app)
 
 # Router configuration
@@ -65,3 +63,23 @@ api_v1_router.include_router(contracts.router)
 api_v1_router.include_router(data_decoder.router)
 app.include_router(api_v1_router)
 app.include_router(default.router)
+
+
+@app.middleware("http")
+async def set_session_context(request: Request, call_next):
+    """
+    Set the database session context for the current request, so the same database session is used across the whole request.
+
+    :param request:
+    :param call_next:
+    :return:
+    """
+    with set_database_session_context():
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            raise e
+        finally:
+            await db_session.remove()
+
+    return response

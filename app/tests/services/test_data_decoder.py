@@ -9,7 +9,6 @@ from safe_eth.eth.contracts import (
 )
 from safe_eth.eth.utils import get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
-from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
@@ -19,7 +18,7 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
-from ...datasources.db.database import database_session
+from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
     CannotDecode,
@@ -40,10 +39,10 @@ from .mocks_data_decoder import (
 
 class TestDataDecoderService(DbAsyncConn):
     @staticmethod
-    async def _store_safe_contract_abi(session: AsyncSession):
+    async def _store_safe_contract_abi():
         dummy_web3 = Web3()
         source = AbiSource(name="local", url="")
-        await source.create(session)
+        await source.create()
         erc20_contract = get_erc20_contract(dummy_web3)
         safe_v1_1_1_contract = get_safe_V1_1_1_contract(dummy_web3)
         safe_v1_4_1_contract = get_safe_V1_4_1_contract(dummy_web3)
@@ -106,32 +105,33 @@ class TestDataDecoderService(DbAsyncConn):
                 source_id=source.id,
             ),
         ):
-            await abi.create(session)
+            await abi.create()
 
+    @db_session_context
     async def test_get_data_decoder_service(self):
         get_data_decoder_service.cache_clear()
         data_decoder_service = await get_data_decoder_service()
         assert data_decoder_service.fn_selectors_with_abis == {}
 
-    @database_session
-    async def test_init_without_abi(self, session: AsyncSession):
+    @db_session_context
+    async def test_init_without_abi(self):
         empty_decoder_service = DataDecoderService()
-        await empty_decoder_service.init(session)
+        await empty_decoder_service.init()
         assert empty_decoder_service.fn_selectors_with_abis == {}
 
-    @database_session
-    async def test_init_with_abi(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_init_with_abi(self):
+        await self._store_safe_contract_abi()
 
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
         exec_transaction_bytes = bytes.fromhex("6a761202")
         name = decoder_service.fn_selectors_with_abis[exec_transaction_bytes]["name"]
         assert name == "execTransaction"
 
-    @database_session
-    async def test_decode_execute_transaction(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_decode_execute_transaction(self):
+        await self._store_safe_contract_abi()
 
         # Call to Safe `execTransaction`
         data = HexBytes(
@@ -150,7 +150,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
 
         data_decoder = DataDecoderService()
-        await data_decoder.init(session)
+        await data_decoder.init()
         function_name, arguments = await data_decoder.decode_transaction(data)
         self.assertEqual(function_name, "execTransaction")
         self.assertIn("baseGas", arguments)
@@ -159,9 +159,9 @@ class TestDataDecoderService(DbAsyncConn):
             type(arguments["baseGas"]), str
         )  # DataDecoderService casts numbers to strings
 
-    @database_session
-    async def test_decode_execute_transaction_with_types(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_decode_execute_transaction_with_types(self):
+        await self._store_safe_contract_abi()
         data = HexBytes(
             "0x6a7612020000000000000000000000005592ec0cfb4dbc12d3ab100b257153436a1f0fea0000"
             "000000000000000000000000000000000000000000000000000000000000000000000000000000"
@@ -183,7 +183,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
 
         data_decoder = DataDecoderService()
-        await data_decoder.init(session)
+        await data_decoder.init()
         function_name, arguments = await data_decoder.decode_transaction_with_types(
             data
         )
@@ -243,9 +243,9 @@ class TestDataDecoderService(DbAsyncConn):
             ],
         )
 
-    @database_session
-    async def test_decode_multisend(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_decode_multisend(self):
+        await self._store_safe_contract_abi()
 
         # Change Safe contract master copy and set fallback manager multisend transaction
         safe_contract_address = "0x5B9ea52Aaa931D4EEf74C8aEaf0Fe759434FeD74"
@@ -270,7 +270,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
 
         data_decoder = DataDecoderService()
-        await data_decoder.init(session)
+        await data_decoder.init()
         expected = [
             {
                 "operation": operation,
@@ -357,9 +357,9 @@ class TestDataDecoderService(DbAsyncConn):
             await data_decoder.decode_transaction_with_types(data), expected_2
         )
 
-    @database_session
-    async def test_decode_multisend_not_valid(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_decode_multisend_not_valid(self):
+        await self._store_safe_contract_abi()
 
         # Same data with some stuff deleted
         data = HexBytes(
@@ -372,7 +372,7 @@ class TestDataDecoderService(DbAsyncConn):
             "000000"
         )
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
         self.assertEqual(await decoder_service.decode_multisend_data(data), [])
         self.assertEqual(
             await decoder_service.decode_transaction_with_types(data),
@@ -389,13 +389,13 @@ class TestDataDecoderService(DbAsyncConn):
             ),
         )
 
-    @database_session
-    async def test_decode_safe_exec_transaction(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_decode_safe_exec_transaction(self):
+        await self._store_safe_contract_abi()
 
         data = exec_transaction_data_mock
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
 
         self.assertIn(bytes.fromhex("c2998238"), decoder_service.fn_selectors_with_abis)
         # Cowswap ABI is required for this test
@@ -403,19 +403,19 @@ class TestDataDecoderService(DbAsyncConn):
             await decoder_service.get_data_decoded(data), exec_transaction_decoded_mock
         )
 
-    @database_session
-    async def test_unexpected_problem_decoding(self, session: AsyncSession):
-        await self._store_safe_contract_abi(session)
+    @db_session_context
+    async def test_unexpected_problem_decoding(self):
+        await self._store_safe_contract_abi()
 
         data = insufficient_data_bytes_mock
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
 
         with self.assertRaises(UnexpectedProblemDecoding):
             await decoder_service.decode_transaction(data)
 
-    @database_session
-    async def test_db_tx_decoder(self, session: AsyncSession):
+    @db_session_context
+    async def test_db_tx_decoder(self):
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
@@ -426,7 +426,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
 
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
 
         with self.assertRaises(CannotDecode):
             await decoder_service.decode_transaction(example_data)
@@ -437,7 +437,7 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
         source = AbiSource(name="local", url="")
-        await source.create(session)
+        await source.create()
         # Test load a new DbTxDecoder
         abi = Abi(
             abi_hash=b"ExampleABI",
@@ -445,9 +445,9 @@ class TestDataDecoderService(DbAsyncConn):
             relevance=100,
             source_id=source.id,
         )
-        await abi.create(session)
+        await abi.create()
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
         fn_name, arguments = await decoder_service.decode_transaction(example_data)
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
@@ -458,9 +458,9 @@ class TestDataDecoderService(DbAsyncConn):
             relevance=100,
             source_id=source.id,
         )
-        await abi.create(session)
+        await abi.create()
         contract = Contract(address=b"c", abi=abi, name="SwappedContract", chain_id=1)
-        await contract.create(session)
+        await contract.create()
 
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=Address(contract.address)
@@ -468,8 +468,8 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
 
-    @database_session
-    async def test_db_tx_decoder_multichain(self, session: AsyncSession):
+    @db_session_context
+    async def test_db_tx_decoder_multichain(self):
         example_data = (
             Web3()
             .eth.contract(abi=example_abi)
@@ -480,7 +480,7 @@ class TestDataDecoderService(DbAsyncConn):
         )
 
         source = AbiSource(name="local", url="")
-        await source.create(session)
+        await source.create()
 
         # Both ABIs generate the same function selector, but with differently ordered parameter names, so
         # decoding will be different
@@ -490,7 +490,7 @@ class TestDataDecoderService(DbAsyncConn):
             relevance=1,
             source_id=source.id,
         )
-        await abi.create(session)
+        await abi.create()
 
         abi_reversed = Abi(
             abi_hash=b"ExampleABIReversed",
@@ -498,17 +498,17 @@ class TestDataDecoderService(DbAsyncConn):
             relevance=100,
             source_id=source.id,
         )
-        await abi_reversed.create(session)
+        await abi_reversed.create()
 
         contract = Contract(address=b"a", abi=abi, name="ExampleContract", chain_id=1)
-        await contract.create(session)
+        await contract.create()
         contract_reversed = Contract(
             address=b"a", abi=abi_reversed, name="ExampleContractReversed", chain_id=2
         )
-        await contract_reversed.create(session)
+        await contract_reversed.create()
 
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
 
         expected_arguments = {"droidId": "4", "numberOfDroids": "10"}
         expected_arguments_reversed = {"numberOfDroids": "4", "droidId": "10"}
@@ -558,9 +558,9 @@ class TestDataDecoderService(DbAsyncConn):
 
         # If no contract is matching but abi is on the database, it should be decoded using the more relevant ABI
         contract.address = b"b"
-        await contract.update(session)
+        await contract.update()
         contract_reversed.address = b"b"
-        await contract_reversed.update(session)
+        await contract_reversed.update()
 
         # Check caches are working even if contract was updated on DB
         fn_name, arguments = await decoder_service.decode_transaction(
@@ -575,7 +575,7 @@ class TestDataDecoderService(DbAsyncConn):
 
         # Init a new service to remove caches
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
 
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
@@ -587,8 +587,8 @@ class TestDataDecoderService(DbAsyncConn):
         self.assertEqual(arguments, expected_arguments_reversed)
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
-    @database_session
-    async def test_decode_fallback_calls_db_tx_decoder(self, session: AsyncSession):
+    @db_session_context
+    async def test_decode_fallback_calls_db_tx_decoder(self):
         example_not_matched_abi = [
             {
                 "inputs": [],
@@ -613,23 +613,23 @@ class TestDataDecoderService(DbAsyncConn):
         ]
 
         decoder_service = DataDecoderService()
-        await decoder_service.init(session)
+        await decoder_service.init()
         source = AbiSource(name="local", url="")
-        await source.create(session)
+        await source.create()
         contract_fallback_abi = Abi(
             abi_hash=b"SwappedABI",
             abi_json=fallback_abi,
             relevance=100,
             source_id=source.id,
         )
-        await contract_fallback_abi.create(session)
+        await contract_fallback_abi.create()
         contract_fallback = Contract(
             address=b"h",
             name="fallback_contract",
             chain_id=1,
             abi=contract_fallback_abi,
         )
-        await contract_fallback.create(session)
+        await contract_fallback.create()
 
         fn_name, arguments = await decoder_service.decode_transaction(
             example_not_matched_data, address=Address(contract_fallback.address)

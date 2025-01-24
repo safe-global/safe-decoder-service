@@ -1,9 +1,8 @@
 from fastapi.testclient import TestClient
 
 from hexbytes import HexBytes
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from ...datasources.db.database import database_session
+from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...utils import datetime_to_str
@@ -18,12 +17,12 @@ class TestRouterContract(DbAsyncConn):
     def setUpClass(cls):
         cls.client = TestClient(app)
 
-    @database_session
-    async def test_view_contracts(self, session: AsyncSession):
+    @db_session_context
+    async def test_view_contracts(self):
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
         address = HexBytes(address_expected)
         contract = Contract(address=address, name="A Test Contracts", chain_id=1)
-        await contract.create(session)
+        await contract.create()
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
@@ -31,11 +30,11 @@ class TestRouterContract(DbAsyncConn):
         response_json = response.json()
         self.assertEqual(response_json["count"], 0)
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
-        await source.create(session)
+        await source.create()
         abi = Abi(abi_json=mock_abi_json, source_id=source.id)
-        await abi.create(session)
+        await abi.create()
         contract.abi_id = abi.id
-        await contract.update(session)
+        await contract.update()
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
@@ -58,7 +57,7 @@ class TestRouterContract(DbAsyncConn):
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=5, abi=abi
         )
-        await contract.create(session)
+        await contract.create()
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
@@ -70,12 +69,12 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["chain_id"], 5)
 
-    @database_session
-    async def test_contracts_pagination(self, session: AsyncSession):
+    @db_session_context
+    async def test_contracts_pagination(self):
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
-        await source.create(session)
+        await source.create()
         abi = Abi(abi_json=mock_abi_json, source_id=source.id)
-        await abi.create(session)
+        await abi.create()
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
         address = HexBytes(address_expected)
         for chain_id in range(0, 10):
@@ -85,7 +84,7 @@ class TestRouterContract(DbAsyncConn):
                 chain_id=chain_id,
                 abi=abi,
             )
-            await contract.create(session)
+            await contract.create()
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}?limit=5",

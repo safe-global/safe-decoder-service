@@ -53,12 +53,13 @@ To open an interactive Python shell within a Docker container and query the data
 ```
 Example usage:
 ```
-In [11]: contracts = await Contract.get_all(session)
+In [11]: contracts = await Contract.get_all()
 
 In [12]: contracts[0].address
 Out[12]: b'J\xdb\xaa\xc7\xbc#\x9e%\x19\xcb\xfd#\x97\xe0\xf7Z\x1d\xe3U\xc8'
 
 ```
+Call `await restore_session()` to reopen a new session.
 
 ## Contributors
 [See contributors](https://github.com/safe-global/safe-decoder-service/graphs/contributors)

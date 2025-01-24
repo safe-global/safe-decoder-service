@@ -13,7 +13,6 @@ from safe_eth.eth.contracts import (
     get_safe_V1_4_1_contract,
     get_uniswap_exchange_contract,
 )
-from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3.types import ABIEvent, ABIFunction
 
@@ -68,30 +67,27 @@ class AbiService:
 
     @staticmethod
     async def _store_abis_in_database(
-        session: AsyncSession,
         abi_jsons: list[Sequence[ABIFunction | ABIEvent]],
         relevance: int,
         abi_source: AbiSource,
     ) -> None:
         for abi_json in abi_jsons:
-            abi = await Abi.get_abi(session, cast(list[dict], abi_json))
+            abi = await Abi.get_abi(cast(list[dict], abi_json))
             if abi is None:
                 await Abi(
                     abi_json=abi_json, source_id=abi_source.id, relevance=relevance
-                ).create(session)
+                ).create()
 
-    async def load_local_abis_in_database(self, session: AsyncSession) -> None:
-        abi_source, _ = await AbiSource.get_or_create(
-            session, "localstorage", "decoder-service"
+    async def load_local_abis_in_database(self) -> None:
+        abi_source, _ = await AbiSource.get_or_create("localstorage", "decoder-service")
+        await self._store_abis_in_database(
+            self.get_safe_contracts_abis(), 100, abi_source
         )
         await self._store_abis_in_database(
-            session, self.get_safe_contracts_abis(), 100, abi_source
+            self.get_erc_abis() + self.get_safe_abis(), 90, abi_source
         )
         await self._store_abis_in_database(
-            session, self.get_erc_abis() + self.get_safe_abis(), 90, abi_source
-        )
-        await self._store_abis_in_database(
-            session, self.get_third_parties_abis(), 50, abi_source
+            self.get_third_parties_abis(), 50, abi_source
         )
 
     def get_safe_contracts_abis(self) -> list[Sequence[ABIFunction | ABIEvent]]:

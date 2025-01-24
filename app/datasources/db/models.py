@@ -12,30 +12,30 @@ from sqlmodel import (
     col,
     select,
 )
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql._expression_select_cls import SelectBase
 from web3.types import ABI
 
+from .database import db_session
 from .utils import get_md5_abi_hash
 
 
 class SqlQueryBase:
 
     @classmethod
-    async def get_all(cls, session: AsyncSession):
-        result = await session.exec(select(cls))
-        return result.all()
+    async def get_all(cls):
+        result = await db_session.execute(select(cls))
+        return result.scalars().all()
 
-    async def _save(self, session: AsyncSession):
-        session.add(self)
-        await session.commit()
+    async def _save(self):
+        db_session.add(self)
+        await db_session.commit()
         return self
 
-    async def update(self, session: AsyncSession):
-        return await self._save(session)
+    async def update(self):
+        return await self._save()
 
-    async def create(self, session: AsyncSession):
-        return await self._save(session)
+    async def create(self):
+        return await self._save()
 
 
 class TimeStampedSQLModel(SQLModel):
@@ -69,33 +69,30 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
     abis: list["Abi"] = Relationship(back_populates="source")
 
     @classmethod
-    async def get_or_create(
-        cls, session: AsyncSession, name: str, url: str
-    ) -> tuple["AbiSource", bool]:
+    async def get_or_create(cls, name: str, url: str) -> tuple["AbiSource", bool]:
         """
         Checks if an AbiSource with the given 'name' and 'url' exists.
         If found, returns it with False. If not, creates and returns it with True.
 
-        :param session: The database session.
         :param name: The name to check or create.
         :param url: The URL to check or create.
         :return: A tuple containing the AbiSource object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
         query = select(cls).where(cls.name == name, cls.url == url)
-        results = await session.exec(query)
-        if result := results.first():
+        results = await db_session.execute(query)
+        if result := results.scalars().first():
             return result, False
         else:
             new_item = cls(name=name, url=url)
-            await new_item.create(session)
+            await new_item.create()
             return new_item, True
 
     @classmethod
-    async def get_abi_source(cls, session: AsyncSession, name: str):
+    async def get_abi_source(cls, name: str):
         query = select(cls).where(cls.name == name)
-        results = await session.exec(query)
-        if result := results.first():
+        results = await db_session.execute(query)
+        if result := results.scalars().first():
             return result
         return None
 
@@ -113,24 +110,23 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     contracts: list["Contract"] = Relationship(back_populates="abi")
 
     @classmethod
-    async def get_abis_sorted_by_relevance(
-        cls, session: AsyncSession
-    ) -> AsyncIterator[ABI]:
+    async def get_abis_sorted_by_relevance(cls) -> AsyncIterator[ABI]:
         """
         :return: Abi JSON, with the ones with less relevance first
         """
-        results = await session.exec(select(cls.abi_json).order_by(col(cls.relevance)))
-        for result in results:
+        results = await db_session.execute(
+            select(cls.abi_json).order_by(col(cls.relevance))
+        )
+        for result in results.scalars().all():
             yield cast(ABI, result)
 
-    async def create(self, session):
+    async def create(self):
         self.abi_hash = get_md5_abi_hash(self.abi_json)
-        return await self._save(session)
+        return await self._save()
 
     @classmethod
     async def get_abi(
         cls,
-        session: AsyncSession,
         abi_json: list[dict] | dict,
     ):
         """
@@ -138,15 +134,14 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         If it exists, returns the existing Abi. If not,
         returns None.
 
-        :param session: The database session.
         :param abi_json: The ABI JSON to check.
         :return: The Abi object if it exists, or None if it doesn't.
         """
         abi_hash = get_md5_abi_hash(abi_json)
         query = select(cls).where(cls.abi_hash == abi_hash)
-        result = await session.exec(query)
+        result = await db_session.execute(query)
 
-        if existing_abi := result.first():
+        if existing_abi := result.scalars().first():
             return existing_abi
 
         return None
@@ -154,7 +149,6 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_or_create_abi(
         cls,
-        session: AsyncSession,
         abi_json: list[dict] | dict,
         source_id: int | None,
         relevance: int | None = 0,
@@ -163,18 +157,17 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         Checks if an Abi with the given 'abi_json' exists.
         If found, returns it with False. If not, creates and returns it with True.
 
-        :param session: The database session.
         :param abi_json: The ABI JSON to check.
         :param relevance:
         :param source_id:
         :return: A tuple containing the Abi object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        if abi := await cls.get_abi(session, abi_json):
+        if abi := await cls.get_abi(abi_json):
             return abi, False
         else:
             new_item = cls(abi_json=abi_json, relevance=relevance, source_id=source_id)
-            await new_item.create(session)
+            await new_item.create()
             return new_item, True
 
 
@@ -230,19 +223,18 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return query
 
     @classmethod
-    async def get_contract(cls, session: AsyncSession, address: bytes, chain_id: int):
+    async def get_contract(cls, address: bytes, chain_id: int):
         query = (
             select(cls).where(cls.address == address).where(cls.chain_id == chain_id)
         )
-        results = await session.exec(query)
-        if result := results.first():
+        results = await db_session.execute(query)
+        if result := results.scalars().first():
             return result
         return None
 
     @classmethod
     async def get_or_create(
         cls,
-        session: AsyncSession,
         address: bytes,
         chain_id: int,
         **kwargs,
@@ -250,14 +242,13 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         """
         Update or create the given params.
 
-        :param session: The database session.
         :param address:
         :param chain_id:
         :param kwargs:
         :return: A tuple containing the Contract object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        if contract := await cls.get_contract(session, address, chain_id):
+        if contract := await cls.get_contract(address, chain_id):
             return contract, False
         else:
             contract = cls(address=address, chain_id=chain_id)
@@ -265,12 +256,12 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             for key, value in kwargs.items():
                 setattr(contract, key, value)
 
-            await contract.create(session)
+            await contract.create()
             return contract, True
 
     @classmethod
     async def get_abi_by_contract_address(
-        cls, session: AsyncSession, address: bytes, chain_id: int | None
+        cls, address: bytes, chain_id: int | None
     ) -> ABI | None:
         """
         :return: Json ABI given the contract `address` and `chain_id`. If `chain_id` is not given,
@@ -287,14 +278,14 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         else:
             query = query.order_by(col(cls.chain_id))
 
-        results = await session.exec(query)
-        if result := results.first():
+        results = await db_session.execute(query)
+        if result := results.scalars().first():
             return cast(ABI, result)
         return None
 
     @classmethod
     async def get_contracts_without_abi(
-        cls, session: AsyncSession, max_retries: int = 0
+        cls, max_retries: int = 0
     ) -> AsyncIterator[Self]:
         """
         Fetches contracts without an ABI and fewer retries than max_retries,
@@ -302,7 +293,6 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         More information about streaming results can be found here:
         https://docs.sqlalchemy.org/en/20/core/connections.html#streaming-with-a-dynamically-growing-buffer-using-stream-results
 
-        :param session:
         :param max_retries:
         :return:
         """
@@ -311,19 +301,18 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             .where(cls.abi_id == None)  # noqa: E711
             .where(cls.fetch_retries <= max_retries)
         )
-        result = await session.stream(query)
+        result = await db_session.stream(query)
         async for (contract,) in result:
             yield contract
 
     @classmethod
-    async def get_proxy_contracts(cls, session: AsyncSession) -> AsyncIterator[Self]:
+    async def get_proxy_contracts(cls) -> AsyncIterator[Self]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 
-        :param session:
         :return:
         """
         query = select(cls).where(cls.implementation.isnot(None))  # type: ignore
-        result = await session.stream(query)
+        result = await db_session.stream(query)
         async for (contract,) in result:
             yield contract
