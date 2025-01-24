@@ -22,7 +22,7 @@ pool_classes = {
     AsyncAdaptedQueuePool.__name__: AsyncAdaptedQueuePool,
 }
 
-_session_context: ContextVar[str] = ContextVar("session_context")
+_db_session_context: ContextVar[str] = ContextVar("db_session_context")
 
 
 @cache
@@ -51,28 +51,30 @@ def set_database_session_context(
     session_id: str | None = None,
 ) -> Generator[None, None, None]:
     """
-    Set session context var, at the end of the context it will be removed.
+    Set session ContextVar, at the end it will be removed.
     This context is designed to be used with `async_scoped_session` to define a context scope.
 
     :param session_id:
     :return:
     """
     _session_id: str = session_id or str(uuid.uuid4())
-    token = _session_context.set(_session_id)
+    logger.debug(f"Storing db_session context: {_session_id}")
+    token = _db_session_context.set(_session_id)
     try:
         yield
     finally:
-        _session_context.reset(token)
+        logger.debug(f"Removing db_session context: {_session_id}")
+        _db_session_context.reset(token)
 
 
 def _get_database_session_context() -> str:
     """
-    Function created to get the session id context var.
+    Get the database session id from the ContextVar.
     Used as a scope function on `async_scoped_session`.
 
     :return: session_id for the current context
     """
-    return _session_context.get()
+    return _db_session_context.get()
 
 
 def db_session_context(func):

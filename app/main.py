@@ -68,7 +68,7 @@ app.include_router(default.router)
 @app.middleware("http")
 async def set_session_context(request: Request, call_next):
     """
-    Set the session context for the current request.
+    Set the database session context for the current request, so the same database session is used across the whole request.
 
     :param request:
     :param call_next:
