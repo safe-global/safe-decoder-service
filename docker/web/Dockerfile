@@ -9,13 +9,11 @@ COPY requirements/prod.txt ./requirements.txt
 RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
-        git \
-		libssl-dev \
         curl \
 		" \
     && apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends $buildDeps \
+    && apt-get install -y --no-install-recommends postgresql-client $buildDeps \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
 	&& export PATH="$PATH:$HOME/.cargo/bin" \
     && pip install -U --no-cache-dir wheel setuptools pip \
