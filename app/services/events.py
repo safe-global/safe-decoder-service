@@ -35,17 +35,19 @@ class EventsService:
         try:
             tx_service_event = json.loads(message)
             if self._is_processable_event(tx_service_event):
-                chain_id: int = int(tx_service_event["chainId"])
-                to: ChecksumAddress = tx_service_event["to"]
                 data: HexStr | None = tx_service_event["data"]
-                contracts_from_data: set[ChecksumAddress] = (
-                    self.get_contracts_from_data(data)
-                )
-
-                for contract_address in {to, *contracts_from_data}:
-                    get_contract_metadata_task.send(
-                        address=contract_address, chain_id=chain_id
+                if data:
+                    # If data is not available, it should be an ether transfer to a EOA
+                    chain_id: int = int(tx_service_event["chainId"])
+                    to: ChecksumAddress = tx_service_event["to"]
+                    contracts_from_data: set[ChecksumAddress] = (
+                        self.get_contracts_from_data(data)
                     )
+
+                    for contract_address in {to, *contracts_from_data}:
+                        get_contract_metadata_task.send(
+                            address=contract_address, chain_id=chain_id
+                        )
         except json.JSONDecodeError:
             logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
 
