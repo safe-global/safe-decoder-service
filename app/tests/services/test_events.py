@@ -97,7 +97,7 @@ class TestEventsService(unittest.TestCase):
 
     @patch("app.workers.tasks.get_contract_metadata_task.send")
     def test_process_event_calls_send(self, mock_get_contract_metadata_task: MagicMock):
-        valid_message = json.dumps(
+        not_valid_message = json.dumps(
             {
                 "chainId": "1",
                 "type": "EXECUTED_MULTISIG_TRANSACTION",
@@ -106,7 +106,20 @@ class TestEventsService(unittest.TestCase):
             }
         )
 
+        # Events with no data should not be indexed, as `to` should be a EOA
         mock_get_contract_metadata_task.assert_not_called()
+        EventsService().process_event(not_valid_message)
+        mock_get_contract_metadata_task.assert_not_called()
+
+        valid_message = json.dumps(
+            {
+                "chainId": "1",
+                "type": "EXECUTED_MULTISIG_TRANSACTION",
+                "to": "0x6ED857dc1da2c41470A95589bB482152000773e9",
+                "data": HexStr("0x4815"),
+            }
+        )
+
         EventsService().process_event(valid_message)
         mock_get_contract_metadata_task.assert_called_once_with(
             address="0x6ED857dc1da2c41470A95589bB482152000773e9", chain_id=1
