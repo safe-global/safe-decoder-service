@@ -7,7 +7,7 @@ from safe_eth.eth.contracts import (
     get_safe_V1_1_1_contract,
     get_safe_V1_4_1_contract,
 )
-from safe_eth.eth.utils import get_empty_tx_params
+from safe_eth.eth.utils import fast_keccak_text, get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
 from web3 import Web3
 
@@ -34,6 +34,7 @@ from .mocks_data_decoder import (
     exec_transaction_data_mock,
     exec_transaction_decoded_mock,
     insufficient_data_bytes_mock,
+    tuple_abi,
 )
 
 
@@ -640,3 +641,44 @@ class TestDataDecoderService(DbAsyncConn):
             example_not_matched_data, address=Address(contract_fallback.address)
         )
         self.assertEqual(accuracy, DecodingAccuracyEnum.NO_MATCH)
+
+    @db_session_context
+    async def test_decode_tuples(self):
+        """
+        Test tuple parameters are decoded as expected
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=tuple_abi)
+            .functions.createWithContext(
+                (fast_keccak_text("Sakamoto"), fast_keccak_text("Days"), b"48")
+            )
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+        contract_fallback_abi = Abi(
+            abi_hash=b"TupleABI",
+            abi_json=tuple_abi,
+            relevance=100,
+            source_id=source.id,
+        )
+        await contract_fallback_abi.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        fn_name, arguments = await decoder_service.decode_transaction(example_data)
+        self.assertEqual(fn_name, "createWithContext")
+        self.assertEqual(
+            arguments,
+            {
+                "params": (
+                    "0x3c03deed836a997bb67d3caa6aaf378dcc5bba915aecc2ec4c7c927d85166a19",
+                    "0x319604e0f5da98581a5c25a5003b1a257b40012bc0012ff4e5350e11a280d610",
+                    "0x3438",
+                )
+            },
+        )

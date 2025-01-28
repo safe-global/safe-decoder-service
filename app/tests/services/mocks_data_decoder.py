@@ -259,3 +259,25 @@ example_swapped_abi = cast(
         },
     ],
 )
+
+# Abi with tuple parameters
+tuple_abi = [
+    {
+        "inputs": [
+            {
+                "components": [
+                    {"internalType": "bytes32", "name": "handler", "type": "bytes32"},
+                    {"internalType": "bytes32", "name": "salt", "type": "bytes32"},
+                    {"internalType": "bytes", "name": "staticInput", "type": "bytes"},
+                ],
+                "internalType": "struct IConditionalOrder.ConditionalOrderParams",
+                "name": "params",
+                "type": "tuple",
+            },
+        ],
+        "name": "createWithContext",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    }
+]
