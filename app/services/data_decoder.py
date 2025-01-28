@@ -236,7 +236,15 @@ class DataDecoderService:
         :param value_decoded:
         :return: dict[str, Any]
         """
-        if isinstance(value_decoded, bytes):
+        if isinstance(value_decoded, tuple):
+            value_decoded = tuple(
+                self._parse_decoded_arguments(value) for value in value_decoded
+            )
+        elif isinstance(value_decoded, list):
+            value_decoded = [
+                self._parse_decoded_arguments(value) for value in value_decoded
+            ]
+        elif isinstance(value_decoded, bytes):
             value_decoded = HexBytes(value_decoded).hex()
         elif isinstance(value_decoded, int):
             value_decoded = str(value_decoded)
