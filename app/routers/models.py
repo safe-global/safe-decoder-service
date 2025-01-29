@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from eth_typing import HexStr
 from safe_eth.eth.utils import (
@@ -78,10 +78,10 @@ class DataDecoderInput(BaseModel):
         ..., pattern=r"^0x[0-9a-fA-F]*$", description="0x-prefixed hexadecimal string"
     )
     to: ChecksumAddress | None = Field(
-        None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
+        default=None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
     )
     chain_id: int | None = Field(
-        None,
+        default=None,
         gt=0,
         description="Optional Chain ID as a positive integer",
         alias="chainId",
@@ -92,6 +92,21 @@ class DataDecoderInput(BaseModel):
         if value and not fast_is_checksum_address(value):
             raise ValueError("Address is not checksumed")
         return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_chain_id_requires_to(cls, data: Any) -> Any:
+        """
+        ChainId requires to, it doesn't make sense otherwise
+
+        :param data:
+        :return:
+        :raises ValueError: if `chain_id` is set but `to` is not
+        """
+        if isinstance(data, dict):
+            if data.get("chainId") is not None and data.get("to") is None:
+                raise ValueError("'chainId' requires 'to' to be set")
+        return data
 
 
 class ParameterDecodedPublic(BaseModel):

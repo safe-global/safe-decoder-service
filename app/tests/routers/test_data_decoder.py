@@ -85,6 +85,31 @@ class TestRouterAbout(DbAsyncConn):
         )
         self.assertEqual(response.status_code, 422)
 
+    async def test_view_data_decoder_with_chain_id_without_to(self):
+        # Test no checksumed address
+        response = self.client.post(
+            "/api/v1/data-decoder/",
+            json={
+                "data": "0x1234",
+                "chainId": 1,
+            },
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            response.json(),
+            {
+                "detail": [
+                    {
+                        "type": "value_error",
+                        "loc": ["body"],
+                        "msg": "Value error, 'chainId' requires 'to' to be set",
+                        "input": {"data": "0x1234", "chainId": 1},
+                        "ctx": {"error": {}},
+                    }
+                ]
+            },
+        )
+
     @db_session_context
     async def test_view_data_decoder_with_chain_id(self):
         source = AbiSource(name="local", url="")
