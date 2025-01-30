@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from .. import VERSION
-from .models import About
+from .models import AboutPublic
 
 router = APIRouter(
     prefix="/about",
@@ -9,6 +9,6 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=About)
-async def about() -> "About":
-    return About(version=VERSION)
+@router.get("", response_model=AboutPublic)
+async def about() -> AboutPublic:
+    return AboutPublic(version=VERSION)

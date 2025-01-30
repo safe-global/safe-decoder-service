@@ -46,11 +46,11 @@ class TestRouterContract(DbAsyncConn):
         self.assertEqual(response_json["next"], None)
         self.assertEqual(results[0]["name"], "A Test Contracts")
         self.assertEqual(results[0]["address"], address_expected)
-        self.assertEqual(results[0]["abi"]["abi_json"], mock_abi_json)
-        self.assertEqual(results[0]["abi"]["abi_hash"], "0xb4b61541")
+        self.assertEqual(results[0]["abi"]["abiJson"], mock_abi_json)
+        self.assertEqual(results[0]["abi"]["abiHash"], "0xb4b61541")
         self.assertEqual(results[0]["abi"]["modified"], datetime_to_str(abi.modified))
-        self.assertEqual(results[0]["display_name"], None)
-        self.assertEqual(results[0]["chain_id"], 1)
+        self.assertEqual(results[0]["displayName"], None)
+        self.assertEqual(results[0]["chainId"], 1)
         self.assertEqual(results[0]["project"], None)
         self.assertEqual(results[0]["modified"], datetime_to_str(contract.modified))
         # Test filter by chain_id
@@ -67,7 +67,7 @@ class TestRouterContract(DbAsyncConn):
         results = response_json["results"]
         self.assertEqual(response_json["count"], 1)
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["chain_id"], 5)
+        self.assertEqual(results[0]["chainId"], 5)
 
     @db_session_context
     async def test_contracts_pagination(self):
