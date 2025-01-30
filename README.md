@@ -8,8 +8,6 @@
 # Safe Decoder Service
 Decodes transaction data providing a human-readable output.
 
-
-
 ## Configuration
 ```bash
 cp .env.sample .env
@@ -42,8 +40,9 @@ cp .env.sample .env
 ### Handle migrations
 This projects is using [Alembic](https://alembic.sqlalchemy.org/en/latest/) to manage database migrations.
 To create a new migration based on changes made to the model code, run the following command:
+
 ```bash
- alembic revision --autogenerate -m "MIGRATION TITLE"
+alembic revision --autogenerate -m "MIGRATION TITLE"
 ```
 
 ### Querying the database via Python Shell in Docker
@@ -52,12 +51,10 @@ To open an interactive Python shell within a Docker container and query the data
  docker exec -it safe-decoder-service-web-1 python -m IPython -i ./scripts/db_profile.py
 ```
 Example usage:
-```
-In [11]: contracts = await Contract.get_all()
-
-In [12]: contracts[0].address
-Out[12]: b'J\xdb\xaa\xc7\xbc#\x9e%\x19\xcb\xfd#\x97\xe0\xf7Z\x1d\xe3U\xc8'
-
+```python
+contracts = await Contract.get_all()
+contracts[0].address
+b'J\xdb\xaa\xc7\xbc#\x9e%\x19\xcb\xfd#\x97\xe0\xf7Z\x1d\xe3U\xc8'
 ```
 Call `await restore_session()` to reopen a new session.
 

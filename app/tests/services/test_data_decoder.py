@@ -682,3 +682,44 @@ class TestDataDecoderService(DbAsyncConn):
                 )
             },
         )
+
+    @db_session_context
+    async def test_load_new_abis(self):
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        # Service should not have any ABI loaded
+        self.assertEqual(decoder_service.fn_selectors_with_abis, {})
+        self.assertIsNone(decoder_service.last_abi_created)
+
+        # Try to load new ABIs, none should be loaded
+        self.assertEqual(await decoder_service.load_new_abis(), 0)
+        self.assertEqual(decoder_service.fn_selectors_with_abis, {})
+        self.assertIsNone(decoder_service.last_abi_created)
+
+        # Store ABIs in the database and load them
+        await self._store_safe_contract_abi()
+        self.assertGreater(await decoder_service.load_new_abis(), 0)
+        self.assertNotEqual(decoder_service.fn_selectors_with_abis, {})
+        self.assertIsNotNone(decoder_service.last_abi_created)
+
+        # No new ABIs to load
+        # Store ABIs in the database and load them
+        self.assertEqual(await decoder_service.load_new_abis(), 0)
+
+        # Add a new ABI
+        source = AbiSource(name="local", url="")
+        await source.create()
+        abi = Abi(
+            abi_hash=b"ExampleABI",
+            abi_json=example_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await abi.create()
+        len_previous_selectors = len(decoder_service.fn_selectors_with_abis)
+        self.assertEqual(await decoder_service.load_new_abis(), 1)
+        self.assertGreater(
+            len(decoder_service.fn_selectors_with_abis), len_previous_selectors
+        )
+        self.assertEqual(decoder_service.last_abi_created, abi.created)

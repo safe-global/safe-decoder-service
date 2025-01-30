@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+import datetime
 from typing import AsyncIterator, Self, cast
 
 from sqlalchemy import DateTime
@@ -45,18 +45,19 @@ class TimeStampedSQLModel(SQLModel):
 
     """
 
-    created: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+    created: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
         nullable=False,
         sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
 
-    modified: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+    modified: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
         nullable=False,
         sa_type=DateTime(timezone=True),  # type: ignore
         sa_column_kwargs={
-            "onupdate": lambda: datetime.now(timezone.utc),
+            "onupdate": lambda: datetime.datetime.now(datetime.timezone.utc),
         },
     )
 
@@ -110,12 +111,39 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     contracts: list["Contract"] = Relationship(back_populates="abi")
 
     @classmethod
+    async def get_created_for_last_inserted(cls) -> datetime.datetime | None:
+        """
+        :return: Abi JSON, with the ones with less relevance first
+        """
+        results = await db_session.execute(
+            select(cls.created).order_by(col(cls.created).desc())
+        )
+        if result := results.first():
+            return result[0]
+        return None
+
+    @classmethod
     async def get_abis_sorted_by_relevance(cls) -> AsyncIterator[ABI]:
         """
         :return: Abi JSON, with the ones with less relevance first
         """
         results = await db_session.execute(
             select(cls.abi_json).order_by(col(cls.relevance))
+        )
+        for result in results.scalars().all():
+            yield cast(ABI, result)
+
+    @classmethod
+    async def get_abi_json_newer_equal_than(
+        cls, when: datetime.datetime
+    ) -> AsyncIterator[ABI]:
+        """
+        :return: Abi JSON, with the ones with less relevance first
+        """
+        results = await db_session.execute(
+            select(cls.abi_json)
+            .where(col(cls.created) >= when)
+            .order_by(col(cls.created).asc())
         )
         for result in results.scalars().all():
             yield cast(ABI, result)
