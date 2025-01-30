@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Any, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from eth_typing import HexStr
+from fastapi_camelcase import CamelModel
 from safe_eth.eth.utils import (
     ChecksumAddress,
     fast_is_checksum_address,
@@ -13,11 +14,11 @@ from safe_eth.eth.utils import (
 from ..services.data_decoder import DecodingAccuracyEnum
 
 
-class About(BaseModel):
+class AboutPublic(CamelModel):
     version: str
 
 
-class ProjectPublic(BaseModel):
+class ProjectPublic(CamelModel):
     description: str
     logo_file: str
 
@@ -25,7 +26,7 @@ class ProjectPublic(BaseModel):
         from_attributes = True
 
 
-class AbiPublic(BaseModel):
+class AbiPublic(CamelModel):
     abi_json: list[dict] | dict | None
     abi_hash: bytes | str
     modified: datetime
@@ -47,7 +48,7 @@ class AbiPublic(BaseModel):
         return abi_hash
 
 
-class ContractsPublic(BaseModel):
+class ContractsPublic(CamelModel):
     address: bytes | ChecksumAddress
     name: str
     display_name: str | None
@@ -73,7 +74,7 @@ class ContractsPublic(BaseModel):
         return address
 
 
-class DataDecoderInput(BaseModel):
+class DataDecoderInput(CamelModel):
     data: str = Field(
         ..., pattern=r"^0x[0-9a-fA-F]*$", description="0x-prefixed hexadecimal string"
     )
@@ -84,7 +85,6 @@ class DataDecoderInput(BaseModel):
         default=None,
         gt=0,
         description="Optional Chain ID as a positive integer",
-        alias="chainId",
     )
 
     @field_validator("to")
@@ -109,7 +109,7 @@ class DataDecoderInput(BaseModel):
         return data
 
 
-class ParameterDecodedPublic(BaseModel):
+class ParameterDecodedPublic(CamelModel):
     name: str
     type: str
     value: Any
@@ -118,7 +118,7 @@ class ParameterDecodedPublic(BaseModel):
     ] = None
 
 
-class BaseDataDecodedPublic(BaseModel):
+class BaseDataDecodedPublic(CamelModel):
     method: str
     parameters: list[ParameterDecodedPublic]
 
@@ -127,7 +127,7 @@ class DataDecodedPublic(BaseDataDecodedPublic):
     accuracy: DecodingAccuracyEnum
 
 
-class MultisendDecodedPublic(BaseModel):
+class MultisendDecodedPublic(CamelModel):
     operation: int
     to: ChecksumAddress
     value: str
