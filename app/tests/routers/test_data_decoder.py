@@ -85,6 +85,7 @@ class TestRouterAbout(DbAsyncConn):
         )
         self.assertEqual(response.status_code, 422)
 
+    @db_session_context
     async def test_view_data_decoder_with_chain_id_without_to(self):
         # Test no checksumed address
         response = self.client.post(

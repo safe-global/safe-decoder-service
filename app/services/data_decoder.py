@@ -1,3 +1,4 @@
+import datetime
 import logging
 from enum import Enum
 from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
@@ -78,13 +79,21 @@ class DataDecoderService:
     fn_selectors_with_abis: dict[bytes, ABIFunction]
     multisend_abis: list[ABI]
     multisend_fn_selectors_with_abis: dict[bytes, ABIFunction]
+    last_abi_created: datetime.datetime | None
 
     async def init(self) -> None:
         """
         Initialize the data decoder service, loading the ABIs from the database and storing the 4byte selectors
         in memory
         """
-        logger.info("%s: Loading contract ABIs for decoding", self.__class__.__name__)
+
+        # last_abi_created will be used to reload ABIs on the database only getting the newer ones
+        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
+        logger.info(
+            "%s: Loading contract ABIs for decoding. Last inserted ABI on the database: %s",
+            self.__class__.__name__,
+            self.last_abi_created,
+        )
         self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
             await self._generate_selectors_with_abis_from_abis(
                 await self.get_supported_abis()
@@ -485,3 +494,24 @@ class DataDecoderService:
                 self.fn_selectors_with_abis[selector] = new_abi
                 updated = True
         return updated
+
+    async def load_new_abis(self) -> int:
+        """
+        Load new ABIs stored on the database after the decoder was started.
+        Use `last_abi_created` property to only load the latest ABIs
+
+        :return: Number of new ABIs loaded
+        """
+
+        last_abi_created = self.last_abi_created
+        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
+        if last_abi_created is not None:
+            abis = Abi.get_abi_newer_equal_than(last_abi_created)
+        else:
+            abis = Abi.get_abis_sorted_by_relevance()
+
+        loaded_abis = 0
+        async for abi in abis:
+            if self.add_abi(abi):
+                loaded_abis += 1
+        return loaded_abis

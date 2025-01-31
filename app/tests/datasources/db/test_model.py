@@ -1,3 +1,4 @@
+import datetime
 from typing import cast
 
 from eth_account import Account
@@ -73,6 +74,35 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result[0], abi)
 
     @db_session_context
+    async def test_abi_get_creation_date_for_last_inserted(self):
+        self.assertIsNone(await Abi.get_creation_date_for_last_inserted())
+
+        abi_jsons = [
+            {"name": "A Test Project with relevance 100"},
+            {"name": "A Test Project with relevance 10"},
+        ]
+        source = AbiSource(name="A Test Source", url="https://test.com")
+        await source.create()
+        abi = Abi(
+            abi_hash=abi_jsons[0]["name"].encode(),
+            abi_json=abi_jsons[0],
+            relevance=100,
+            source_id=source.id,
+        )
+        await abi.create()
+
+        last_abi = Abi(
+            abi_hash=abi_jsons[1]["name"].encode(),
+            abi_json=abi_jsons[1],
+            relevance=100,
+            source_id=source.id,
+        )
+        await last_abi.create()
+
+        last_inserted = await Abi.get_creation_date_for_last_inserted()
+        self.assertEqual(last_inserted, last_abi.created)
+
+    @db_session_context
     async def test_abi_get_abis_sorted_by_relevance(self):
         abi_jsons = [
             {"name": "A Test Project with relevance 100"},
@@ -103,6 +133,57 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result, abi_jsons[1])
         result = await anext(results)
         self.assertEqual(result, abi_jsons[0])
+
+    @db_session_context
+    async def test_abi_get_abi_newer_equal_than(self):
+        current_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.assertListEqual(
+            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)], []
+        )
+
+        abi_jsons = [
+            {"name": "A Test Project with relevance 100"},
+            {"name": "A Test Project with relevance 10"},
+        ]
+        source = AbiSource(name="A Test Source", url="https://test.com")
+        await source.create()
+        abi = Abi(
+            abi_hash=abi_jsons[0]["name"].encode(),
+            abi_json=abi_jsons[0],
+            relevance=100,
+            source_id=source.id,
+        )
+        await abi.create()
+
+        last_abi = Abi(
+            abi_hash=abi_jsons[1]["name"].encode(),
+            abi_json=abi_jsons[1],
+            relevance=100,
+            source_id=source.id,
+        )
+        await last_abi.create()
+
+        self.assertListEqual(
+            [
+                x
+                async for x in Abi.get_abi_newer_equal_than(
+                    datetime.datetime.now(tz=datetime.timezone.utc)
+                )
+            ],
+            [],
+        )
+        self.assertListEqual(
+            [x async for x in Abi.get_abi_newer_equal_than(last_abi.created)],
+            [last_abi.abi_json],
+        )
+        self.assertListEqual(
+            [x async for x in Abi.get_abi_newer_equal_than(abi.created)],
+            [abi.abi_json, last_abi.abi_json],
+        )
+        self.assertListEqual(
+            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)],
+            [abi.abi_json, last_abi.abi_json],
+        )
 
     @db_session_context
     async def test_abi_source(self):
