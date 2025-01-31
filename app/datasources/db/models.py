@@ -111,9 +111,9 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     contracts: list["Contract"] = Relationship(back_populates="abi")
 
     @classmethod
-    async def get_created_for_last_inserted(cls) -> datetime.datetime | None:
+    async def get_creation_date_for_last_inserted(cls) -> datetime.datetime | None:
         """
-        :return: Abi JSON, with the ones with less relevance first
+        :return: Creation date for last inserted ABI, `None` if table is empty
         """
         results = await db_session.execute(
             select(cls.created).order_by(col(cls.created).desc())
@@ -134,11 +134,14 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield cast(ABI, result)
 
     @classmethod
-    async def get_abi_json_newer_equal_than(
+    async def get_abi_newer_equal_than(
         cls, when: datetime.datetime
     ) -> AsyncIterator[ABI]:
         """
-        :return: Abi JSON, with the ones with less relevance first
+        Get ABI json with `created` newer or equal than provided `when` parameter.
+
+        :param when: It will be compared with ABI `created` field
+        :return: Abi JSONs, sorted by the oldest ones first
         """
         results = await db_session.execute(
             select(cls.abi_json)

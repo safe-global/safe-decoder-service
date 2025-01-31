@@ -88,7 +88,7 @@ class DataDecoderService:
         """
 
         # last_abi_created will be used to reload ABIs on the database only getting the newer ones
-        self.last_abi_created = await Abi.get_created_for_last_inserted()
+        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
         logger.info(
             "%s: Loading contract ABIs for decoding. Last inserted ABI on the database: %s",
             self.__class__.__name__,
@@ -504,9 +504,9 @@ class DataDecoderService:
         """
 
         last_abi_created = self.last_abi_created
-        self.last_abi_created = await Abi.get_created_for_last_inserted()
+        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
         if last_abi_created is not None:
-            abis = Abi.get_abi_json_newer_equal_than(last_abi_created)
+            abis = Abi.get_abi_newer_equal_than(last_abi_created)
         else:
             abis = Abi.get_abis_sorted_by_relevance()
 

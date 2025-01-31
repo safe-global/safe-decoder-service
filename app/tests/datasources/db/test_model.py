@@ -74,8 +74,8 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result[0], abi)
 
     @db_session_context
-    async def test_abi_get_created_for_last_inserted(self):
-        self.assertIsNone(await Abi.get_created_for_last_inserted())
+    async def test_abi_get_creation_date_for_last_inserted(self):
+        self.assertIsNone(await Abi.get_creation_date_for_last_inserted())
 
         abi_jsons = [
             {"name": "A Test Project with relevance 100"},
@@ -99,7 +99,7 @@ class TestModel(DbAsyncConn):
         )
         await last_abi.create()
 
-        last_inserted = await Abi.get_created_for_last_inserted()
+        last_inserted = await Abi.get_creation_date_for_last_inserted()
         self.assertEqual(last_inserted, last_abi.created)
 
     @db_session_context
@@ -135,10 +135,10 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result, abi_jsons[0])
 
     @db_session_context
-    async def test_abi_get_abi_json_newer_equal_than(self):
+    async def test_abi_get_abi_newer_equal_than(self):
         current_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         self.assertListEqual(
-            [x async for x in Abi.get_abi_json_newer_equal_than(current_datetime)], []
+            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)], []
         )
 
         abi_jsons = [
@@ -166,22 +166,22 @@ class TestModel(DbAsyncConn):
         self.assertListEqual(
             [
                 x
-                async for x in Abi.get_abi_json_newer_equal_than(
+                async for x in Abi.get_abi_newer_equal_than(
                     datetime.datetime.now(tz=datetime.timezone.utc)
                 )
             ],
             [],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_json_newer_equal_than(last_abi.created)],
+            [x async for x in Abi.get_abi_newer_equal_than(last_abi.created)],
             [last_abi.abi_json],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_json_newer_equal_than(abi.created)],
+            [x async for x in Abi.get_abi_newer_equal_than(abi.created)],
             [abi.abi_json, last_abi.abi_json],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_json_newer_equal_than(current_datetime)],
+            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)],
             [abi.abi_json, last_abi.abi_json],
         )
 
