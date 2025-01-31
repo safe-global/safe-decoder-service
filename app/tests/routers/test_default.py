@@ -14,9 +14,7 @@ class TestRouterDefault(unittest.TestCase):
 
     def test_view_home(self):
         response = self.client.get("/", follow_redirects=False)
-        self.assertEqual(response.status_code, 307)
-        self.assertTrue(response.has_redirect_location)
-        self.assertEqual(response.headers["location"], "/docs")
+        self.assertEqual(response.status_code, 200)
 
     def test_view_redoc(self):
         response = self.client.get("/redoc", follow_redirects=False)
@@ -24,7 +22,9 @@ class TestRouterDefault(unittest.TestCase):
 
     def test_view_swagger_ui(self):
         response = self.client.get("/docs", follow_redirects=False)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 307)
+        self.assertTrue(response.has_redirect_location)
+        self.assertEqual(response.headers["location"], "/")
 
     def test_view_health(self):
         response = self.client.get("/health")

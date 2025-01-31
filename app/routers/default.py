@@ -8,17 +8,17 @@ router = APIRouter()
 
 
 @router.get("/", include_in_schema=False)
-async def home() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
-
-
-@router.get("/docs", include_in_schema=False)
-async def swagger_ui_html():
+async def home():
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="Safe Decoder Service - Swagger UI",
         swagger_favicon_url="/static/favicon.ico",
     )
+
+
+@router.get("/docs", include_in_schema=False)
+async def swagger_ui_html() -> RedirectResponse:
+    return RedirectResponse(url="/")
 
 
 @router.get("/redoc", include_in_schema=False)
