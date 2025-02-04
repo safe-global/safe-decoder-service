@@ -76,15 +76,23 @@ class ContractsPublic(CamelModel):
 
 class DataDecoderInput(CamelModel):
     data: str = Field(
-        ..., pattern=r"^0x[0-9a-fA-F]*$", description="0x-prefixed hexadecimal string"
+        pattern=r"^0x[0-9a-fA-F]*$",
+        description="0x-prefixed hexadecimal string",
+        examples=[
+            "0xa9059cbb0000000000000000000000005afe3855358e112b5647b952709e6165e1c1eeee00000000000000000000000000000000000000000000001e1de1d2517bae38ac"
+        ],
     )
     to: ChecksumAddress | None = Field(
-        default=None, pattern=r"^0x[0-9a-fA-F]{40}$", description="Optional to address"
+        default=None,
+        pattern=r"^0x[0-9a-fA-F]{40}$",
+        description="Optional to address",
+        examples=["0x5aFE3855358E112B5647B952709E6165e1c1eEEe"],
     )
     chain_id: int | None = Field(
         default=None,
         gt=0,
         description="Optional Chain ID as a positive integer",
+        examples=[1],
     )
 
     @field_validator("to")
