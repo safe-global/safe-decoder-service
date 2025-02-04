@@ -8,6 +8,8 @@ import secrets
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.custom_logger import JsonLogger
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -44,4 +46,24 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logging.basicConfig(level=logging.getLevelName(settings.LOG_LEVEL))
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"json": {"()": JsonLogger}},  # Custom formatter class
+    "handlers": {
+        "console": {
+            "level": settings.LOG_LEVEL,
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        }
+    },
+    "loggers": {
+        "": {
+            "level": settings.LOG_LEVEL,
+            "handlers": ["console"],
+            "propagate": False,
+        }
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
