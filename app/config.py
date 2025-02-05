@@ -2,7 +2,7 @@
 Base settings file for FastApi application.
 """
 
-import logging
+import logging.config
 import os
 import secrets
 

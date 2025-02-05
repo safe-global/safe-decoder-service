@@ -2,23 +2,61 @@ import logging
 
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
-from dramatiq.middleware import AsyncIO
+from dramatiq.middleware import AsyncIO, Middleware
 from hexbytes import HexBytes
 from periodiq import PeriodiqMiddleware, cron
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.config import settings
+from app.custom_logger import ContextMessageLog, TaskInfo
 from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.services.contract_metadata_service import get_contract_metadata_service
 
+
+class LoggingMiddleware(Middleware):
+    def before_process_message(self, broker, message):
+        """
+        Setup a logRecord factory with task information
+
+        :param broker:
+        :param message:
+        :return:
+        """
+
+        def log_record_factory(*args, **kwargs):
+            """
+            Function called every time a logRecord is instantiated.
+
+            :param args:
+            :param kwargs:
+            :return:
+            """
+            # Create a log record with additional context
+            record = logging.LogRecord(*args, **kwargs)
+            task_detail = TaskInfo(
+                name=message.actor_name,
+                id=message.message_id,
+                kwargs=message.kwargs,
+                args=message.args,
+            )
+            record.contextMessage = ContextMessageLog(taskDetail=task_detail)
+            return record
+
+        logging.setLogRecordFactory(log_record_factory)
+        logger.info("Running task...")
+
+    def after_process_message(self, broker, message, *, result=None, exception=None):
+        logger.info("Ending task...")
+        # Unset record factory
+        logging.setLogRecordFactory(logging.LogRecord)
+
+
 logger = logging.getLogger(__name__)
-
-
 redis_broker = RedisBroker(url=settings.REDIS_URL)
 redis_broker.add_middleware(PeriodiqMiddleware(skip_delay=60))
 redis_broker.add_middleware(AsyncIO())
-
+redis_broker.add_middleware(LoggingMiddleware())
 dramatiq.set_broker(redis_broker)
 
 
@@ -46,11 +84,7 @@ async def get_contract_metadata_task(
     if skip_attemp_download or await contract_metadata_service.should_attempt_download(
         address, chain_id, 0
     ):
-        logger.info(
-            "Downloading contract metadata for contract=%s and chain=%s",
-            address,
-            chain_id,
-        )
+        logger.info("Downloading contract metadata")
         # TODO Check if contract is MultiSend. In that case, get the transaction and decode it
         contract_metadata = await contract_metadata_service.get_contract_metadata(
             fast_to_checksum_address(address), chain_id
@@ -59,32 +93,22 @@ async def get_contract_metadata_task(
             contract_metadata
         )
         if result:
-            logger.info(
-                "Success download contract metadata for contract=%s and chain=%s",
-                address,
-                chain_id,
-            )
+            logger.info("Success download contract metadata")
         else:
-            logger.info(
-                "Failed to download contract metadata for contract=%s and chain=%s",
-                address,
-                chain_id,
-            )
+            logger.info("Failed to download contract metadata")
 
         if proxy_implementation_address := contract_metadata_service.get_proxy_implementation_address(
             contract_metadata
         ):
             logger.info(
-                "Adding task to download proxy implementation metadata from address=%s for contract=%s and chain=%s",
+                "Adding task to download proxy implementation metadata with address %s",
                 proxy_implementation_address,
-                address,
-                chain_id,
             )
             get_contract_metadata_task.send(
                 address=proxy_implementation_address, chain_id=chain_id
             )
     else:
-        logger.debug("Skipping contract=%s and chain=%s", address, chain_id)
+        logger.debug("Skipping contract")
 
 
 @dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight

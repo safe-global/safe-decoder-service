@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 
 from ...config import settings
+from ...custom_logger import ContextMessageLog, DbSessionDetail
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +59,26 @@ def set_database_session_context(
     :return:
     """
     _session_id: str = session_id or str(uuid.uuid4())
-    logger.debug(f"Storing db_session context: {_session_id}")
+    logger.debug(
+        "Storing db_session context",
+        extra={
+            "context_message": ContextMessageLog(
+                dbSessionDetail=DbSessionDetail(sessionId=_session_id)
+            ).model_dump()
+        },
+    )
     token = _db_session_context.set(_session_id)
     try:
         yield
     finally:
-        logger.debug(f"Removing db_session context: {_session_id}")
+        logger.debug(
+            "Removing db_session context",
+            extra={
+                "context_message": ContextMessageLog(
+                    dbSessionDetail=DbSessionDetail(sessionId=_session_id)
+                ).model_dump()
+            },
+        )
         _db_session_context.reset(token)
 
 

@@ -98,13 +98,13 @@ async def http_request_middleware(request: Request, call_next):
             url=str(request.url), method=request.method, startTime=start_time
         )
         http_response = HttpResponseLog(
-            status=response.status_code, end_time=end_time, totalTime=int(total_time)
+            status=response.status_code, endTime=end_time, totalTime=int(total_time)
         )
         context_message = ContextMessageLog(
             httpRequest=http_request, httpResponse=http_response
         )
         logger.info(
-            "Http request", extra={"context_message": context_message.model_dump()}
+            "Http request", extra={"contextMessage": context_message.model_dump()}
         )
     except ValueError as e:
         logger.error(f"Validation log error {e}")
