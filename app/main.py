@@ -8,8 +8,12 @@ from fastapi import APIRouter, FastAPI
 from starlette.requests import Request
 
 from . import VERSION
-from .custom_logger import ContextMessageLog, HttpRequestLog, HttpResponseLog
-from .datasources.db.database import db_session, set_database_session_context
+from .custom_logger import ContextMessageLog, HttpRequestFilter, HttpResponseLog
+from .datasources.db.database import (
+    _get_database_session_context,
+    db_session,
+    set_database_session_context,
+)
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -83,6 +87,19 @@ async def http_request_middleware(request: Request, call_next):
     """
     start_time = datetime.datetime.now(datetime.timezone.utc)
     with set_database_session_context():
+        # Add default request log information, it's necessary do it inside of context to add db_session id.
+        try:
+            logger.addFilter(
+                HttpRequestFilter(
+                    _get_database_session_context(),
+                    request.url,
+                    request.method,
+                    start_time,
+                )
+            )
+        except ValueError as e:
+            logger.error(f"Validation log error {e}")
+
         try:
             response = await call_next(request)
         except Exception as e:
@@ -94,15 +111,10 @@ async def http_request_middleware(request: Request, call_next):
     try:
         end_time = datetime.datetime.now(datetime.timezone.utc)
         total_time = (end_time - start_time).total_seconds() * 1000  # time in ms
-        http_request = HttpRequestLog(
-            url=str(request.url), method=request.method, startTime=start_time
-        )
         http_response = HttpResponseLog(
             status=response.status_code, endTime=end_time, totalTime=int(total_time)
         )
-        context_message = ContextMessageLog(
-            httpRequest=http_request, httpResponse=http_response
-        )
+        context_message = ContextMessageLog(httpResponse=http_response)
         logger.info(
             "Http request", extra={"contextMessage": context_message.model_dump()}
         )

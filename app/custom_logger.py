@@ -5,6 +5,7 @@ from pydantic.main import BaseModel
 
 
 class HttpRequestLog(BaseModel):
+    dbSession: str
     url: str
     method: str
     body: str | None = None
@@ -23,10 +24,6 @@ class ErrorDetail(BaseModel):
     exceptionInfo: str
 
 
-class DbSessionDetail(BaseModel):
-    sessionId: str
-
-
 class TaskInfo(BaseModel):
     name: str
     id: str
@@ -38,7 +35,6 @@ class ContextMessageLog(BaseModel):
     httpRequest: HttpRequestLog | None = None
     httpResponse: HttpResponseLog | None = None
     errorDetail: ErrorDetail | None = None
-    dbSessionDetail: DbSessionDetail | None = None
     taskDetail: TaskInfo | None = None
 
 
@@ -81,3 +77,32 @@ class JsonLogger(logging.Formatter):
         )
 
         return json_log.model_dump_json(exclude_none=True)
+
+
+class HttpRequestFilter(logging.Filter):
+    """
+    Add default information for any log initiated by a request
+    """
+
+    def __init__(self, session_id=None, url=None, method=None, start_time=None):
+        super().__init__()
+        # Set context_id via constructor or use a default value
+        self.session_id = session_id
+        self.url = url
+        self.method = method
+        self.start_time = start_time
+
+    def filter(self, record):
+        http_request = HttpRequestLog(
+            dbSession=self.session_id,
+            url=str(self.url),
+            method=self.method,
+            startTime=self.start_time,
+        )
+        if hasattr(record, "contextMessage"):
+            # Add request
+            record.contextMessage["httpRequest"] = http_request
+        else:
+            record.contextMessage = ContextMessageLog(httpRequest=http_request)
+
+        return True
