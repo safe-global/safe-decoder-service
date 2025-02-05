@@ -8,7 +8,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.requests import Request
 
 from . import VERSION
-from .custom_logger import ContextMessageLog, HttpRequestFilter, HttpResponseLog
+from .custom_logger import HttpRequestLog, HttpResponseLog
 from .datasources.db.database import (
     _get_database_session_context,
     db_session,
@@ -21,6 +21,28 @@ from .services.abis import AbiService
 from .services.events import EventsService
 
 logger = logging.getLogger()
+
+
+def log_record_factory(*args, **kwargs) -> logging.LogRecord:
+    """
+    Create a record with default information
+
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    # Create a log record with additional context
+    record = logging.LogRecord(*args, **kwargs)
+    try:
+        record.db_session = _get_database_session_context()
+    except LookupError:
+        # This error means that there is not session
+        pass
+
+    return record
+
+
+logging.setLogRecordFactory(log_record_factory)
 
 
 @asynccontextmanager
@@ -87,38 +109,36 @@ async def http_request_middleware(request: Request, call_next):
     """
     start_time = datetime.datetime.now(datetime.timezone.utc)
     with set_database_session_context():
-        # Add default request log information, it's necessary do it inside of context to add db_session id.
-        try:
-            logger.addFilter(
-                HttpRequestFilter(
-                    _get_database_session_context(),
-                    request.url,
-                    request.method,
-                    start_time,
-                )
-            )
-        except ValueError as e:
-            logger.error(f"Validation log error {e}")
-
         try:
             response = await call_next(request)
         except Exception as e:
             raise e
         finally:
             await db_session.remove()
-
-    # Log request
-    try:
-        end_time = datetime.datetime.now(datetime.timezone.utc)
-        total_time = (end_time - start_time).total_seconds() * 1000  # time in ms
-        http_response = HttpResponseLog(
-            status=response.status_code, endTime=end_time, totalTime=int(total_time)
-        )
-        context_message = ContextMessageLog(httpResponse=http_response)
-        logger.info(
-            "Http request", extra={"contextMessage": context_message.model_dump()}
-        )
-    except ValueError as e:
-        logger.error(f"Validation log error {e}")
+            # Log request
+            try:
+                end_time = datetime.datetime.now(datetime.timezone.utc)
+                total_time = (
+                    end_time - start_time
+                ).total_seconds() * 1000  # time in ms
+                http_request = HttpRequestLog(
+                    url=str(request.url),
+                    method=request.method,
+                    startTime=start_time,
+                )
+                http_response = HttpResponseLog(
+                    status=response.status_code,
+                    endTime=end_time,
+                    totalTime=int(total_time),
+                )
+                logger.info(
+                    "Http request",
+                    extra={
+                        "http_response": http_response.model_dump(),
+                        "http_request": http_request.model_dump(),
+                    },
+                )
+            except ValueError as e:
+                logger.error(f"Validation log error {e}")
 
     return response

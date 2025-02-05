@@ -19,7 +19,7 @@ from web3.types import ABI, ABIFunction
 
 from ..datasources.db.models import Abi, Contract
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class DataDecoderException(Exception):
