@@ -49,9 +49,16 @@ class JsonLog(BaseModel):
     contextMessage: ContextMessageLog | dict | None = None
 
 
-class JsonLogger(logging.Formatter):
+class JsonFormatter(logging.Formatter):
     """
-    Json formatter
+    Json formatter with following schema
+    {
+        level: str,
+        timestamp: Datetime,
+        context: str,
+        message: str,
+        contextMessage: <contextMessage>
+    }
     """
 
     def format(self, record):

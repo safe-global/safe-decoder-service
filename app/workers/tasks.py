@@ -14,9 +14,9 @@ from app.datasources.db.models import Contract
 from app.services.contract_metadata_service import get_contract_metadata_service
 
 
-def log_record_factory(*args, **kwargs):
+def log_record_factory_for_task(*args, **kwargs):
     """
-    Injects by default the task information.
+    Injects to log record the task information.
 
     :param args:
     :param kwargs:
@@ -30,7 +30,7 @@ def log_record_factory(*args, **kwargs):
     return record
 
 
-logging.setLogRecordFactory(log_record_factory)
+logging.setLogRecordFactory(log_record_factory_for_task)
 
 
 logger = logging.getLogger(__name__)

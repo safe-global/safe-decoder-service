@@ -23,9 +23,9 @@ from .services.events import EventsService
 logger = logging.getLogger()
 
 
-def log_record_factory(*args, **kwargs) -> logging.LogRecord:
+def log_record_factory_for_request(*args, **kwargs) -> logging.LogRecord:
     """
-    Create a record with default information
+    Inject session database identifier int log record.
 
     :param args:
     :param kwargs:
@@ -42,7 +42,7 @@ def log_record_factory(*args, **kwargs) -> logging.LogRecord:
     return record
 
 
-logging.setLogRecordFactory(log_record_factory)
+logging.setLogRecordFactory(log_record_factory_for_request)
 
 
 @asynccontextmanager
