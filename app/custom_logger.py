@@ -49,7 +49,7 @@ class JsonLog(BaseModel):
     contextMessage: ContextMessageLog | dict | None = None
 
 
-class JsonFormatter(logging.Formatter):
+class SafeJsonFormatter(logging.Formatter):
     """
     Json formatter with following schema
     {

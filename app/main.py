@@ -25,7 +25,7 @@ logger = logging.getLogger()
 
 def log_record_factory_for_request(*args, **kwargs) -> logging.LogRecord:
     """
-    Inject session database identifier int log record.
+    Inject session database identifier in log record.
 
     :param args:
     :param kwargs:
