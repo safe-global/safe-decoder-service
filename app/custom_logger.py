@@ -6,6 +6,8 @@ from typing import Generator
 
 from pydantic.main import BaseModel
 
+logger = logging.getLogger(__name__)
+
 
 class HttpRequestLog(BaseModel):
     url: str
@@ -119,8 +121,10 @@ def logging_task_context(task_message) -> Generator[None, None, None]:
     )
     token = _task_info.set(task_detail)
     try:
+        logger.debug("Starting task...")
         yield
     finally:
+        logger.debug("Finishing task...")
         _task_info.reset(token)
 
 

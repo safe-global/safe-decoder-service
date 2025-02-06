@@ -99,22 +99,24 @@ async def get_contract_metadata_task(
 @dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
 @db_session_context
 async def get_missing_contract_metadata_task():
-    async for contract in Contract.get_contracts_without_abi(
-        settings.CONTRACT_MAX_DOWNLOAD_RETRIES
-    ):
-        get_contract_metadata_task.send(
-            address=HexBytes(contract.address).hex(),
-            chain_id=contract.chain_id,
-            skip_attemp_download=True,
-        )
+    with logging_task_context(CurrentMessage.get_current_message()):
+        async for contract in Contract.get_contracts_without_abi(
+            settings.CONTRACT_MAX_DOWNLOAD_RETRIES
+        ):
+            get_contract_metadata_task.send(
+                address=HexBytes(contract.address).hex(),
+                chain_id=contract.chain_id,
+                skip_attemp_download=True,
+            )
 
 
 @dramatiq.actor(periodic=cron("0 5 * * *"))  # Every day at 5 am
 @db_session_context
 async def update_proxies_task():
-    async for proxy_contract in Contract.get_proxy_contracts():
-        get_contract_metadata_task.send(
-            address=HexBytes(proxy_contract.address).hex(),
-            chain_id=proxy_contract.chain_id,
-            skip_attemp_download=True,
-        )
+    with logging_task_context(CurrentMessage.get_current_message()):
+        async for proxy_contract in Contract.get_proxy_contracts():
+            get_contract_metadata_task.send(
+                address=HexBytes(proxy_contract.address).hex(),
+                chain_id=proxy_contract.chain_id,
+                skip_attemp_download=True,
+            )
