@@ -106,7 +106,8 @@ class TestAsyncTasks(DbAsyncConn):
             AsyncEtherscanClientV2(EthereumNetwork(chain_id))
         ]
         # Should try one time
-        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
+        self._wait_tasks_execution()
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
         self.assertIsNone(contract.abi_id)
@@ -115,7 +116,8 @@ class TestAsyncTasks(DbAsyncConn):
         # Shouldn't try second time
         etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         chain_id = 100
-        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
+        self._wait_tasks_execution()
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
         self.assertIsNone(contract.abi_id)
@@ -125,7 +127,8 @@ class TestAsyncTasks(DbAsyncConn):
         contract.fetch_retries = 0
         redis.delete(cache_key)
         await contract.update()
-        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
+        self._wait_tasks_execution()
         await db_session.refresh(contract)
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
@@ -148,7 +151,7 @@ class TestAsyncTasks(DbAsyncConn):
         proxy_implementation_address = "0x43506849D7C04F9138D1A2050bbF3A0c054402dd"
         chain_id = 1
 
-        get_contract_metadata_task.fn(address=contract_address, chain_id=chain_id)
+        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
 
         self._wait_tasks_execution()
 
