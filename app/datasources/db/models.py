@@ -134,18 +134,16 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield cast(ABI, result)
 
     @classmethod
-    async def get_abi_newer_equal_than(
-        cls, when: datetime.datetime
-    ) -> AsyncIterator[ABI]:
+    async def get_abi_newer_than(cls, when: datetime.datetime) -> AsyncIterator[ABI]:
         """
-        Get ABI json with `created` newer or equal than provided `when` parameter.
+        Get ABI json with `created` newer than provided `when` parameter.
 
         :param when: It will be compared with ABI `created` field
         :return: Abi JSONs, sorted by the oldest ones first
         """
         results = await db_session.execute(
             select(cls.abi_json)
-            .where(col(cls.created) >= when)
+            .where(col(cls.created) > when)
             .order_by(col(cls.created).asc())
         )
         for result in results.scalars().all():
