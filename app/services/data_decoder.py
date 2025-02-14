@@ -506,7 +506,7 @@ class DataDecoderService:
         last_abi_created = self.last_abi_created
         self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
         if last_abi_created is not None:
-            abis = Abi.get_abi_newer_equal_than(last_abi_created)
+            abis = Abi.get_abi_newer_than(last_abi_created)
         else:
             abis = Abi.get_abis_sorted_by_relevance()
 

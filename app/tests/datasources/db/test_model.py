@@ -135,10 +135,10 @@ class TestModel(DbAsyncConn):
         self.assertEqual(result, abi_jsons[0])
 
     @db_session_context
-    async def test_abi_get_abi_newer_equal_than(self):
-        current_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    async def test_abi_get_abi_newer_than(self):
+        initial_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)], []
+            [x async for x in Abi.get_abi_newer_than(initial_datetime)], []
         )
 
         abi_jsons = [
@@ -166,22 +166,22 @@ class TestModel(DbAsyncConn):
         self.assertListEqual(
             [
                 x
-                async for x in Abi.get_abi_newer_equal_than(
+                async for x in Abi.get_abi_newer_than(
                     datetime.datetime.now(tz=datetime.timezone.utc)
                 )
             ],
             [],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_equal_than(last_abi.created)],
+            [x async for x in Abi.get_abi_newer_than(last_abi.created)],
+            [],
+        )
+        self.assertListEqual(
+            [x async for x in Abi.get_abi_newer_than(abi.created)],
             [last_abi.abi_json],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_equal_than(abi.created)],
-            [abi.abi_json, last_abi.abi_json],
-        )
-        self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_equal_than(current_datetime)],
+            [x async for x in Abi.get_abi_newer_than(initial_datetime)],
             [abi.abi_json, last_abi.abi_json],
         )
 
