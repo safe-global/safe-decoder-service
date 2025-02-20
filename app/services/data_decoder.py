@@ -177,11 +177,7 @@ class DataDecoderService:
             # Try to find an ABI in other network
             abi = await self.get_contract_abi(address, None)
         if abi:
-            return bool(
-                fn_abi
-                for fn_abi in abi
-                if fn_abi.get("type") == "fallback"
-            )
+            return bool(fn_abi for fn_abi in abi if fn_abi.get("type") == "fallback")
         return False
 
     @alru_cache(maxsize=2048)
