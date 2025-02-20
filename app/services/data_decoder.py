@@ -178,7 +178,7 @@ class DataDecoderService:
             abi = await self.get_contract_abi(address, None)
         if abi:
             return bool(
-                dict(fn_abi, name="fallback")
+                fn_abi
                 for fn_abi in abi
                 if fn_abi.get("type") == "fallback"
             )
