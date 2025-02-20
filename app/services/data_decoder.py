@@ -6,16 +6,16 @@ from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
-from eth_typing import Address, ChecksumAddress, HexStr
+from eth_typing import ABI, ABIFunction, Address, ChecksumAddress, HexStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from safe_eth.eth.contracts import get_multi_send_contract
 from safe_eth.safe.multi_send import MultiSend
+from safe_eth.util.util import to_0x_hex_str
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
-from web3.types import ABI, ABIFunction
 
 from ..datasources.db.models import Abi, Contract
 
@@ -117,7 +117,7 @@ class DataDecoderService:
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
         return {
-            function_abi_to_4byte_selector(cast(dict[str, Any], fn_abi)): fn_abi
+            function_abi_to_4byte_selector(fn_abi): fn_abi
             for fn_abi in abi
             if fn_abi["type"] == "function"
         }
@@ -163,13 +163,13 @@ class DataDecoderService:
         return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
 
     @alru_cache(maxsize=2048)
-    async def get_contract_fallback_function(
+    async def has_contract_fallback_function(
         self, address: Address, chain_id: int | None
-    ) -> ABIFunction | None:
+    ) -> bool:
         """
         :param address: Contract address
         :param chain_id: Chain for the contract
-        :return: Fallback `ABIFunction` if found, `None` otherwise.
+        :return: `True` if found Fallback `ABIFunction`, `False` otherwise.
             If contract is not found for the chain, return the first one that matches in other chain.
         """
         abi = await self.get_contract_abi(address, chain_id)
@@ -177,15 +177,8 @@ class DataDecoderService:
             # Try to find an ABI in other network
             abi = await self.get_contract_abi(address, None)
         if abi:
-            return next(
-                (
-                    cast(ABIFunction, dict(fn_abi, name="fallback"))
-                    for fn_abi in abi
-                    if fn_abi.get("type") == "fallback"
-                ),
-                None,
-            )
-        return None
+            return bool(fn_abi for fn_abi in abi if fn_abi.get("type") == "fallback")
+        return False
 
     @alru_cache(maxsize=2048)
     async def get_contract_abi_selectors_with_functions(
@@ -232,9 +225,6 @@ class DataDecoderService:
                     # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
-        # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
-        elif address:
-            return await self.get_contract_fallback_function(address, chain_id)
         return None
 
     def _parse_decoded_arguments(self, value_decoded: Any) -> Any:
@@ -254,7 +244,7 @@ class DataDecoderService:
                 self._parse_decoded_arguments(value) for value in value_decoded
             ]
         elif isinstance(value_decoded, bytes):
-            value_decoded = HexBytes(value_decoded).hex()
+            value_decoded = to_0x_hex_str(value_decoded)
         elif isinstance(value_decoded, int):
             value_decoded = str(value_decoded)
         return value_decoded
@@ -284,7 +274,10 @@ class DataDecoderService:
         params = data[4:]
         fn_abi = await self.get_abi_function(data, address, chain_id)
         if not fn_abi:
-            raise CannotDecode(data.hex())
+            # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
+            if address and await self.has_contract_fallback_function(address, chain_id):
+                return "fallback", []
+            raise CannotDecode(to_0x_hex_str(data))
         try:
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
@@ -292,7 +285,7 @@ class DataDecoderService:
             normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
             values = map(self._parse_decoded_arguments, normalized)
         except (ValueError, DecodingError) as exc:
-            logger.warning("Cannot decode %s", data.hex())
+            logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
         return fn_abi["name"], list(zip(names, types, values))
@@ -314,7 +307,9 @@ class DataDecoderService:
                     operation=multisend_tx.operation.value,
                     to=multisend_tx.to,
                     value=str(multisend_tx.value),
-                    data=HexStr(multisend_tx.data.hex()) if multisend_tx.data else None,
+                    data=(
+                        to_0x_hex_str(multisend_tx.data) if multisend_tx.data else None
+                    ),
                     data_decoded=await self.get_data_decoded(
                         multisend_tx.data,
                         address=cast(Address, multisend_tx.to),
@@ -326,7 +321,7 @@ class DataDecoderService:
         except ValueError:
             logger.warning(
                 "Problem decoding multisend transaction with data=%s",
-                HexBytes(data).hex(),
+                to_0x_hex_str(HexBytes(data)),
                 exc_info=True,
             )
         return None

@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 from eth_typing import HexStr
+from safe_eth.util.util import to_0x_hex_str
 
 from app.services.events import EventsService
 from app.tests.services.mocks_multisend import multisend_data
@@ -16,7 +17,7 @@ class TestEventsService(unittest.TestCase):
         self.assertEqual(events_service.get_contracts_from_data(HexStr("0x")), set())
         self.assertEqual(events_service.get_contracts_from_data(HexStr("0x8")), set())
         self.assertEqual(
-            events_service.get_contracts_from_data(HexStr(multisend_data.hex())),
+            events_service.get_contracts_from_data(to_0x_hex_str(multisend_data)),
             {"0x5B9ea52Aaa931D4EEf74C8aEaf0Fe759434FeD74"},
         )
 
@@ -134,7 +135,7 @@ class TestEventsService(unittest.TestCase):
                 "chainId": "1",
                 "type": "EXECUTED_MULTISIG_TRANSACTION",
                 "to": "0x6ED857dc1da2c41470A95589bB482152000773e9",
-                "data": HexStr(multisend_data.hex()),
+                "data": to_0x_hex_str(multisend_data),
             }
         )
 
