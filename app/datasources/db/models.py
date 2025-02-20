@@ -1,6 +1,7 @@
 import datetime
 from typing import AsyncIterator, Self, cast
 
+from eth_typing import ABI
 from sqlalchemy import DateTime
 from sqlmodel import (
     JSON,
@@ -13,7 +14,6 @@ from sqlmodel import (
     select,
 )
 from sqlmodel.sql._expression_select_cls import SelectBase
-from web3.types import ABI
 
 from .database import db_session
 from .utils import get_md5_abi_hash

@@ -1,5 +1,6 @@
-from typing import Sequence, cast
+from typing import cast
 
+from eth_typing import ABI
 from safe_eth.eth.contracts import (
     get_erc20_contract,
     get_erc721_contract,
@@ -14,7 +15,6 @@ from safe_eth.eth.contracts import (
     get_uniswap_exchange_contract,
 )
 from web3 import Web3
-from web3.types import ABIEvent, ABIFunction
 
 from app.datasources.abis.aave import (
     aave_a_token,
@@ -68,7 +68,7 @@ class AbiService:
 
     @staticmethod
     async def _store_abis_in_database(
-        abi_jsons: list[Sequence[ABIFunction | ABIEvent]],
+        abi_jsons: list[ABI],
         relevance: int,
         abi_source: AbiSource,
     ) -> None:
@@ -91,7 +91,9 @@ class AbiService:
             self.get_third_parties_abis(), 50, abi_source
         )
 
-    def get_safe_contracts_abis(self) -> list[Sequence[ABIFunction | ABIEvent]]:
+    def get_safe_contracts_abis(
+        self,
+    ) -> list[ABI]:
         return [
             get_safe_V0_0_1_contract(self.dummy_w3).abi,
             get_safe_V1_0_0_contract(self.dummy_w3).abi,
@@ -100,20 +102,20 @@ class AbiService:
             get_safe_V1_4_1_contract(self.dummy_w3).abi,
         ]
 
-    def get_safe_abis(self) -> list[Sequence[ABIFunction | ABIEvent]]:
+    def get_safe_abis(self) -> list[ABI]:
         return [
             get_multi_send_contract(self.dummy_w3).abi,
             get_safe_to_l2_migration_contract(self.dummy_w3).abi,
             safe_allowance_module_abi,
         ]
 
-    def get_erc_abis(self) -> list[Sequence[ABIFunction | ABIEvent]]:
+    def get_erc_abis(self) -> list[ABI]:
         return [
             get_erc721_contract(self.dummy_w3).abi,
             get_erc20_contract(self.dummy_w3).abi,
         ]
 
-    def get_third_parties_abis(self) -> list[Sequence[ABIFunction | ABIEvent]]:
+    def get_third_parties_abis(self) -> list[ABI]:
         aave_contracts = [
             aave_a_token,
             aave_lending_pool,

@@ -9,6 +9,7 @@ from safe_eth.eth.contracts import (
 )
 from safe_eth.eth.utils import fast_keccak_text, get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
@@ -277,7 +278,7 @@ class TestDataDecoderService(DbAsyncConn):
                 "operation": operation,
                 "to": safe_contract_address,
                 "value": value,
-                "data": change_master_copy_data.hex(),
+                "data": to_0x_hex_str(change_master_copy_data),
                 "data_decoded": {
                     "method": "changeMasterCopy",
                     "parameters": [
@@ -293,7 +294,7 @@ class TestDataDecoderService(DbAsyncConn):
                 "operation": operation,
                 "to": safe_contract_address,
                 "value": value,
-                "data": change_fallback_manager_data.hex(),
+                "data": to_0x_hex_str(change_fallback_manager_data),
                 "data_decoded": {
                     "method": "setFallbackHandler",
                     "parameters": [
@@ -322,7 +323,7 @@ class TestDataDecoderService(DbAsyncConn):
                             "operation": operation,
                             "to": safe_contract_address,
                             "value": value,
-                            "data": change_master_copy_data.hex(),
+                            "data": to_0x_hex_str(change_master_copy_data),
                             "data_decoded": {
                                 "method": "changeMasterCopy",
                                 "parameters": [
@@ -338,7 +339,7 @@ class TestDataDecoderService(DbAsyncConn):
                             "operation": operation,
                             "to": safe_contract_address,
                             "value": value,
-                            "data": change_fallback_manager_data.hex(),
+                            "data": to_0x_hex_str(change_fallback_manager_data),
                             "data_decoded": {
                                 "method": "setFallbackHandler",
                                 "parameters": [
