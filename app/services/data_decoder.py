@@ -169,7 +169,7 @@ class DataDecoderService:
         """
         :param address: Contract address
         :param chain_id: Chain for the contract
-        :return: True if found Fallback `ABIFunction`, False otherwise.
+        :return: `True` if found Fallback `ABIFunction`, `False` otherwise.
             If contract is not found for the chain, return the first one that matches in other chain.
         """
         abi = await self.get_contract_abi(address, chain_id)
