@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from starlette.requests import Request
+from starlette.responses import Response
 
 from . import VERSION
 from .custom_logger import HttpRequestLog, HttpResponseLog
@@ -109,6 +110,7 @@ async def http_request_middleware(request: Request, call_next):
     """
     start_time = datetime.datetime.now(datetime.timezone.utc)
     with set_database_session_context():
+        response: Response | None = None
         try:
             response = await call_next(request)
         except Exception as e:
@@ -126,8 +128,9 @@ async def http_request_middleware(request: Request, call_next):
                     method=request.method,
                     startTime=start_time,
                 )
+                status_code = response.status_code if response else 500
                 http_response = HttpResponseLog(
-                    status=response.status_code,
+                    status=status_code,
                     endTime=end_time,
                     totalTime=int(total_time),
                 )
