@@ -10,6 +10,7 @@ from safe_eth.eth.utils import (
     fast_is_checksum_address,
     fast_to_checksum_address,
 )
+from safe_eth.util.util import to_0x_hex_str
 
 from ..services.data_decoder import DecodingAccuracyEnum
 
@@ -44,7 +45,7 @@ class AbiPublic(CamelModel):
         :return:
         """
         if isinstance(abi_hash, bytes):
-            return "0x" + abi_hash.hex()  # Convert bytes to a hex string
+            return to_0x_hex_str(abi_hash)  # Convert bytes to a hex string
         return abi_hash
 
 

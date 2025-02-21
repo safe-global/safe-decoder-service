@@ -2,11 +2,12 @@ from typing import cast
 
 from fastapi.testclient import TestClient
 
+from eth_typing import ABIEvent, ABIFunction
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import get_empty_tx_params
+from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
-from web3.types import ABIEvent, ABIFunction
 
 from ...datasources.abis.gnosis_protocol import cowswap_settlement_v2_abi
 from ...datasources.db.database import db_session_context
@@ -47,7 +48,8 @@ class TestRouterAbout(DbAsyncConn):
         )
 
         response = self.client.post(
-            "/api/v1/data-decoder/", json={"data": add_owner_with_threshold_data.hex()}
+            "/api/v1/data-decoder/",
+            json={"data": to_0x_hex_str(add_owner_with_threshold_data)},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -79,7 +81,7 @@ class TestRouterAbout(DbAsyncConn):
         response = self.client.post(
             "/api/v1/data-decoder/",
             json={
-                "data": add_owner_with_threshold_data.hex(),
+                "data": to_0x_hex_str(add_owner_with_threshold_data),
                 "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
             },
         )

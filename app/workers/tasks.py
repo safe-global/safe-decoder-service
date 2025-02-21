@@ -3,9 +3,9 @@ import logging
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import AsyncIO, CurrentMessage
-from hexbytes import HexBytes
 from periodiq import PeriodiqMiddleware, cron
 from safe_eth.eth.utils import fast_to_checksum_address
+from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
 from app.custom_logger import get_task_info, logging_task_context
@@ -104,7 +104,7 @@ async def get_missing_contract_metadata_task():
             settings.CONTRACT_MAX_DOWNLOAD_RETRIES
         ):
             get_contract_metadata_task.send(
-                address=HexBytes(contract.address).hex(),
+                address=to_0x_hex_str(contract.address),
                 chain_id=contract.chain_id,
                 skip_attemp_download=True,
             )
@@ -116,7 +116,7 @@ async def update_proxies_task():
     with logging_task_context(CurrentMessage.get_current_message()):
         async for proxy_contract in Contract.get_proxy_contracts():
             get_contract_metadata_task.send(
-                address=HexBytes(proxy_contract.address).hex(),
+                address=to_0x_hex_str(proxy_contract.address),
                 chain_id=proxy_contract.chain_id,
                 skip_attemp_download=True,
             )
