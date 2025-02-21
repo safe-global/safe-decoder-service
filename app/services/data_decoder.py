@@ -342,12 +342,18 @@ class DataDecoderService:
         """
         if not data:
             return None
+
+        data_str = data if isinstance(data, str) else to_0x_hex_str(data)
         try:
+            logger.debug("Decoding data %s", data_str)
             fn_name, parameters = await self.decode_transaction_with_types(
                 data, address=address, chain_id=chain_id
             )
-            return {"method": fn_name, "parameters": parameters}
+            decoded: DataDecoded = {"method": fn_name, "parameters": parameters}
+            logger.debug("Decoded data %s into %s", data_str, decoded)
+            return decoded
         except DataDecoderException:
+            logger.debug("Cannot decode data %s", data_str)
             return None
 
     async def decode_parameters_data(
@@ -363,6 +369,7 @@ class DataDecoderService:
 
         :param data:
         :param parameters:
+        :param chain_id:
         :return: Parameters with an extra object with key `value_decoded` if decoding is possible
         """
         fn_selector = data[:4]
@@ -498,15 +505,36 @@ class DataDecoderService:
         :return: Number of new ABIs loaded
         """
 
-        last_abi_created = self.last_abi_created
+        logger.info(
+            "%s: Reloading contract ABIs",
+            self.__class__.__name__,
+        )
+        previous_last_abi_created = self.last_abi_created
         self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
-        if last_abi_created is not None:
-            abis = Abi.get_abi_newer_than(last_abi_created)
-        else:
+        if not previous_last_abi_created:
+            # No reference to compare, so we get all the ABIs
             abis = Abi.get_abis_sorted_by_relevance()
+        else:
+            if (
+                self.last_abi_created
+                and self.last_abi_created > previous_last_abi_created
+            ):
+                # Only reload if new ABIs were inserted
+                abis = Abi.get_abi_newer_than(previous_last_abi_created)
+            else:
+                logger.info(
+                    "%s: No new contract ABIs to load",
+                    self.__class__.__name__,
+                )
+                return 0
 
         loaded_abis = 0
         async for abi in abis:
             if self.add_abi(abi):
                 loaded_abis += 1
+        logger.info(
+            "%s: Loaded new %d contract ABIs",
+            self.__class__.__name__,
+            loaded_abis,
+        )
         return loaded_abis
