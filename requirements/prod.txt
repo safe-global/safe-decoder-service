@@ -6,7 +6,7 @@ dramatiq[redis, watch]==1.17.1
 fastapi-camelcase==2.0.0
 fastapi[all]==0.115.8
 periodiq==0.13.0
-pydantic-settings==2.7.1
+pydantic-settings==2.8.0
 redis[hiredis]==5.2.1
 safe-eth-py==7.1.1
 sqladmin[full]==0.20.1
