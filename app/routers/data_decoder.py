@@ -17,8 +17,22 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=DataDecodedPublic)
+@router.post(
+    "",
+    response_model=DataDecodedPublic,
+    summary="Decode provided data",
+    response_description="Decoded data if it can be decoded",
+)
 async def data_decoder(input_data: DataDecoderInput) -> DataDecodedPublic:
+    """
+    Decode provided data if there's a matching ABI on the database. Accuracy of the decoding
+    can be:
+
+    - *FULL_MATCH*: Matched contract address and chain id.
+    - *PARTIAL_MATCH* Matched contract address, but not chain id.
+    - *ONLY_FUNCTION_MATCH*: Matched function from another contract.
+    - *NO_MATCH*: Selector cannot be decoded.
+    """
     data_decoder_service = await get_data_decoder_service()
 
     # Load new ABIs from the database, don't await it so they are loaded while calling `get_data_decoded`

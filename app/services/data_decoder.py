@@ -47,8 +47,8 @@ class DataDecoded(TypedDict):
 
 
 class DecodingAccuracyEnum(Enum):
-    FULL_MATCH = "FULL_MATCH"  # Matched contract and chain id
-    PARTIAL_MATCH = "PARTIAL_MATCH"  # Matched contract
+    FULL_MATCH = "FULL_MATCH"  # Matched contract address and chain id
+    PARTIAL_MATCH = "PARTIAL_MATCH"  # Matched contract address
     ONLY_FUNCTION_MATCH = (
         "ONLY_FUNCTION_MATCH"  # Matched function from another contract
     )
