@@ -8,7 +8,7 @@ fastapi[all]==0.115.8
 periodiq==0.13.0
 pydantic-settings==2.8.0
 redis[hiredis]==5.2.1
-safe-eth-py==7.1.1
+safe-eth-py==7.2.0
 sqladmin[full]==0.20.1
 sqlmodel==0.0.22
-web3==7.8.0
+web3==7.9.0
