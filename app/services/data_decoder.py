@@ -163,24 +163,6 @@ class DataDecoderService:
         return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
 
     @alru_cache(maxsize=2048)
-    async def has_contract_fallback_function(
-        self, address: Address, chain_id: int | None
-    ) -> bool:
-        """
-        :param address: Contract address
-        :param chain_id: Chain for the contract
-        :return: `True` if found Fallback `ABIFunction`, `False` otherwise.
-            If contract is not found for the chain, return the first one that matches in other chain.
-        """
-        abi = await self.get_contract_abi(address, chain_id)
-        if not abi and chain_id is not None:
-            # Try to find an ABI in other network
-            abi = await self.get_contract_abi(address, None)
-        if abi:
-            return bool(fn_abi for fn_abi in abi if fn_abi.get("type") == "fallback")
-        return False
-
-    @alru_cache(maxsize=2048)
     async def get_contract_abi_selectors_with_functions(
         self, address: Address, chain_id: int | None
     ) -> dict[bytes, ABIFunction] | None:
@@ -274,9 +256,6 @@ class DataDecoderService:
         params = data[4:]
         fn_abi = await self.get_abi_function(data, address, chain_id)
         if not fn_abi:
-            # Check if the contract has a fallback call and return a minimal ABIFunction for fallback call
-            if address and await self.has_contract_fallback_function(address, chain_id):
-                return "fallback", []
             raise CannotDecode(to_0x_hex_str(data))
         try:
             names = get_abi_input_names(fn_abi)
