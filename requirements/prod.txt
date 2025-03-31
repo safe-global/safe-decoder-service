@@ -1,5 +1,5 @@
 aio-pika==9.5.4
-alembic==1.14.1
+alembic==1.15.2
 async-lru==2.0.4
 asyncpg==0.30.0
 dramatiq[redis, watch]==1.17.1
