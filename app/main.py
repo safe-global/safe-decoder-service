@@ -8,8 +8,9 @@ from fastapi import APIRouter, FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
+
 from . import VERSION
-from .custom_logger import HttpRequestLog, HttpResponseLog
 from .datasources.db.database import (
     _get_database_session_context,
     db_session,

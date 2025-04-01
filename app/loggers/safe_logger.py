@@ -71,17 +71,11 @@ class SafeJsonFormatter(logging.Formatter):
                 exceptionInfo=str(record.exc_info),
             )
         context_message = ContextMessageLog(
-            dbSession=record.db_session if hasattr(record, "db_session") else None,
-            httpRequest=(
-                record.http_request if hasattr(record, "http_request") else None
-            ),
-            httpResponse=(
-                record.http_response if hasattr(record, "http_response") else None
-            ),
-            errorInfo=(
-                record.error_detail if hasattr(record, "error_detail") else None
-            ),
-            taskInfo=record.task_detail if hasattr(record, "task_detail") else None,
+            dbSession=getattr(record, "db_session", None),
+            httpRequest=getattr(record, "http_request", None),
+            httpResponse=getattr(record, "http_response", None),
+            errorInfo=getattr(record, "error_detail", None),
+            taskInfo=getattr(record, "task_detail", None),
         )
 
         json_log = JsonLog(

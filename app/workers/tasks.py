@@ -8,9 +8,9 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
-from app.custom_logger import get_task_info, logging_task_context
 from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
+from app.loggers.safe_logger import get_task_info, logging_task_context
 from app.services.contract_metadata_service import get_contract_metadata_service
 
 
