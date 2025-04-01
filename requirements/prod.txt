@@ -1,6 +1,6 @@
 aio-pika==9.5.5
 alembic==1.15.2
-async-lru==2.0.4
+async-lru==2.0.5
 asyncpg==0.30.0
 dramatiq[redis, watch]==1.17.1
 fastapi-camelcase==2.0.0
