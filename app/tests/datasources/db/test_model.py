@@ -14,10 +14,10 @@ from app.services.contract_metadata_service import (
 )
 
 from ...mocks.contract_metadata_mocks import etherscan_proxy_metadata_mock
-from .db_async_conn import DbAsyncConn
+from .async_db_test_case import AsyncDbTestCase
 
 
-class TestModel(DbAsyncConn):
+class TestModel(AsyncDbTestCase):
 
     @db_session_context
     async def test_contract(self):

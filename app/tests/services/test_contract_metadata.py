@@ -22,7 +22,7 @@ from app.services.contract_metadata_service import (
     EnhancedContractMetadata,
 )
 
-from ..datasources.db.db_async_conn import DbAsyncConn
+from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..mocks.contract_metadata_mocks import (
     blockscout_metadata_mock,
     etherscan_metadata_mock,
@@ -31,7 +31,7 @@ from ..mocks.contract_metadata_mocks import (
 )
 
 
-class TestContractMetadataService(DbAsyncConn):
+class TestContractMetadataService(AsyncDbTestCase):
 
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True

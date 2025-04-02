@@ -5,7 +5,7 @@ from sqlmodel import SQLModel
 from app.datasources.db.database import get_engine
 
 
-class DbAsyncConn(unittest.IsolatedAsyncioTestCase):
+class AsyncDbTestCase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.engine = get_engine()
         # Create the database tables
