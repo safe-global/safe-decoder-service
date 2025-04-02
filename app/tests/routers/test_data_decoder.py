@@ -15,11 +15,11 @@ from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
 from ...services.data_decoder import DecodingAccuracyEnum, get_data_decoder_service
-from ..datasources.db.db_async_conn import DbAsyncConn
+from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..services.mocks_data_decoder import example_abi, example_swapped_abi
 
 
-class TestRouterAbout(DbAsyncConn):
+class TestRouterAbout(AsyncDbTestCase):
     client: TestClient
 
     @classmethod

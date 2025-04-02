@@ -3,10 +3,10 @@ from collections import Counter
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource
 from ...services.abis import AbiService
-from ...tests.datasources.db.db_async_conn import DbAsyncConn
+from ...tests.datasources.db.async_db_test_case import AsyncDbTestCase
 
 
-class TestAbiService(DbAsyncConn):
+class TestAbiService(AsyncDbTestCase):
 
     async def asyncSetUp(self):
         await super().asyncSetUp()

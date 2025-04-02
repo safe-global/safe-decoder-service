@@ -6,11 +6,11 @@ from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...utils import datetime_to_str
-from ..datasources.db.db_async_conn import DbAsyncConn
+from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..mocks.abi_mock import mock_abi_json
 
 
-class TestRouterContract(DbAsyncConn):
+class TestRouterContract(AsyncDbTestCase):
     client: TestClient
 
     @classmethod

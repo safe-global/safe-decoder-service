@@ -28,7 +28,7 @@ from ...services.data_decoder import (
     UnexpectedProblemDecoding,
     get_data_decoder_service,
 )
-from ..datasources.db.db_async_conn import DbAsyncConn
+from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from .mocks_data_decoder import (
     example_abi,
     example_swapped_abi,
@@ -39,7 +39,7 @@ from .mocks_data_decoder import (
 )
 
 
-class TestDataDecoderService(DbAsyncConn):
+class TestDataDecoderService(AsyncDbTestCase):
     @staticmethod
     async def _store_safe_contract_abi():
         dummy_web3 = Web3()

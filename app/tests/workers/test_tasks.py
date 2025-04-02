@@ -17,7 +17,7 @@ from app.workers.tasks import get_contract_metadata_task, redis_broker, test_tas
 
 from ...datasources.cache.redis import get_redis
 from ...services.contract_metadata_service import ContractMetadataService
-from ..datasources.db.db_async_conn import DbAsyncConn
+from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..mocks.contract_metadata_mocks import (
     etherscan_metadata_mock,
     etherscan_proxy_metadata_mock,
@@ -62,7 +62,7 @@ class TestTasks(unittest.TestCase):
         self.assertEqual(len(redis_tasks), 0)
 
 
-class TestAsyncTasks(DbAsyncConn):
+class TestAsyncTasks(AsyncDbTestCase):
 
     async def asyncSetUp(self):
         await super().asyncSetUp()
