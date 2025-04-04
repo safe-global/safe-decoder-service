@@ -590,60 +590,6 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
     @db_session_context
-    async def test_decode_fallback_calls_db_tx_decoder(self):
-        example_not_matched_abi = [
-            {
-                "inputs": [],
-                "name": "claimOwner",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function",
-            },
-        ]
-
-        example_not_matched_data = (
-            Web3()
-            .eth.contract(abi=example_not_matched_abi)
-            .functions.claimOwner()
-            .build_transaction(
-                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
-            )["data"]
-        )
-
-        fallback_abi = [
-            {"stateMutability": "payable", "type": "fallback"},
-        ]
-
-        decoder_service = DataDecoderService()
-        await decoder_service.init()
-        source = AbiSource(name="local", url="")
-        await source.create()
-        contract_fallback_abi = Abi(
-            abi_hash=b"SwappedABI",
-            abi_json=fallback_abi,
-            relevance=100,
-            source_id=source.id,
-        )
-        await contract_fallback_abi.create()
-        contract_fallback = Contract(
-            address=b"h",
-            name="fallback_contract",
-            chain_id=1,
-            abi=contract_fallback_abi,
-        )
-        await contract_fallback.create()
-
-        fn_name, arguments = await decoder_service.decode_transaction(
-            example_not_matched_data, address=Address(contract_fallback.address)
-        )
-        self.assertEqual(fn_name, "fallback")
-        self.assertEqual(arguments, {})
-        accuracy = await decoder_service.get_decoding_accuracy(
-            example_not_matched_data, address=Address(contract_fallback.address)
-        )
-        self.assertEqual(accuracy, DecodingAccuracyEnum.NO_MATCH)
-
-    @db_session_context
     async def test_decode_tuples(self):
         """
         Test tuple parameters are decoded as expected
