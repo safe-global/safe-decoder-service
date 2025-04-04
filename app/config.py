@@ -8,7 +8,7 @@ import secrets
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.custom_logger import SafeJsonFormatter
+from app.loggers.safe_logger import SafeJsonFormatter
 
 
 class Settings(BaseSettings):
