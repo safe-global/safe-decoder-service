@@ -1,5 +1,6 @@
 import datetime
 import logging
+import traceback
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Generator
@@ -65,11 +66,19 @@ class SafeJsonFormatter(logging.Formatter):
 
     def format(self, record):
         if record.levelname == "ERROR":
+            exception_info: str | None = None
+            # Check if the error contains exception data
+            if record.exc_info:
+                exc_type, exc_value, exc_tb = record.exc_info
+                exception_info = "".join(
+                    traceback.format_exception(exc_type, exc_value, exc_tb)
+                )
             record.error_detail = ErrorInfo(
                 function=record.funcName,
                 line=record.lineno,
-                exceptionInfo=str(record.exc_info),
+                exceptionInfo=exception_info,
             )
+
         context_message = ContextMessageLog(
             dbSession=getattr(record, "db_session", None),
             httpRequest=getattr(record, "http_request", None),
