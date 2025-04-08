@@ -33,7 +33,7 @@ Then enter the virtualenv and install the dependencies:
 
 ```bash
 source venv/bin/activate
-pip install -r requirements/dev.txt
+pip install -r requirements.txt
 pre-commit install -f
 cp .env.sample .env
 ```

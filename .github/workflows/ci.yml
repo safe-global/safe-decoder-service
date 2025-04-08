@@ -71,11 +71,11 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-        cache-dependency-path: 'requirements/*.txt'
+        cache-dependency-path: 'requirements*.txt'
     - name: Install dependencies
       run: |
         pip install wheel
-        pip install -r requirements/dev.txt coveralls
+        pip install -r requirements.txt coveralls
       env:
         PIP_USE_MIRRORS: true
     - name: Run database migrations
