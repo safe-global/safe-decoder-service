@@ -5,7 +5,7 @@ ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 ENV PYTHONUNBUFFERED=1
 
-COPY requirements/prod.txt ./requirements.txt
+COPY requirements-prod.txt ./requirements.txt
 RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
