@@ -267,7 +267,7 @@ class DataDecoderService:
             logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
-        return fn_abi["name"], list(zip(names, types, values))
+        return fn_abi["name"], list(zip(names, types, values))  # type: ignore
 
     async def decode_multisend_data(
         self, data: bytes | str, chain_id: int | None = None
