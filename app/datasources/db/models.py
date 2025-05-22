@@ -101,7 +101,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
-    relevance: int | None = Field(nullable=False, default=0)
+    relevance: int | None = Field(nullable=False, default=0, index=True)
     abi_json: list[dict] | dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
         nullable=False, default=None, foreign_key="abisource.id"
