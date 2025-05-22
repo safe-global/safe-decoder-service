@@ -20,6 +20,7 @@ from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
 from .services.abis import AbiService
+from .services.data_decoder import get_data_decoder_service
 from .services.events import EventsService
 
 logger = logging.getLogger()
@@ -51,8 +52,12 @@ logging.setLogRecordFactory(log_record_factory_for_request)
 async def lifespan(app: FastAPI):
     """
     Define the lifespan of the application:
-    - Connects to the QueueProvider at startup.
-    - Disconnects from the QueueProvider at shutdown.
+    - At startup:
+         - Connects to the QueueProvider.
+         - Load hardcoded ABIs in database
+         - Initializes DataDecoderService
+    - At shutdown:
+        - Disconnects from the QueueProvider.
     """
     queue_provider = QueueProvider()
     consume_task = None
@@ -68,8 +73,12 @@ async def lifespan(app: FastAPI):
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
-        with set_database_session_context("LoadAbisOnStartup"):
+
+        with set_database_session_context("InitializeDataDecoderServiceOnStartup"):
+            # Load hardcoded ABIs in database
             await abi_service.load_local_abis_in_database()
+            # Initializes DataDecoderService
+            await get_data_decoder_service()
         yield
     finally:
         if consume_task:
