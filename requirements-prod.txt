@@ -5,10 +5,12 @@ asyncpg==0.30.0
 dramatiq[redis, watch]==1.17.1
 fastapi-camelcase==2.0.0
 fastapi[all]==0.115.12
+gunicorn==23.0.0
 periodiq==0.13.0
 pydantic-settings==2.9.1
 redis[hiredis]==5.2.1
 safe-eth-py==7.2.0
 sqladmin[full]==0.20.1
 sqlmodel==0.0.24
+uvicorn-worker==0.3.0
 web3==7.10.0
