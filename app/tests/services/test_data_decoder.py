@@ -434,7 +434,7 @@ class TestDataDecoderService(AsyncDbTestCase):
             await decoder_service.decode_transaction(example_data)
 
         # Test `add_abi`
-        decoder_service.add_abi(example_abi)
+        await decoder_service.add_abi(example_abi)
         fn_name, arguments = await decoder_service.decode_transaction(example_data)
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
