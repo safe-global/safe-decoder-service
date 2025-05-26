@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 from enum import Enum
@@ -109,7 +110,7 @@ class DataDecoderService:
             )
         )
 
-    def _generate_selectors_with_abis_from_abi(
+    async def _generate_selectors_with_abis_from_abi(
         self, abi: ABI
     ) -> dict[bytes, ABIFunction]:
         """
@@ -117,7 +118,7 @@ class DataDecoderService:
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
         return {
-            function_abi_to_4byte_selector(fn_abi): fn_abi
+            await asyncio.to_thread(function_abi_to_4byte_selector, fn_abi): fn_abi
             for fn_abi in abi
             if fn_abi["type"] == "function"
         }
@@ -133,8 +134,8 @@ class DataDecoderService:
         return {
             fn_selector: fn_abi
             async for supported_abi in abis
-            for fn_selector, fn_abi in self._generate_selectors_with_abis_from_abi(
-                supported_abi
+            for fn_selector, fn_abi in (
+                await self._generate_selectors_with_abis_from_abi(supported_abi)
             ).items()
         }
 
@@ -177,7 +178,7 @@ class DataDecoderService:
             # Try to find an ABI in other network
             abi = await self.get_contract_abi(address, None)
         if abi:
-            return self._generate_selectors_with_abis_from_abi(abi)
+            return await self._generate_selectors_with_abis_from_abi(abi)
         return None
 
     async def get_abi_function(
@@ -461,15 +462,15 @@ class DataDecoderService:
                 return DecodingAccuracyEnum.PARTIAL_MATCH
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
-    def add_abi(self, abi: ABI) -> bool:
+    async def add_abi(self, abi: ABI) -> bool:
         """
         Add a new abi without rebuilding the entire decoder
 
         :return: True if decoder updated, False otherwise
         """
         updated = False
-        for selector, new_abi in self._generate_selectors_with_abis_from_abi(
-            abi
+        for selector, new_abi in (
+            await self._generate_selectors_with_abis_from_abi(abi)
         ).items():
             if selector not in self.fn_selectors_with_abis:
                 self.fn_selectors_with_abis[selector] = new_abi
@@ -509,7 +510,7 @@ class DataDecoderService:
 
         loaded_abis = 0
         async for abi in abis:
-            if self.add_abi(abi):
+            if await self.add_abi(abi):
                 loaded_abis += 1
         logger.info(
             "%s: Loaded new %d contract ABIs",
