@@ -504,16 +504,14 @@ class DataDecoderService:
 
         :return: Number of new ABIs loaded
         """
-        if self.lock_load_new_abis.locked():
-            logger.info(
-                "%s: Ignoring load_new_abis, already loaded",
-                self.__class__.__name__,
-            )
-        async with self.lock_load_new_abis:
+        acquired = False
+        try:
+            await asyncio.wait_for(self.lock_load_new_abis.acquire(), timeout=0.01)
             logger.info(
                 "%s: Reloading contract ABIs",
                 self.__class__.__name__,
             )
+            acquired = True
             previous_last_abi_created = self.last_abi_created
             self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
             if not previous_last_abi_created:
@@ -543,3 +541,12 @@ class DataDecoderService:
                 loaded_abis,
             )
             return loaded_abis
+        except asyncio.TimeoutError:
+            logger.info(
+                "%s: Reloading of ABIs in progress by another request, not doing anything",
+                self.__class__.__name__,
+            )
+            return 0
+        finally:
+            if acquired:
+                self.lock_load_new_abis.release()
