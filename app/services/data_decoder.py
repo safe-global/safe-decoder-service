@@ -492,6 +492,10 @@ class DataDecoderService:
         previous_last_abi_created = self.last_abi_created
         self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
         if not previous_last_abi_created:
+            logger.info(
+                "%s: No ABIs were loaded previously",
+                self.__class__.__name__,
+            )
             # No reference to compare, so we get all the ABIs
             abis = Abi.get_abis_sorted_by_relevance()
         else:
