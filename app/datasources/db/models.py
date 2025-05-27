@@ -80,7 +80,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
         :return: A tuple containing the AbiSource object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        query = select(cls).where(cls.name == name, cls.url == url)
+        query = select(cls).where(cls.name == name, cls.url == url).limit(1)
         results = await db_session.execute(query)
         if result := results.scalars().first():
             return result, False
@@ -91,7 +91,7 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
     @classmethod
     async def get_abi_source(cls, name: str):
-        query = select(cls).where(cls.name == name)
+        query = select(cls).where(cls.name == name).limit(1)
         results = await db_session.execute(query)
         if result := results.scalars().first():
             return result
@@ -116,7 +116,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: Creation date for last inserted ABI, `None` if table is empty
         """
         results = await db_session.execute(
-            select(cls.created).order_by(col(cls.created).desc())
+            select(cls.created).order_by(col(cls.created).desc()).limit(1)
         )
         if result := results.first():
             return result[0]
@@ -167,7 +167,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: The Abi object if it exists, or None if it doesn't.
         """
         abi_hash = get_md5_abi_hash(abi_json)
-        query = select(cls).where(cls.abi_hash == abi_hash)
+        query = select(cls).where(cls.abi_hash == abi_hash).limit(1)
         result = await db_session.execute(query)
 
         if existing_abi := result.scalars().first():
