@@ -7,16 +7,17 @@ from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
 from eth_abi.exceptions import DecodingError
-from eth_typing import ABI, ABIFunction, Address, ChecksumAddress, HexStr
+from eth_typing import ABI, ABIFunction, Address, ChecksumAddress, HexStr, TypeStr
 from eth_utils import function_abi_to_4byte_selector
 from hexbytes import HexBytes
 from safe_eth.eth.contracts import get_multi_send_contract
+from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 from safe_eth.util.util import to_0x_hex_str
 from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
-from web3._utils.normalizers import BASE_RETURN_NORMALIZERS
+from web3._utils.normalizers import implicitly_identity
 
 from ..datasources.db.models import Abi, Contract
 
@@ -69,6 +70,22 @@ async def get_data_decoder_service() -> "DataDecoderService":
     data_decoder_service = DataDecoderService()
     await data_decoder_service.init()
     return data_decoder_service
+
+
+@implicitly_identity
+def addresses_checksummed_normalizer(
+    type_str: TypeStr, data: Any
+) -> tuple[TypeStr, ChecksumAddress] | None:
+    """
+    Redefine normalizer, as we want to use an optimized and cached version of the checksum encoder
+
+    :param type_str:
+    :param data:
+    :return:
+    """
+    if type_str == "address":
+        return type_str, fast_to_checksum_address(data)
+    return None
 
 
 class DataDecoderService:
@@ -262,7 +279,9 @@ class DataDecoderService:
             names = get_abi_input_names(fn_abi)
             types = get_abi_input_types(fn_abi)
             decoded = decode_abi(types, params)
-            normalized = map_abi_data(BASE_RETURN_NORMALIZERS, types, decoded)
+            normalized = map_abi_data(
+                [addresses_checksummed_normalizer], types, decoded
+            )
             values = map(self._parse_decoded_arguments, normalized)
         except (ValueError, DecodingError) as exc:
             logger.warning("Cannot decode %s", to_0x_hex_str(data))
