@@ -126,6 +126,7 @@ class DataDecoderService:
                 self.get_multisend_abis()
             )
         )
+        self.lock_load_new_abis = asyncio.Lock()
 
     async def _generate_selectors_with_abis_from_abi(
         self, abi: ABI
@@ -503,41 +504,42 @@ class DataDecoderService:
 
         :return: Number of new ABIs loaded
         """
-
-        logger.info(
-            "%s: Reloading contract ABIs",
-            self.__class__.__name__,
-        )
-        previous_last_abi_created = self.last_abi_created
-        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
-        if not previous_last_abi_created:
+        if self.lock_load_new_abis.locked():
             logger.info(
-                "%s: No ABIs were loaded previously",
+                "%s: Ignoring load_new_abis, already loaded",
                 self.__class__.__name__,
             )
-            # No reference to compare, so we get all the ABIs
-            abis = Abi.get_abis_sorted_by_relevance()
-        else:
-            if (
-                self.last_abi_created
-                and self.last_abi_created > previous_last_abi_created
-            ):
-                # Only reload if new ABIs were inserted
-                abis = Abi.get_abi_newer_than(previous_last_abi_created)
+        async with self.lock_load_new_abis:
+            logger.info(
+                "%s: Reloading contract ABIs",
+                self.__class__.__name__,
+            )
+            previous_last_abi_created = self.last_abi_created
+            self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
+            if not previous_last_abi_created:
+                # No reference to compare, so we get all the ABIs
+                abis = Abi.get_abis_sorted_by_relevance()
             else:
-                logger.info(
-                    "%s: No new contract ABIs to load",
-                    self.__class__.__name__,
-                )
-                return 0
+                if (
+                    self.last_abi_created
+                    and self.last_abi_created > previous_last_abi_created
+                ):
+                    # Only reload if new ABIs were inserted
+                    abis = Abi.get_abi_newer_than(previous_last_abi_created)
+                else:
+                    logger.info(
+                        "%s: No new contract ABIs to load",
+                        self.__class__.__name__,
+                    )
+                    return 0
 
-        loaded_abis = 0
-        async for abi in abis:
-            if await self.add_abi(abi):
-                loaded_abis += 1
-        logger.info(
-            "%s: Loaded new %d contract ABIs",
-            self.__class__.__name__,
-            loaded_abis,
-        )
-        return loaded_abis
+            loaded_abis = 0
+            async for abi in abis:
+                if await self.add_abi(abi):
+                    loaded_abis += 1
+            logger.info(
+                "%s: Loaded new %d contract ABIs",
+                self.__class__.__name__,
+                loaded_abis,
+            )
+            return loaded_abis
