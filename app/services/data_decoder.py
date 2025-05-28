@@ -126,6 +126,7 @@ class DataDecoderService:
                 self.get_multisend_abis()
             )
         )
+        # lock_load_new_abis will avoid concurrent calls to load_new_abis
         self.lock_load_new_abis = asyncio.Lock()
 
     async def _generate_selectors_with_abis_from_abi(
@@ -507,11 +508,11 @@ class DataDecoderService:
         acquired = False
         try:
             await asyncio.wait_for(self.lock_load_new_abis.acquire(), timeout=0.01)
+            acquired = True
             logger.info(
                 "%s: Reloading contract ABIs",
                 self.__class__.__name__,
             )
-            acquired = True
             previous_last_abi_created = self.last_abi_created
             self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
             if not previous_last_abi_created:
