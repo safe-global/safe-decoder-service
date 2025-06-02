@@ -168,7 +168,7 @@ class ContractMetadataService:
         if contract_metadata.metadata:
             if contract_metadata.source:
                 source = await AbiSource.get_abi_source(
-                    name=cast(str, contract_metadata.source.value)
+                    name=contract_metadata.source.value
                 )
                 if source is None:
                     logging.error(
