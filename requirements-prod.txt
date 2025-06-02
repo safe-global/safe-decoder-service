@@ -2,7 +2,7 @@ aio-pika==9.5.5
 alembic==1.16.1
 async-lru==2.0.5
 asyncpg==0.30.0
-dramatiq[redis, watch]==1.17.1
+dramatiq[redis, watch]==1.18.0
 fastapi-camelcase==2.0.0
 fastapi[all]==0.115.12
 gunicorn==23.0.0
