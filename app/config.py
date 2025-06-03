@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     )
     TEST: bool = False
     LOG_LEVEL: str = "INFO"
+    LOG_LEVEL_EVENTS_SERVICE: str = "DEBUG"
     REDIS_URL: str = "redis://"
     DATABASE_URL: str = "psql://postgres:"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
@@ -62,7 +63,12 @@ LOGGING_CONFIG = {
             "level": settings.LOG_LEVEL,
             "handlers": ["console"],
             "propagate": False,
-        }
+        },
+        "app.services.events": {
+            "level": settings.LOG_LEVEL_EVENTS_SERVICE,
+            "handlers": ["console"],
+            "propagate": False,
+        },
     },
 }
 

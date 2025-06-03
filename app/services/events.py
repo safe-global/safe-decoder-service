@@ -8,6 +8,8 @@ from safe_eth.safe.multi_send import MultiSend
 
 from ..workers.tasks import get_contract_metadata_task
 
+logger = logging.getLogger(__name__)
+
 
 class EventsService:
 
@@ -32,6 +34,7 @@ class EventsService:
 
         :param message: The incoming message to process, expected to be a JSON string.
         """
+        logger.debug("Received event %s", message)
         try:
             tx_service_event = json.loads(message)
             if self._is_processable_event(tx_service_event):
@@ -49,7 +52,7 @@ class EventsService:
                             address=contract_address, chain_id=chain_id
                         )
         except json.JSONDecodeError:
-            logging.error(f"Unsupported message. Cannot parse as JSON: {message}")
+            logger.error("Unsupported message. Cannot parse as JSON: %s", message)
 
     @staticmethod
     def _is_processable_event(tx_service_event: dict) -> bool:
