@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call, patch
 from eth_typing import HexStr
 from safe_eth.util.util import to_0x_hex_str
 
-from app.services.events import EventsService
+from app.services.events import EventsService, logger
 from app.tests.services.mocks_multisend import multisend_data
 
 
@@ -86,14 +86,14 @@ class TestEventsService(unittest.TestCase):
             EventsService._is_processable_event(invalid_event_invalid_type)
         )
 
-    @patch("logging.error")
-    def test_process_event_invalid_json(self, mock_log):
+    @patch.object(logger, "error")
+    def test_process_event_invalid_json(self, mock_log: MagicMock):
         invalid_message = '{"chainId": "123", "type": "transaction"'
 
         EventsService().process_event(invalid_message)
 
         mock_log.assert_called_with(
-            'Unsupported message. Cannot parse as JSON: {"chainId": "123", "type": "transaction"'
+            "Unsupported message. Cannot parse as JSON: %s", invalid_message
         )
 
     @patch("app.workers.tasks.get_contract_metadata_task.send")

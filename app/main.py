@@ -65,14 +65,17 @@ async def lifespan(app: FastAPI):
     try:
         loop = asyncio.get_running_loop()
         try:
+            logger.debug("Connecting to Queue Provider")
             await queue_provider.connect(loop)
+            logger.debug("Connected to Queue Provider")
         except QueueProviderUnableToConnectException as e:
-            logger.error(f"Unable to connect to Queue Provider {e}")
+            logger.error("Unable to connect to Queue Provider %s", e)
         if queue_provider.is_connected():
             events_service = EventsService()
             consume_task = asyncio.create_task(
                 queue_provider.consume(events_service.process_event)
             )
+            logger.debug("Created task to consume elements from Queue Provider")
 
         with set_database_session_context("InitializeDataDecoderServiceOnStartup"):
             # Load hardcoded ABIs in database
