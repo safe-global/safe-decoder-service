@@ -119,3 +119,10 @@ async def update_proxies_task():
                 chain_id=proxy_contract.chain_id,
                 skip_attemp_download=True,
             )
+
+
+@dramatiq.actor(periodic=cron("0 * * * *"))  # Every midnight
+@db_session_context
+async def update_safe_contracts_info():
+    with logging_task_context(CurrentMessage.get_current_message()):
+        await update_safe_contracts_info()
