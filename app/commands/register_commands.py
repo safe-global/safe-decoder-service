@@ -1,0 +1,64 @@
+import asyncio
+import inspect
+from functools import wraps
+from typing import Any, Callable
+
+from typer import Typer
+
+from app.commands.safe_contracts import (
+    download_contracts_from_prod_decoder,
+    setup_safe_contracts,
+)
+from app.config import settings
+from app.datasources.db.database import db_session, set_database_session_context
+
+
+def async_command(func: Callable) -> Callable:
+    """
+    Extension to support async functions, also open and close a database session in case was necessary.
+
+    Args:
+        func:
+
+    Returns:
+
+    """
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any):
+            async def run_with_context():
+                with set_database_session_context():
+                    try:
+                        return await func(*args, **kwargs)
+                    finally:
+                        await db_session.remove()
+
+            return asyncio.run(run_with_context())
+
+        return wrapper
+    return func
+
+
+def register_commands(app: Typer):
+    """
+    Add the commands to the Typer instance.
+
+    Args:
+        app:
+
+    Returns:
+
+    """
+
+    @app.command(help="Load Safe Contracts")
+    @async_command
+    async def load_safe_contracts():
+        await setup_safe_contracts()
+
+    if settings.TEST:
+
+        @app.command(help="Download Safe Contracts from Prod")
+        @async_command
+        async def download_safe_contracts_from_prod():
+            await download_contracts_from_prod_decoder()

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Union
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from eth_typing import HexStr
 from fastapi_camelcase import CamelModel
@@ -57,6 +57,7 @@ class ContractsPublic(CamelModel):
     project: ProjectPublic | None
     abi: AbiPublic
     modified: datetime
+    trusted_for_delegate: bool
 
     class Config:
         from_attributes = True
@@ -73,6 +74,15 @@ class ContractsPublic(CamelModel):
         if isinstance(address, bytes):
             return fast_to_checksum_address(address)
         return address
+
+    @computed_field(return_type=str | None)
+    def logo_url(self) -> str | None:
+        if isinstance(self.address, bytes):
+            addr_str = self.address.hex()
+        else:
+            addr_str = str(self.address)
+        base_url = "https://safe-transaction-assets.safe.global/contracts/logos"
+        return f"{base_url}/{addr_str}.png"
 
 
 class DataDecoderInput(CamelModel):

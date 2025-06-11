@@ -55,7 +55,9 @@ class TestModel(AsyncDbTestCase):
 
     @db_session_context
     async def test_project(self):
-        project = Project(description="A Test Project", logo_file="logo.jpg")
+        project = Project(
+            name="Safe", description="A Test Project", logo_file="logo.jpg"
+        )
         await project.create()
         result = await project.get_all()
         self.assertEqual(result[0], project)
