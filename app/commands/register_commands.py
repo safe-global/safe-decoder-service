@@ -13,13 +13,11 @@ from app.datasources.db.database import db_session, set_database_session_context
 
 def async_command(func: Callable) -> Callable:
     """
-    Extension to support async functions, also open and close a database session in case was necessary.
+    Wrap a function so:Add commentMore actions
+        - Async functions are supported
+        - A database session is open and closed
 
-    Args:
-        func:
-
-    Returns:
-
+    :param func:
     """
     if inspect.iscoroutinefunction(func):
 
@@ -42,11 +40,7 @@ def register_commands(app: Typer):
     """
     Add the commands to the Typer instance.
 
-    Args:
-        app:
-
-    Returns:
-
+    :param app:
     """
 
     @app.command(help="Load Safe Contracts")
