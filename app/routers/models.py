@@ -12,6 +12,7 @@ from safe_eth.eth.utils import (
 )
 from safe_eth.util.util import to_0x_hex_str
 
+from ..config import settings
 from ..services.data_decoder import DecodingAccuracyEnum
 
 
@@ -81,8 +82,8 @@ class ContractsPublic(CamelModel):
             addr_str = self.address.hex()
         else:
             addr_str = str(self.address)
-        base_url = "https://safe-transaction-assets.safe.global/contracts/logos"
-        return f"{base_url}/{addr_str}.png"
+
+        return f"{settings.CONTRACTS_LOGO_BASE_URL}/{addr_str}.png"
 
 
 class DataDecoderInput(CamelModel):
