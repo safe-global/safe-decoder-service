@@ -2,7 +2,7 @@ import datetime
 from typing import AsyncIterator, Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, update
 from sqlmodel import (
     JSON,
     Column,
@@ -345,3 +345,36 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         result = await db_session.stream(query)
         async for (contract,) in result:
             yield contract
+
+    @classmethod
+    async def update_contract_info(
+        cls,
+        address: bytes,
+        name: str,
+        display_name: str,
+        trusted_for_delegate: bool | None = False,
+    ) -> int:
+        """
+        Update the contract metadata for all the chains
+
+        Args:
+            address:
+            name:
+            display_name:
+            trusted_for_delegate:
+
+        Returns: number of affected rows
+
+        """
+        query = (
+            update(cls)
+            .where(col(cls.address) == address)
+            .values(
+                name=name,
+                display_name=display_name,
+                trusted_for_delegate=trusted_for_delegate,
+            )
+        )
+        result = await db_session.execute(query)
+        await db_session.commit()
+        return result.rowcount

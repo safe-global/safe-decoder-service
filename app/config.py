@@ -44,6 +44,12 @@ class Settings(BaseSettings):
         90  # Task running once per day, means 3 months trying.
     )
 
+    CONTRACTS_TRUSTED_FOR_DELEGATE_CALL: list[str] = [
+        "MultiSendCallOnly",
+        "SignMessageLib",
+        "SafeMigration",
+    ]
+
 
 settings = Settings()
 
