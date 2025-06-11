@@ -291,3 +291,52 @@ class TestModel(AsyncDbTestCase):
                 fast_to_checksum_address(cast(bytes, proxy_contract.implementation)),
                 "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
             )
+
+    @db_session_context
+    async def test_update_contract_info(self):
+        address_to_be_updated = HexBytes("0xd53cd0aB83D845Ac265BE939c57F53AD838012c9")
+        other_address = HexBytes("0x43506849D7C04F9138D1A2050bbF3A0c054402dd")
+
+        contract_name = "SignMessageLib"
+        contract_display_name = "Sign Message Library"
+        rows_affected = await Contract.update_contract_info(
+            address=address_to_be_updated,
+            name=contract_name,
+            display_name=contract_display_name,
+        )
+        self.assertEqual(rows_affected, 0)
+        contracts_to_be_updated = [
+            await Contract(address=address_to_be_updated, chain_id=chain_id).create()
+            for chain_id in range(5)
+        ]
+        other_contract = await Contract(address=other_address, chain_id=1).create()
+
+        for contract in contracts_to_be_updated:
+            self.assertIsNone(contract.name)
+            self.assertIsNone(contract.display_name)
+            self.assertFalse(contract.trusted_for_delegate)
+
+        self.assertIsNone(other_contract.name)
+        self.assertIsNone(other_contract.display_name)
+
+        rows_affected = await Contract.update_contract_info(
+            address=address_to_be_updated,
+            name=contract_name,
+            display_name=contract_display_name,
+            trusted_for_delegate=True,
+        )
+        self.assertEqual(rows_affected, 5)
+        # Other contract remains not updated
+        not_updated_contract = await Contract.get_contract(
+            address=other_address, chain_id=1
+        )
+        self.assertIsNone(not_updated_contract.name)
+        self.assertIsNone(not_updated_contract.display_name)
+        # contracts_to_be_updated should be updated
+        for contract in contracts_to_be_updated:
+            updated_contract = await Contract.get_contract(
+                address=address_to_be_updated, chain_id=contract.chain_id
+            )
+            self.assertEqual(updated_contract.name, contract_name)
+            self.assertEqual(updated_contract.display_name, contract_display_name)
+            self.assertTrue(updated_contract.trusted_for_delegate)

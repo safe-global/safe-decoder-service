@@ -1,17 +1,13 @@
+import logging
 from functools import cache
 
 from hexbytes import HexBytes
 from safe_eth.safe.safe_deployments import default_safe_deployments
 
-from app.commands.styles import error, success
 from app.config import settings
 from app.datasources.db.models import Contract
 
-TRUSTED_FOR_DELEGATE_CALL = [
-    "MultiSendCallOnly",
-    "SignMessageLib",
-    "SafeMigration",
-]
+logger = logging.getLogger(__name__)
 
 
 def _generate_safe_contract_display_name(contract_name: str, version: str) -> str:
@@ -65,8 +61,10 @@ async def update_safe_contracts_info() -> None:
             contract_name in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
         )
         if affected_rows:
-            success(
+            logger.info(
                 f"Updated contract with address: {contract_address} in {affected_rows} chains"
             )
         else:
-            error(f"Could not find any contract with address: {contract_address}")
+            logger.warning(
+                f"Could not find any contract with address: {contract_address}"
+            )
