@@ -357,14 +357,11 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         """
         Update the contract metadata for all the chains
 
-        Args:
-            address:
-            name:
-            display_name:
-            trusted_for_delegate:
-
-        Returns: number of affected rows
-
+        :param address:
+        :param name:
+        :param display_name:
+        :param trusted_for_delegate:
+        :return: number of affected rows
         """
         query = (
             update(cls)
