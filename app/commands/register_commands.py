@@ -6,10 +6,8 @@ from typing import Any, Callable
 from typer import Typer
 
 from app.commands.safe_contracts import (
-    download_contracts_from_prod_decoder,
     setup_safe_contracts,
 )
-from app.config import settings
 from app.datasources.db.database import db_session, set_database_session_context
 
 
@@ -55,10 +53,3 @@ def register_commands(app: Typer):
     @async_command
     async def load_safe_contracts():
         await setup_safe_contracts()
-
-    if settings.TEST:
-
-        @app.command(help="Download Safe Contracts from Prod")
-        @async_command
-        async def download_safe_contracts_from_prod():
-            await download_contracts_from_prod_decoder()
