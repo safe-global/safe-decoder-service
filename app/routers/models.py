@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Union, cast
+from typing import Any, Union
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
@@ -51,19 +51,19 @@ class AbiPublic(CamelModel):
 
 
 class ContractsPublic(CamelModel):
-    address: bytes | ChecksumAddress
+    address: ChecksumAddress
     name: str
     display_name: str | None
     chain_id: int
     project: ProjectPublic | None
     abi: AbiPublic
     modified: datetime
-    trusted_for_delegate: bool
+    trusted_for_delegate_call: bool
 
     class Config:
         from_attributes = True
 
-    @field_validator("address")
+    @field_validator("address", mode="before")
     @classmethod
     def convert_to_checksum_address(cls, address: bytes):
         """
@@ -78,12 +78,7 @@ class ContractsPublic(CamelModel):
 
     @computed_field(return_type=str | None)
     def logo_url(self) -> str | None:
-        if isinstance(self.address, bytes):
-            addr_str = cast(str, to_0x_hex_str(self.address))
-        else:
-            addr_str = str(self.address)
-
-        return f"{settings.CONTRACTS_LOGO_BASE_URL}/{addr_str}.png"
+        return f"{settings.CONTRACT_LOGO_BASE_URL}/{self.address}.png"
 
 
 class DataDecoderInput(CamelModel):

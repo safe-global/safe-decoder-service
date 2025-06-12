@@ -54,10 +54,10 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(results[0]["chainId"], 1)
         self.assertEqual(results[0]["project"], None)
         self.assertEqual(results[0]["modified"], datetime_to_str(contract.modified))
-        self.assertFalse(results[0]["trustedForDelegate"])
+        self.assertFalse(results[0]["trustedForDelegateCall"])
         self.assertEqual(
             results[0]["logoUrl"],
-            f"{settings.CONTRACTS_LOGO_BASE_URL}/{address_expected}.png",
+            f"{settings.CONTRACT_LOGO_BASE_URL}/{address_expected}.png",
         )
         # Test filter by chain_id
         contract = Contract(

@@ -314,7 +314,7 @@ class TestModel(AsyncDbTestCase):
         for contract in contracts_to_be_updated:
             self.assertIsNone(contract.name)
             self.assertIsNone(contract.display_name)
-            self.assertFalse(contract.trusted_for_delegate)
+            self.assertFalse(contract.trusted_for_delegate_call)
 
         self.assertIsNone(other_contract.name)
         self.assertIsNone(other_contract.display_name)
@@ -323,7 +323,7 @@ class TestModel(AsyncDbTestCase):
             address=address_to_be_updated,
             name=contract_name,
             display_name=contract_display_name,
-            trusted_for_delegate=True,
+            trusted_for_delegate_call=True,
         )
         self.assertEqual(rows_affected, 5)
         # Other contract remains not updated
@@ -339,4 +339,4 @@ class TestModel(AsyncDbTestCase):
             )
             self.assertEqual(updated_contract.name, contract_name)
             self.assertEqual(updated_contract.display_name, contract_display_name)
-            self.assertTrue(updated_contract.trusted_for_delegate)
+            self.assertTrue(updated_contract.trusted_for_delegate_call)

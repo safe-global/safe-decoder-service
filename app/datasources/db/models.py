@@ -217,7 +217,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     name: str | None = None
     display_name: str | None = None
     description: str | None = None
-    trusted_for_delegate: bool = Field(nullable=False, default=False)
+    trusted_for_delegate_call: bool = Field(nullable=False, default=False)
     implementation: bytes | None = None
     fetch_retries: int = Field(nullable=False, default=0)
     abi_id: int | None = Field(nullable=True, default=None, foreign_key="abi.id")
@@ -352,7 +352,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         address: bytes,
         name: str,
         display_name: str,
-        trusted_for_delegate: bool | None = False,
+        trusted_for_delegate_call: bool | None = False,
     ) -> int:
         """
         Update the contract metadata for all the chains
@@ -360,7 +360,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         :param address:
         :param name:
         :param display_name:
-        :param trusted_for_delegate:
+        :param trusted_for_delegate_call:
         :return: number of affected rows
         """
         query = (
@@ -369,7 +369,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             .values(
                 name=name,
                 display_name=display_name,
-                trusted_for_delegate=trusted_for_delegate,
+                trusted_for_delegate_call=trusted_for_delegate_call,
             )
         )
         result = await db_session.execute(query)
