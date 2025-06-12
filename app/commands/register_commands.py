@@ -13,11 +13,12 @@ from app.datasources.db.database import db_session, set_database_session_context
 
 def async_command(func: Callable) -> Callable:
     """
-    Wrap a function so:Add commentMore actions
+    Wrap a function so:
         - Async functions are supported
         - A database session is open and closed
 
     :param func:
+    :return:
     """
     if inspect.iscoroutinefunction(func):
 
