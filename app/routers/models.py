@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Union
+from typing import Any, Union, cast
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
@@ -79,7 +79,7 @@ class ContractsPublic(CamelModel):
     @computed_field(return_type=str | None)
     def logo_url(self) -> str | None:
         if isinstance(self.address, bytes):
-            addr_str = self.address.hex()
+            addr_str = cast(str, to_0x_hex_str(self.address))
         else:
             addr_str = str(self.address)
 
