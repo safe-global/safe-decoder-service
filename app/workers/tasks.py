@@ -122,7 +122,7 @@ async def update_proxies_task():
             )
 
 
-@dramatiq.actor(periodic=cron("0 * * * *"))  # Every midnight
+@dramatiq.actor(periodic=cron("0 * * * *"))  # Every hour
 @db_session_context
 async def update_safe_contracts_info_task():
     with logging_task_context(CurrentMessage.get_current_message()):
