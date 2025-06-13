@@ -2,7 +2,7 @@ import datetime
 from typing import AsyncIterator, Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, update
 from sqlmodel import (
     JSON,
     Column,
@@ -217,7 +217,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     name: str | None = None
     display_name: str | None = None
     description: str | None = None
-    trusted_for_delegate: bool = Field(nullable=False, default=False)
+    trusted_for_delegate_call: bool = Field(nullable=False, default=False)
     implementation: bytes | None = None
     fetch_retries: int = Field(nullable=False, default=0)
     abi_id: int | None = Field(nullable=True, default=None, foreign_key="abi.id")
@@ -345,3 +345,33 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         result = await db_session.stream(query)
         async for (contract,) in result:
             yield contract
+
+    @classmethod
+    async def update_contract_info(
+        cls,
+        address: bytes,
+        name: str,
+        display_name: str,
+        trusted_for_delegate_call: bool | None = False,
+    ) -> int:
+        """
+        Update the contract metadata for all the chains
+
+        :param address:
+        :param name:
+        :param display_name:
+        :param trusted_for_delegate_call:
+        :return: number of affected rows
+        """
+        query = (
+            update(cls)
+            .where(col(cls.address) == address)
+            .values(
+                name=name,
+                display_name=display_name,
+                trusted_for_delegate_call=trusted_for_delegate_call,
+            )
+        )
+        result = await db_session.execute(query)
+        await db_session.commit()
+        return result.rowcount

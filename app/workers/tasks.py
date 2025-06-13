@@ -12,6 +12,7 @@ from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import get_task_info, logging_task_context
 from app.services.contract_metadata_service import get_contract_metadata_service
+from app.services.safe_contracts_service import update_safe_contracts_info
 
 
 def log_record_factory_for_task(*args, **kwargs):
@@ -119,3 +120,10 @@ async def update_proxies_task():
                 chain_id=proxy_contract.chain_id,
                 skip_attemp_download=True,
             )
+
+
+@dramatiq.actor(periodic=cron("0 * * * *"))  # Every hour
+@db_session_context
+async def update_safe_contracts_info_task():
+    with logging_task_context(CurrentMessage.get_current_message()):
+        await update_safe_contracts_info()

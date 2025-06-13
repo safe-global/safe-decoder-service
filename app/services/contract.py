@@ -35,4 +35,5 @@ class ContractService:
         count = await self.pagination.get_count(
             Contract.get_contracts_with_abi_query(address, chain_ids)
         )
+
         return page, count

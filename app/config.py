@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     CONTRACT_MAX_DOWNLOAD_RETRIES: int = (
         90  # Task running once per day, means 3 months trying.
     )
+    CONTRACT_LOGO_BASE_URL: str = (
+        "https://safe-transaction-assets.safe.global/contracts/logos"
+    )
+    CONTRACTS_TRUSTED_FOR_DELEGATE_CALL: list[str] = [
+        "MultiSendCallOnly",
+        "SignMessageLib",
+        "SafeMigration",
+    ]
 
 
 settings = Settings()

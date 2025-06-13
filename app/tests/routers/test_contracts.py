@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from hexbytes import HexBytes
 
+from ...config import settings
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
@@ -53,6 +54,11 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(results[0]["chainId"], 1)
         self.assertEqual(results[0]["project"], None)
         self.assertEqual(results[0]["modified"], datetime_to_str(contract.modified))
+        self.assertFalse(results[0]["trustedForDelegateCall"])
+        self.assertEqual(
+            results[0]["logoUrl"],
+            f"{settings.CONTRACT_LOGO_BASE_URL}/{address_expected}.png",
+        )
         # Test filter by chain_id
         contract = Contract(
             address=address, name="A Test Contracts", chain_id=5, abi=abi
