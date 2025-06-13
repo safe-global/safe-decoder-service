@@ -35,8 +35,8 @@ def _get_default_deployments_by_version() -> list[tuple[str, str, str]]:
     :return: list of (version, contract_name, contract_address)
     """
     chain_deployments: list[tuple[str, str, str]] = []
-    versions = list(default_safe_deployments.keys())
-    for version in versions:
+    # versions = list(default_safe_deployments.keys())
+    for version in default_safe_deployments:
         for contract_name, addresses in default_safe_deployments[version].items():
             for contract_address in addresses:
                 chain_deployments.append((version, contract_name, contract_address))
