@@ -21,15 +21,25 @@ class TestRouterContract(AsyncDbTestCase):
     @db_session_context
     async def test_view_contracts(self):
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
-        address = HexBytes(address_expected)
-        contract = Contract(address=address, name="A Test Contracts", chain_id=1)
-        await contract.create()
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
         self.assertEqual(response_json["count"], 0)
+
+        address = HexBytes(address_expected)
+        contract = Contract(
+            address=address, name="A Test Contracts", chain_id=1, fetch_retries=2
+        )
+        await contract.create()
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertIsNone(response_json["results"][0]["abi"])
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
         await source.create()
         abi = Abi(abi_json=mock_abi_json, source_id=source.id)
@@ -55,6 +65,7 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(results[0]["project"], None)
         self.assertEqual(results[0]["modified"], datetime_to_str(contract.modified))
         self.assertFalse(results[0]["trustedForDelegateCall"])
+        self.assertEqual(results[0]["fetchRetries"], 2)
         self.assertEqual(
             results[0]["logoUrl"],
             f"{settings.CONTRACT_LOGO_BASE_URL}/{address_expected}.png",

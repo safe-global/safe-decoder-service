@@ -77,7 +77,7 @@ class TestRouterAbout(AsyncDbTestCase):
         response = self.client.post("/api/v1/data-decoder/", json={"data": "0x123"})
         self.assertEqual(response.status_code, 404)
 
-        # Test no checksumed address
+        # Test no checksummed address
         response = self.client.post(
             "/api/v1/data-decoder/",
             json={
@@ -89,7 +89,7 @@ class TestRouterAbout(AsyncDbTestCase):
 
     @db_session_context
     async def test_view_data_decoder_with_chain_id_without_to(self):
-        # Test no checksumed address
+        # Test no checksummed address
         response = self.client.post(
             "/api/v1/data-decoder/",
             json={

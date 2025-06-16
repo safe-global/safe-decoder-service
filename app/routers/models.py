@@ -56,9 +56,10 @@ class ContractsPublic(CamelModel):
     display_name: str | None
     chain_id: int
     project: ProjectPublic | None
-    abi: AbiPublic
+    abi: AbiPublic | None
     modified: datetime
     trusted_for_delegate_call: bool
+    fetch_retries: int
 
     class Config:
         from_attributes = True
@@ -105,7 +106,7 @@ class DataDecoderInput(CamelModel):
     @field_validator("to")
     def validate_checksum_address(cls, value):
         if value and not fast_is_checksum_address(value):
-            raise ValueError("Address is not checksumed")
+            raise ValueError("Address is not checksummed")
         return value
 
     @model_validator(mode="before")

@@ -263,7 +263,7 @@ class DataDecoderService:
         :param data: Tx data as `hex string` or `bytes`
         :param address: contract address in case of ABI colliding
         :param chain_id: Chain for the contract
-        :return: Tuple with the `function name` and a List of sorted tuples with
+        :return: tuple with the `function name` and a List of sorted tuples with
             the `name` of the argument, `type` and `value`
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
@@ -408,7 +408,7 @@ class DataDecoderService:
         :param data: Tx data as `hex string` or `bytes`
         :param address: contract address in case of ABI colliding
         :param chain_id: chain for the contract
-        :return: Tuple with the `function name` and a list of dictionaries
+        :return: tuple with the `function name` and a list of dictionaries
             [{'name': str, 'type': str, 'value': `depending on type`}...]
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
@@ -439,7 +439,7 @@ class DataDecoderService:
         :param data: Tx data as `hex string` or `bytes`
         :param address: contract address in case of ABI colliding
         :param chain_id: chain for the contract
-        :return: Tuple with the `function name` and a dictionary with the arguments of the function
+        :return: tuple with the `function name` and a dictionary with the arguments of the function
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
