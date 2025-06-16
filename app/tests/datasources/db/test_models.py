@@ -5,7 +5,7 @@ from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
 
-from app.datasources.db.database import db_session_context
+from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
 from app.services.contract_metadata_service import (
     ContractMetadataService,
@@ -17,7 +17,7 @@ from ...mocks.contract_metadata_mocks import etherscan_proxy_metadata_mock
 from .async_db_test_case import AsyncDbTestCase
 
 
-class TestModel(AsyncDbTestCase):
+class TestModels(AsyncDbTestCase):
 
     @db_session_context
     async def test_contract(self):
@@ -27,6 +27,29 @@ class TestModel(AsyncDbTestCase):
         await contract.create()
         result = await contract.get_all()
         self.assertEqual(result[0], contract)
+
+    @db_session_context
+    async def test_get_contracts_query(self):
+        address = b"a"
+        expected_contract = Contract(
+            address=address,
+            name="A test contract",
+            chain_id=1,
+            implementation=b"a",
+            abi=None,
+        )
+        await expected_contract.create()
+        query = Contract.get_contracts_query(
+            address, chain_ids=None, only_with_abi=False
+        )
+        contract = (await db_session.execute(query)).scalars().first()
+        assert contract == expected_contract
+
+        query = Contract.get_contracts_query(
+            address, chain_ids=None, only_with_abi=True
+        )
+        contract = (await db_session.execute(query)).scalars().first()
+        assert contract is None
 
     @db_session_context
     async def test_contract_get_abi_by_contract_address(self):
