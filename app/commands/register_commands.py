@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from typer import Typer
 
+from app.commands.download_contract import download_contract_command
 from app.commands.safe_contracts import (
     setup_safe_contracts,
 )
@@ -48,3 +49,8 @@ def register_commands(app: Typer):
     @async_command
     async def load_safe_contracts():
         await setup_safe_contracts()
+
+    @app.command(help="Force to download a contract")
+    @async_command
+    async def download_contract(address: str, chain_id: int):
+        await download_contract_command(address, chain_id)
