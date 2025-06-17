@@ -52,7 +52,7 @@ class AbiPublic(CamelModel):
 
 class ContractsPublic(CamelModel):
     address: ChecksumAddress
-    name: str
+    name: str | None
     display_name: str | None
     chain_id: int
     project: ProjectPublic | None
