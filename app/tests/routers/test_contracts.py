@@ -85,6 +85,19 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["count"], 1)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["chainId"], 5)
+        # name could be None
+        contract_without_name = "0xD1a2a63a9766673940B4D2d7cB16259876Aca8a2"
+        contract = Contract(
+            address=HexBytes(contract_without_name), chain_id=1, fetch_retries=2
+        )
+        await contract.create()
+        response = self.client.get(
+            f"/api/v1/contracts/{contract_without_name}",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertIsNone(response_json["results"][0]["abi"])
 
     @db_session_context
     async def test_contracts_pagination(self):
