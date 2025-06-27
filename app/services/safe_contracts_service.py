@@ -55,10 +55,11 @@ async def update_safe_contracts_info() -> None:
     ) in _get_default_deployments_by_version():
         display_name = _generate_safe_contract_display_name(contract_name, version)
         affected_rows = await Contract.update_contract_info(
-            HexBytes(contract_address),
-            display_name,
-            contract_name,
-            contract_name in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
+            address=HexBytes(contract_address),
+            name=contract_name,
+            display_name=display_name,
+            trusted_for_delegate_call=contract_name
+            in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
         )
         if affected_rows:
             logger.info(

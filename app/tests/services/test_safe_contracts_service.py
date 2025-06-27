@@ -52,16 +52,16 @@ class TestContractMetadataService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_update.call_count, 2)
 
         mock_update.assert_any_call(
-            HexBytes("0x9641d764fc13c8B624c04430C7356C1C7C8102e2"),
-            "Safe: MultiSendCallOnly 1.4.1",
-            "MultiSendCallOnly",
-            True,  # Trusted contract
+            address=HexBytes("0x9641d764fc13c8B624c04430C7356C1C7C8102e2"),
+            name="MultiSendCallOnly",
+            display_name="Safe: MultiSendCallOnly 1.4.1",
+            trusted_for_delegate_call=True,  # Trusted contract
         )
         mock_update.assert_any_call(
-            HexBytes("0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"),
-            "Safe: MultiSend 1.4.1",
-            "MultiSend",
-            False,  # Not trusted
+            address=HexBytes("0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"),
+            name="MultiSend",
+            display_name="Safe: MultiSend 1.4.1",
+            trusted_for_delegate_call=False,  # Not trusted
         )
 
         mock_logger.info.assert_called_once_with(
