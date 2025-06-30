@@ -7,7 +7,7 @@ fastapi-camelcase==2.0.0
 fastapi[all]==0.115.12
 gunicorn==23.0.0
 periodiq==0.13.0
-pydantic-settings==2.9.1
+pydantic-settings==2.10.1
 redis[hiredis]==6.2.0
 safe-eth-py==7.5.1
 sqladmin[full]==0.20.1
