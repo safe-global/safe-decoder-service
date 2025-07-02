@@ -235,8 +235,9 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     def get_contracts_query(
         cls,
-        address: bytes,
+        address: bytes | None = None,
         chain_ids: list[int] | None = None,
+        trusted_for_delegate_call: bool | None = None,
         only_with_abi: bool = False,
     ) -> SelectBase["Contract"]:
         """
@@ -244,17 +245,26 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
 
         :param address:
         :param chain_ids: list of chain_ids, `None` for all chains
+        :param trusted_for_delegate_call: only return contracts trusted for delegate call
         :param only_with_abi: only return contracts with ABI
         :return:
         """
-        query = select(cls).where(cls.address == address)
-        if chain_ids:
-            query = query.where(col(cls.chain_id).in_(chain_ids)).order_by(
-                col(cls.chain_id).desc()
+        query = select(cls)
+        if address:  # Filter by the provided address
+            query = query.where(cls.address == address)
+
+        if trusted_for_delegate_call is not None:
+            query = query.where(
+                cls.trusted_for_delegate_call == trusted_for_delegate_call
             )
+
+        if chain_ids:
+            query = query.where(col(cls.chain_id).in_(chain_ids))
         if only_with_abi:
             query = query.where(cls.abi_id.isnot(None))  # type: ignore
 
+        # Sort by address
+        query = query.order_by(col(cls.address), col(cls.chain_id))
         return query
 
     @classmethod

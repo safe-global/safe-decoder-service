@@ -20,6 +20,38 @@ router = APIRouter(
 
 
 @router.get(
+    "",
+    response_model=PaginatedResponse[ContractsPublic],
+    summary="List contracts",
+    response_description="Paginated list of contracts",
+)
+async def list_all_contracts(
+    request: Request,
+    pagination_params: PaginationQueryParams = Depends(),
+    chain_ids: Annotated[list[int] | None, Query()] = None,
+    trusted_for_delegate_call: bool | None = None,
+) -> PaginatedResponse[ContractsPublic]:
+    """
+    List all contracts
+    Args:
+        request:
+        address:
+        pagination_params:
+        chain_ids:
+        trusted_for_delegate_call:
+
+    Returns:
+
+    """
+    pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
+    contracts_service = ContractService(pagination=pagination)
+    contracts_page, count = await contracts_service.get_contracts(
+        chain_ids=chain_ids, trusted_for_delegate_call=trusted_for_delegate_call
+    )
+    return pagination.serialize(request.url, contracts_page, count)
+
+
+@router.get(
     "/{address}",
     response_model=PaginatedResponse[ContractsPublic],
     summary="List matching contracts",
@@ -44,6 +76,6 @@ async def list_contracts(
     pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
     contracts_page, count = await contracts_service.get_contracts(
-        HexBytes(address), chain_ids
+        address=HexBytes(address), chain_ids=chain_ids
     )
     return pagination.serialize(request.url, contracts_page, count)

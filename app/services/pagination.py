@@ -35,7 +35,6 @@ class GenericPagination:
         self.max_page_size = max_page_size
         self.limit = min(limit, max_page_size) if limit else default_page_size
         self.offset = offset if offset else 0
-        self.session = db_session()
 
     def get_next_page(self, url: URL, count: int) -> str | None:
         """
@@ -69,21 +68,20 @@ class GenericPagination:
         :param query:
         :return:
         """
-        queryset = await self.session.execute(
-            query.offset(self.offset).limit(self.limit)
-        )
+        queryset = await db_session.execute(query.offset(self.offset).limit(self.limit))
         return queryset.scalars().all()
 
     async def get_count(self, query) -> int:
         """
         Get from database the count of rows that fit the query
 
-        :param session:
         :param query:
         :return:
         """
-        count_query = await self.session.execute(
-            select(func.count()).where(query._whereclause)
+        # We dont need sort the query to get the count, so we remove the order section
+        query = query.order_by(None)
+        count_query = await db_session.execute(
+            select(func.count()).select_from(query.alias())
         )
         return count_query.scalars().one()
 
