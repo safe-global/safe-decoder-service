@@ -32,10 +32,9 @@ async def list_all_contracts(
     trusted_for_delegate_call: bool | None = None,
 ) -> PaginatedResponse[ContractsPublic]:
     """
-    List all contracts
+    Returns a paginated list of contracts, optionally filtered by chain IDs and trusted delegate call flag.
     Args:
         request:
-        address:
         pagination_params:
         chain_ids:
         trusted_for_delegate_call:
