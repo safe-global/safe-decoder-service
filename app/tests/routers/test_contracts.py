@@ -8,6 +8,7 @@ from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...utils import datetime_to_str
 from ..datasources.db.async_db_test_case import AsyncDbTestCase
+from ..datasources.db.factory import contract_factory
 from ..mocks.abi_mock import mock_abi_json
 
 
@@ -143,3 +144,106 @@ class TestRouterContract(AsyncDbTestCase):
             f"http://testserver/api/v1/contracts/{address_expected}?limit=5&offset=0",
         )
         self.assertEqual(len(results), 5)
+
+    @db_session_context
+    async def test_view_list_all_contracts(self):
+        response = self.client.get(
+            "/api/v1/contracts/",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 0)
+
+        untrusted_contract = await contract_factory(
+            address="0x0000000000000000000000000000000000000001", chain_id=6
+        )
+        response = self.client.get(
+            "/api/v1/contracts/",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertEqual(response_json["next"], None)
+        self.assertEqual(response_json["previous"], None)
+        self.assertEqual(len(response_json["results"]), 1)
+        self.assertEqual(
+            response_json["results"][0]["chainId"], untrusted_contract.chain_id
+        )
+        self.assertEqual(response_json["results"][0]["name"], untrusted_contract.name)
+        self.assertEqual(
+            HexBytes(response_json["results"][0]["address"]), untrusted_contract.address
+        )
+        self.assertEqual(
+            response_json["results"][0]["displayName"], untrusted_contract.display_name
+        )
+        self.assertFalse(response_json["results"][0]["trustedForDelegateCall"])
+
+        trusted_contract = await contract_factory(
+            address="0x0000000000000000000000000000000000000000",
+            trusted_for_delegate_call=True,
+            chain_id=5,
+        )
+        response = self.client.get(
+            "/api/v1/contracts/",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 2)
+
+        response = self.client.get(
+            "/api/v1/contracts/?trusted_for_delegate_call=true",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertEqual(
+            response_json["results"][0]["chainId"], trusted_contract.chain_id
+        )
+        self.assertEqual(response_json["results"][0]["name"], trusted_contract.name)
+        self.assertEqual(
+            HexBytes(response_json["results"][0]["address"]), trusted_contract.address
+        )
+        self.assertEqual(
+            response_json["results"][0]["displayName"], trusted_contract.display_name
+        )
+        self.assertTrue(response_json["results"][0]["trustedForDelegateCall"])
+
+        untrusted_contract_next_chain = await contract_factory(
+            address="0x0000000000000000000000000000000000000001", chain_id=7
+        )
+
+        response = self.client.get(
+            "/api/v1/contracts/",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 3)
+        # Should be sorted right
+        self.assertEqual(
+            response_json["results"][0]["address"],
+            "0x0000000000000000000000000000000000000000",
+        )
+        self.assertEqual(
+            response_json["results"][1]["address"],
+            "0x0000000000000000000000000000000000000001",
+        )
+        self.assertEqual(response_json["results"][1]["chainId"], 6)
+        self.assertEqual(
+            response_json["results"][2]["address"],
+            "0x0000000000000000000000000000000000000001",
+        )
+        self.assertEqual(response_json["results"][2]["chainId"], 7)
+
+        response = self.client.get(
+            f"/api/v1/contracts/?chain_ids={untrusted_contract_next_chain.chain_id}",
+        )
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertEqual(
+            response_json["results"][0]["address"],
+            "0x0000000000000000000000000000000000000001",
+        )
+        self.assertEqual(
+            response_json["results"][0]["chainId"],
+            untrusted_contract_next_chain.chain_id,
+        )

@@ -46,6 +46,18 @@ class TestModels(AsyncDbTestCase):
         assert contract == expected_contract
 
         query = Contract.get_contracts_query(
+            chain_ids=None, only_with_abi=False, trusted_for_delegate_call=False
+        )
+        contract = (await db_session.execute(query)).scalars().first()
+        assert contract == expected_contract
+
+        query = Contract.get_contracts_query(
+            chain_ids=None, only_with_abi=False, trusted_for_delegate_call=True
+        )
+        contract = (await db_session.execute(query)).scalars().first()
+        assert contract is None
+
+        query = Contract.get_contracts_query(
             address, chain_ids=None, only_with_abi=True
         )
         contract = (await db_session.execute(query)).scalars().first()

@@ -1,5 +1,6 @@
 -r requirements-prod.txt
 coverage
+faker
 freezegun
 httpx
 mypy
