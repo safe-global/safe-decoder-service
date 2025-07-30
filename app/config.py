@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     )
     TEST: bool = False
     LOG_LEVEL: str = "INFO"
-    LOG_LEVEL_EVENTS_SERVICE: str = "DEBUG"
+    LOG_LEVEL_EVENTS_SERVICE: str = "INFO"
     REDIS_URL: str = "redis://"
     DATABASE_URL: str = "psql://postgres:"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
