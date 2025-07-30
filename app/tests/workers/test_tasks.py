@@ -13,7 +13,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import AbiSource, Contract
-from app.workers.tasks import get_contract_metadata_task, redis_broker, test_task
+from app.workers.tasks import get_contract_metadata_task, redis_broker, task_to_test
 
 from ...datasources.cache.redis import get_redis
 from ...services.contract_metadata_service import ContractMetadataService
@@ -43,7 +43,7 @@ class TestTasks(unittest.TestCase):
         self.assertEqual(len(redis_tasks), 0)
 
         test_message = "Task in Redis Queue"
-        test_task.send(test_message)
+        task_to_test.send(test_message)
 
         redis_tasks = redis_broker.client.lrange("dramatiq:default", 0, -1)
         assert isinstance(redis_tasks, list)
@@ -53,7 +53,7 @@ class TestTasks(unittest.TestCase):
         assert isinstance(task_info_raw, bytes)
         task_info = json.loads(task_info_raw)
         self.assertEqual(task_info.get("args"), [test_message])
-        self.assertEqual(task_info.get("actor_name"), "test_task")
+        self.assertEqual(task_info.get("actor_name"), "task_to_test")
 
         self.worker.start()
 
