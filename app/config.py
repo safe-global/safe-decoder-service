@@ -61,7 +61,7 @@ LOGGING_CONFIG = {
     "formatters": {"json": {"()": SafeJsonFormatter}},  # Custom formatter class
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": settings.LOG_LEVEL,
             "class": "logging.StreamHandler",
             "formatter": "json",
         }
