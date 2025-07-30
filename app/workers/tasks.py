@@ -43,14 +43,14 @@ dramatiq.set_broker(redis_broker)
 
 
 @dramatiq.actor
-def test_task(message: str) -> None:
+def task_to_test(message: str) -> None:
     """
     Examples of use:
 
         from periodiq import cron
         @dramatiq.actor(periodic=cron("*/2 * * * *"))
 
-        async def test_task(message: str) -> None:
+        async def task_to_test(message: str) -> None:
     """
     logger.info(f"Message processed! -> {message}")
     return
