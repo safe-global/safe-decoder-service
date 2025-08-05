@@ -13,4 +13,4 @@ safe-eth-py==7.5.1
 sqladmin[full]==0.21.0
 sqlmodel==0.0.24
 uvicorn-worker==0.3.0
-web3==7.12.1
+web3==7.13.0
