@@ -75,9 +75,7 @@ async def list_contracts(
     request: Request,
     address: Annotated[
         str,
-        Path(
-            description="EIP-55 checksummed contract address."
-        ),
+        Path(description="EIP-55 checksummed contract address."),
     ],
     pagination_params: PaginationQueryParams = Depends(),
     chain_ids: Annotated[
