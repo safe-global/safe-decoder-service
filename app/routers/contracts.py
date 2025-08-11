@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
@@ -47,8 +47,8 @@ async def list_all_contracts(
     `trusted_for_delegate_call` flag.
     
     **Parameters:**
-    - `chain_ids`: Filter contracts by specific chain IDs. Repeat the param to filter by multiple chains (e.g. `?chain_ids=1&chain_ids=137`)
-    - `trusted_for_delegate_call`: Filter contracts by trusted delegate call flag
+    - `chain_ids`: Filter contracts by specific chain IDs. Repeat the param to filter by multiple chains (e.g. `?chain_ids=1&chain_ids=137`).
+    - `trusted_for_delegate_call`: Filter contracts by trusted delegate call flag.
 
     **Response:**
     - Paginated list of contracts matching the criteria.
@@ -91,11 +91,11 @@ async def list_contracts(
     Return a **paginated** list of contracts that match the provided **EIP-55 checksummed** address.
 
     **Parameters:**
-    - `address`: Contract address in checksum format (required)
-    - `chain_ids`: List of chain IDs to filter contracts (optional)
+    - `address`: Contract address in checksum format (required).
+    - `chain_ids`: List of chain IDs to filter contracts (optional).
 
     **Returns:**
-    - Paginated response containing contracts matching the address
+    - Paginated response containing contracts matching the address.
     """
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
