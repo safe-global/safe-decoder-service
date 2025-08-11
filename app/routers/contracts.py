@@ -38,14 +38,14 @@ async def list_all_contracts(
         bool | None,
         Query(
             description="If true, only return contracts trusted for delegate calls. "
-                        "If false, only return those not trusted. Omit to return all.",
+            "If false, only return those not trusted. Omit to return all.",
         ),
     ] = None,
 ) -> PaginatedResponse[ContractsPublic]:
     """
     Returns a **paginated** list of contracts, optionally filtered by `chain_ids` and the
     `trusted_for_delegate_call` flag.
-    
+
     **Parameters:**
     - `chain_ids`: Filter contracts by specific chain IDs. Repeat the param to filter by multiple chains (e.g. `?chain_ids=1&chain_ids=137`).
     - `trusted_for_delegate_call`: Filter contracts by trusted delegate call flag.
