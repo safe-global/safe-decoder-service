@@ -24,6 +24,20 @@ router = APIRouter(
     response_model=PaginatedResponse[ContractsPublic],
     summary="List all contracts",
     response_description="Paginated list of contracts",
+    description="""Returns a **paginated** list of contracts, optionally filtered by `chain_ids` and the
+    `trusted_for_delegate_call` flag.
+
+    **Parameters:**
+    - `chain_ids`: Filter contracts by specific chain IDs. Repeat the param to filter by multiple chains (e.g. `?chain_ids=1&chain_ids=137`).
+    - `trusted_for_delegate_call`: Filter contracts by trusted delegate call flag.
+
+    **Response:**
+    - Paginated list of contracts matching the criteria.
+
+    **Notes**
+    - Pagination is controlled by `PaginationQueryParams` (`limit`, `offset`).
+    - When `chain_ids` is provided, only contracts deployed on those chains are returned.
+    """,
 )
 async def list_all_contracts(
     request: Request,
@@ -42,20 +56,18 @@ async def list_all_contracts(
         ),
     ] = None,
 ) -> PaginatedResponse[ContractsPublic]:
-    """
-    Returns a **paginated** list of contracts, optionally filtered by `chain_ids` and the
-    `trusted_for_delegate_call` flag.
+    """  
+    Returns a paginated list of contracts, optionally filtered by `chain_ids` and  
+    `trusted_for_delegate_call`.  
 
-    **Parameters:**
-    - `chain_ids`: Filter contracts by specific chain IDs. Repeat the param to filter by multiple chains (e.g. `?chain_ids=1&chain_ids=137`).
-    - `trusted_for_delegate_call`: Filter contracts by trusted delegate call flag.
+    Pagination is controlled by `PaginationQueryParams` (`limit`, `offset`).  
+    When `chain_ids` is provided, only contracts deployed on those chains are returned.  
 
-    **Response:**
-    - Paginated list of contracts matching the criteria.
-
-    **Notes**
-    - Pagination is controlled by `PaginationQueryParams` (`limit`, `offset`).
-    - When `chain_ids` is provided, only contracts deployed on those chains are returned.
+    :param request:
+    :param pagination_params: Pagination parameters.
+    :param chain_ids: Filter contracts by specific chain IDs.  
+    :param trusted_for_delegate_call: Filter contracts by trusted delegate call flag.  
+    :return: Paginated list of contracts matching the criteria.  
     """
     pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
@@ -70,6 +82,16 @@ async def list_all_contracts(
     response_model=PaginatedResponse[ContractsPublic],
     summary="List contracts for a checksummed address",
     response_description="Paginated list of contracts matching the provided address",
+    description="""
+    Return a **paginated** list of contracts that match the provided **EIP-55 checksummed** address.
+
+    **Parameters:**
+    - `address`: Contract address in checksum format (required).
+    - `chain_ids`: List of chain IDs to filter contracts (optional).
+
+    **Returns:**
+    - Paginated response containing contracts matching the address.
+    """,
 )
 async def list_contracts(
     request: Request,
@@ -85,16 +107,15 @@ async def list_contracts(
         ),
     ] = None,
 ) -> PaginatedResponse[ContractsPublic]:
-    """
-    Return a **paginated** list of contracts that match the provided **EIP-55 checksummed** address.
+    """  
+    Return a paginated list of contracts that match the provided EIP-55 checksummed address.  
 
-    **Parameters:**
-    - `address`: Contract address in checksum format (required).
-    - `chain_ids`: List of chain IDs to filter contracts (optional).
-
-    **Returns:**
-    - Paginated response containing contracts matching the address.
-    """
+    :param request:
+    :param address: Contract address in checksum format. (Required)  
+    :param pagination_params: Pagination query parameters.
+    :param chain_ids: List of chain IDs to filter contracts. (Optional)  
+    :return: Paginated response containing contracts matching the address.  
+    """  
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
 
