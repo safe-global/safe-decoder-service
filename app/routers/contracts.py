@@ -115,7 +115,7 @@ async def list_contracts(
     :param pagination_params: Pagination query parameters.
     :param chain_ids: List of chain IDs to filter contracts. (Optional)  
     :return: Paginated response containing contracts matching the address.  
-    """  
+    """
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
 
