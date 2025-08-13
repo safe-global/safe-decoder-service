@@ -56,18 +56,18 @@ async def list_all_contracts(
         ),
     ] = None,
 ) -> PaginatedResponse[ContractsPublic]:
-    """  
-    Returns a paginated list of contracts, optionally filtered by `chain_ids` and  
-    `trusted_for_delegate_call`.  
+    """
+    Returns a paginated list of contracts, optionally filtered by `chain_ids` and
+    `trusted_for_delegate_call`.
 
-    Pagination is controlled by `PaginationQueryParams` (`limit`, `offset`).  
-    When `chain_ids` is provided, only contracts deployed on those chains are returned.  
+    Pagination is controlled by `PaginationQueryParams` (`limit`, `offset`).
+    When `chain_ids` is provided, only contracts deployed on those chains are returned.
 
     :param request:
     :param pagination_params: Pagination parameters.
-    :param chain_ids: Filter contracts by specific chain IDs.  
-    :param trusted_for_delegate_call: Filter contracts by trusted delegate call flag.  
-    :return: Paginated list of contracts matching the criteria.  
+    :param chain_ids: Filter contracts by specific chain IDs.
+    :param trusted_for_delegate_call: Filter contracts by trusted delegate call flag.
+    :return: Paginated list of contracts matching the criteria.
     """
     pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
@@ -107,14 +107,14 @@ async def list_contracts(
         ),
     ] = None,
 ) -> PaginatedResponse[ContractsPublic]:
-    """  
-    Return a paginated list of contracts that match the provided EIP-55 checksummed address.  
+    """
+    Return a paginated list of contracts that match the provided EIP-55 checksummed address.
 
     :param request:
-    :param address: Contract address in checksum format. (Required)  
+    :param address: Contract address in checksum format. (Required)
     :param pagination_params: Pagination query parameters.
-    :param chain_ids: List of chain IDs to filter contracts. (Optional)  
-    :return: Paginated response containing contracts matching the address.  
+    :param chain_ids: List of chain IDs to filter contracts. (Optional)
+    :return: Paginated response containing contracts matching the address.
     """
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
