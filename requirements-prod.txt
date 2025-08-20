@@ -9,7 +9,7 @@ gunicorn==23.0.0
 periodiq==0.13.0
 pydantic-settings==2.10.1
 redis[hiredis]==6.2.0
-safe-eth-py==7.5.1
+safe-eth-py==7.9.0
 sqladmin[full]==0.21.0
 sqlmodel==0.0.24
 uvicorn-worker==0.3.0
