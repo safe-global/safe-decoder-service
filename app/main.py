@@ -136,8 +136,10 @@ async def http_request_middleware(request: Request, call_next):
                 total_time = (
                     end_time - start_time
                 ).total_seconds() * 1000  # time in ms
+                route = request.scope.get("route")
                 http_request = HttpRequestLog(
                     url=str(request.url),
+                    route=route.path if route else None,
                     method=request.method,
                     startTime=start_time,
                 )
