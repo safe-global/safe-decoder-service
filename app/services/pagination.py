@@ -39,6 +39,15 @@ class GenericPagination:
 
     @staticmethod
     def _get_url(request: Request) -> URL:
+        """
+        Constructs a URL from the request, handling proxy forwarding headers.
+
+        When behind a proxy, uses x-forwarded-* headers to reconstruct the original URL
+        with the correct scheme, host, port, and path prefix.
+
+        :param request: The FastAPI/Starlette request object
+        :return: URL object with proxy-aware scheme, host, port, and path
+        """
         prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
         if prefix:
             host = request.headers.get("x-forwarded-host", request.url.hostname)

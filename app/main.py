@@ -114,7 +114,25 @@ app.include_router(default.router)
 @app.middleware("http")
 async def http_redirect_middleware(request: Request, call_next):
     """
-    Intercepts response redirects to update location in case of being behind a proxy
+    Intercepts HTTP response redirects and updates the Location header when behind a proxy.
+
+    This middleware handles cases where the application is deployed behind a reverse proxy
+    that forwards requests with custom headers. When a redirect response is generated,
+    it ensures the Location header reflects the correct external URL by incorporating
+    proxy forwarding headers.
+
+    Args:
+        request (Request): The incoming HTTP request object
+        call_next: The next middleware/handler in the chain
+
+    Returns:
+        Response: The HTTP response, potentially with an updated Location header
+
+    Proxy Headers Used:
+        - x-forwarded-prefix: Path prefix to prepend to the redirect location
+        - x-forwarded-host: External hostname visible to clients
+        - x-forwarded-proto: External protocol (http/https)
+        - x-forwarded-port: External port number
     """
     response = await call_next(request)
     prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
