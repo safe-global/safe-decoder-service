@@ -4,15 +4,18 @@ from fastapi import APIRouter
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import RedirectResponse
 
+from starlette.requests import Request
+
 router = APIRouter()
 
 
 @router.get("/", include_in_schema=False)
-async def home():
+async def home(req: Request):
+    forwarded_prefix = req.headers.get("x-forwarded-prefix", "")
     return get_swagger_ui_html(
-        openapi_url="/openapi.json",
+        openapi_url=f"{forwarded_prefix}/openapi.json",
         title="Safe Decoder Service - Swagger UI",
-        swagger_favicon_url="/static/favicon.ico",
+        swagger_favicon_url=f"{forwarded_prefix}/static/favicon.ico",
     )
 
 
