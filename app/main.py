@@ -117,12 +117,12 @@ async def http_redirect_middleware(request: Request, call_next):
     Intercepts response redirects to update location in case of being behind a proxy
     """
     response = await call_next(request)
-    if "location" in response.headers:
+    prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
+    if "location" in response.headers and prefix:
         original_url = URL(response.headers["location"])
-        prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
-        host = request.headers.get("x-forwarded-host", original_url.hostname)
-        protocol = request.headers.get("x-forwarded-proto", original_url.scheme)
-        port = request.headers.get("x-forwarded-port", original_url.port)
+        host = request.headers.get("x-forwarded-host")
+        protocol = request.headers.get("x-forwarded-proto")
+        port = request.headers.get("x-forwarded-port")
         response.headers["location"] = str(
             original_url.replace(
                 scheme=protocol,

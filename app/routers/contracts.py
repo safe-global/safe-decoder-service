@@ -69,14 +69,14 @@ async def list_all_contracts(
     :param trusted_for_delegate_call: Filter contracts by trusted delegate call flag.
     :return: Paginated list of contracts matching the criteria.
     """
-    pagination = GenericPagination(
-        pagination_params.limit, pagination_params.offset, request=request
-    )
+    pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
     contracts_page, count = await contracts_service.get_contracts(
         chain_ids=chain_ids, trusted_for_delegate_call=trusted_for_delegate_call
     )
-    return pagination.serialize(contracts_page, count)
+    return pagination.serialize(
+        GenericPagination._get_url(request), contracts_page, count
+    )
 
 
 @router.get(
@@ -121,11 +121,11 @@ async def list_contracts(
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
 
-    pagination = GenericPagination(
-        pagination_params.limit, pagination_params.offset, request=request
-    )
+    pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
     contracts_page, count = await contracts_service.get_contracts(
         address=HexBytes(address), chain_ids=chain_ids
     )
-    return pagination.serialize(contracts_page, count)
+    return pagination.serialize(
+        GenericPagination._get_url(request), contracts_page, count
+    )
