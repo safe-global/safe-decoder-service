@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 
+from starlette.datastructures import URL
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -108,6 +109,29 @@ api_v1_router.include_router(contracts.router)
 api_v1_router.include_router(data_decoder.router)
 app.include_router(api_v1_router)
 app.include_router(default.router)
+
+
+@app.middleware("http")
+async def http_redirect_middleware(request: Request, call_next):
+    """
+    Intercepts response redirects to update location in case of being behind a proxy
+    """
+    response = await call_next(request)
+    if "location" in response.headers:
+        original_url = URL(response.headers["location"])
+        prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
+        host = request.headers.get("x-forwarded-host", original_url.hostname)
+        protocol = request.headers.get("x-forwarded-proto", original_url.scheme)
+        port = request.headers.get("x-forwarded-port", original_url.port)
+        response.headers["location"] = str(
+            original_url.replace(
+                scheme=protocol,
+                hostname=host,
+                port=port,
+                path=prefix + original_url.path,
+            )
+        )
+    return response
 
 
 @app.middleware("http")
