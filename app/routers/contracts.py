@@ -74,7 +74,9 @@ async def list_all_contracts(
     contracts_page, count = await contracts_service.get_contracts(
         chain_ids=chain_ids, trusted_for_delegate_call=trusted_for_delegate_call
     )
-    return pagination.serialize(request.url, contracts_page, count)
+    return pagination.serialize(
+        GenericPagination._get_url(request), contracts_page, count
+    )
 
 
 @router.get(
@@ -124,4 +126,6 @@ async def list_contracts(
     contracts_page, count = await contracts_service.get_contracts(
         address=HexBytes(address), chain_ids=chain_ids
     )
-    return pagination.serialize(request.url, contracts_page, count)
+    return pagination.serialize(
+        GenericPagination._get_url(request), contracts_page, count
+    )

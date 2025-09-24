@@ -247,3 +247,76 @@ class TestRouterContract(AsyncDbTestCase):
             response_json["results"][0]["chainId"],
             untrusted_contract_next_chain.chain_id,
         )
+
+    @db_session_context
+    async def test_contracts_pagination_with_proxied_host_and_prefix(self):
+        source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
+        await source.create()
+        abi = Abi(abi_json=mock_abi_json, source_id=source.id)
+        await abi.create()
+        address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
+        address = HexBytes(address_expected)
+
+        # Create multiple contracts to test pagination
+        for chain_id in range(0, 10):
+            contract = Contract(
+                address=address,
+                name="A Test Contracts",
+                chain_id=chain_id,
+                abi=abi,
+            )
+            await contract.create()
+
+        # Test first page with proxy headers
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}?limit=5",
+            headers={
+                "x-forwarded-prefix": "/safe-decoder",
+                "x-forwarded-host": "proxy.example.com",
+                "x-forwarded-proto": "https",
+                "x-forwarded-port": "443",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        results = response_json["results"]
+        self.assertEqual(response_json["count"], 10)
+        self.assertEqual(len(results), 5)
+
+        # Check that next URL includes proxy information
+        next_url = response_json["next"]
+        self.assertIsNotNone(next_url)
+        self.assertTrue(
+            next_url.startswith("https://proxy.example.com:443/safe-decoder/")
+        )
+        self.assertIn("limit=5&offset=5", next_url)
+
+        # Previous should be None for first page
+        self.assertEqual(response_json["previous"], None)
+
+        # Test second page with proxy headers
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}?limit=5&offset=5",
+            headers={
+                "x-forwarded-prefix": "/safe-decoder",
+                "x-forwarded-host": "proxy.example.com",
+                "x-forwarded-proto": "https",
+                "x-forwarded-port": "443",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        results = response_json["results"]
+        self.assertEqual(response_json["count"], 10)
+        self.assertEqual(len(results), 5)
+
+        # Check that previous URL includes proxy information
+        previous_url = response_json["previous"]
+        self.assertIsNotNone(previous_url)
+        self.assertTrue(
+            previous_url.startswith("https://proxy.example.com:443/safe-decoder/")
+        )
+        self.assertIn("limit=5&offset=0", previous_url)
+
+        # Next should be None for last page
+        self.assertEqual(response_json["next"], None)
