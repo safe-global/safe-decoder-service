@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from ..datasources.cache.redis import cache_response
 from ..services.contract import ContractService
 from ..services.pagination import (
     GenericPagination,
@@ -95,6 +96,7 @@ async def list_all_contracts(
     - Paginated response containing contracts matching the address.
     """,
 )
+@cache_response(PaginatedResponse[ContractsPublic])
 async def list_contracts(
     request: Request,
     address: Annotated[
