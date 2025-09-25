@@ -11,6 +11,6 @@ pydantic-settings==2.10.1
 redis[hiredis]==6.4.0
 safe-eth-py==7.11.0
 sqladmin[full]==0.21.0
-sqlmodel==0.0.24
+sqlmodel==0.0.25
 uvicorn-worker==0.4.0
 web3==7.13.0
