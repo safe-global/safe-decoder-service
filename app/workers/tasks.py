@@ -8,6 +8,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
+from app.datasources.cache.redis import del_contract_key
 from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import get_task_info, logging_task_context
@@ -79,6 +80,8 @@ async def get_contract_metadata_task(
             )
             if result:
                 logger.info("Success download contract metadata")
+                # Force invalidate contract cache view
+                del_contract_key(address)
             else:
                 logger.info("Failed to download contract metadata")
 
