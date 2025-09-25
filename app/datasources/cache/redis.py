@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from redis import Redis
 
 from ...config import settings
+from ...utils import get_proxy_aware_url
 
 
 @cache
@@ -45,10 +46,15 @@ def get_field_key(kwargs: dict) -> str:
     :return: An MD5 hash string representing the filtered and serialized kwargs.
     """
     # Ignore request if it's part of the parameters
+    request = kwargs.get("request")
+    url_path = ""
+    if request:
+        url_path = str(get_proxy_aware_url(request))
     cacheable_kwargs = {
         k: v for k, v in kwargs.items() if k != "request" and "request" not in k.lower()
     }
-    raw_key = json.dumps(cacheable_kwargs, sort_keys=True, default=str)
+    payload = {"url": url_path, **cacheable_kwargs}
+    raw_key = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.md5(raw_key.encode()).hexdigest()
 
 
