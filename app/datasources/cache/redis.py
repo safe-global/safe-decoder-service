@@ -16,16 +16,35 @@ def get_redis() -> Redis:
 
 
 def cache_contract_key_builder(address: str, **kwargs) -> str:
+    """
+    Build the Redis cache key for a contract by its address.
+
+    :param address: The contract address to use as key identifier.
+    :param kwargs: Optional additional arguments (ignored).
+    :return: A string cache key in the format 'contract:<address>'.
+    """
     return f"contract:{address.lower()}"
 
 
 def del_contract_key(address: str):
+    """
+    Delete the Redis cache entry for a specific contract by address.
+
+    :param address: The contract address used to build the cache key.
+    :return: None
+    """
     get_redis().unlink(cache_contract_key_builder(address))
 
 
 def get_field_key(kwargs: dict) -> str:
+    """
+    Generate a hashed cache key from the given keyword arguments,
+    excluding any request-related data.
 
-    # Ignore request if is part of the parameters
+    :param kwargs: Dictionary of keyword arguments passed to the endpoint.
+    :return: An MD5 hash string representing the filtered and serialized kwargs.
+    """
+    # Ignore request if it's part of the parameters
     cacheable_kwargs = {
         k: v for k, v in kwargs.items() if k != "request" and "request" not in k.lower()
     }
@@ -36,6 +55,20 @@ def get_field_key(kwargs: dict) -> str:
 def cache_response(
     key_builder: Callable[..., str], model: type[BaseModel], expire: int = 60
 ):
+    """
+    Cache the response of an endpoint in Redis using a hash structure.
+
+    The cache key is composed of a hash key (based on the resource, e.g., contract address)
+    and a field key (based on filtered function kwargs). If a cached value exists, it is
+    returned directly. Otherwise, the decorated function is called, and its response is
+    validated and cached.
+
+    :param key_builder: Function that builds the Redis hash key from kwargs.
+    :param model: Pydantic model used to validate and serialize the response.
+    :param expire: Expiration time for the Redis key in seconds (default: 60).
+    :return: The original or cached response.
+    """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
