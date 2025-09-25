@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class HttpRequestLog(BaseModel):
     url: str
     method: str
+    route: str | None = None
     body: str | None = None
     startTime: datetime.datetime
 
