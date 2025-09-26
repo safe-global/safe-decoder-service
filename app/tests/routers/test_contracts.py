@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 
 from ...config import settings
+from ...datasources.cache.redis import del_contract_cache
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
@@ -34,6 +35,19 @@ class TestRouterContract(AsyncDbTestCase):
             address=address, name="A Test Contracts", chain_id=1, fetch_retries=2
         )
         await contract.create()
+
+        # Should return cached response with count 0
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}",
+        )
+        self.assertEqual(response.status_code, 200)
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 0)
+
+        # Invalidate cache
+        del_contract_cache(address_expected)
+
+        # Should return cached response with count 0
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
@@ -42,11 +56,16 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["count"], 1)
         self.assertIsNone(response_json["results"][0]["abi"])
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")
+
         await source.create()
         abi = Abi(abi_json=mock_abi_json, source_id=source.id)
         await abi.create()
         contract.abi_id = abi.id
         await contract.update()
+
+        # Invalidate cache
+        del_contract_cache(address_expected)
+
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
@@ -77,6 +96,9 @@ class TestRouterContract(AsyncDbTestCase):
         )
         await contract.create()
 
+        # Invalidate cache
+        del_contract_cache(address_expected)
+
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
         )
@@ -92,6 +114,10 @@ class TestRouterContract(AsyncDbTestCase):
             address=HexBytes(contract_without_name), chain_id=1, fetch_retries=2
         )
         await contract.create()
+
+        # Invalidate cache
+        del_contract_cache(address_expected)
+
         response = self.client.get(
             f"/api/v1/contracts/{contract_without_name}",
         )

@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import select
 from starlette.datastructures import URL
-from starlette.requests import Request
 
 from app.datasources.db.database import db_session
 
@@ -36,30 +35,6 @@ class GenericPagination:
         self.max_page_size = max_page_size
         self.limit = min(limit, max_page_size) if limit else default_page_size
         self.offset = offset if offset else 0
-
-    @staticmethod
-    def _get_url(request: Request) -> URL:
-        """
-        Constructs a URL from the request, handling proxy forwarding headers.
-
-        When behind a proxy, uses x-forwarded-* headers to reconstruct the original URL
-        with the correct scheme, host, port, and path prefix.
-
-        :param request: The FastAPI/Starlette request object
-        :return: URL object with proxy-aware scheme, host, port, and path
-        """
-        prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
-        if prefix:
-            host = request.headers.get("x-forwarded-host", request.url.hostname)
-            protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
-            port = request.headers.get("x-forwarded-port", request.url.port)
-            return request.url.replace(
-                scheme=protocol,
-                hostname=host,
-                port=port,
-                path=prefix + request.url.path,
-            )
-        return request.url
 
     def get_next_page(self, url: URL, count: int) -> str | None:
         """

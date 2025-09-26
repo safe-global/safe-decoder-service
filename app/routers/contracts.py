@@ -5,12 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from ..datasources.cache.redis import cache_response, get_key_for_contract
 from ..services.contract import ContractService
 from ..services.pagination import (
     GenericPagination,
     PaginatedResponse,
     PaginationQueryParams,
 )
+from ..utils import get_proxy_aware_url
 from .models import ContractsPublic
 
 router = APIRouter(
@@ -74,9 +76,7 @@ async def list_all_contracts(
     contracts_page, count = await contracts_service.get_contracts(
         chain_ids=chain_ids, trusted_for_delegate_call=trusted_for_delegate_call
     )
-    return pagination.serialize(
-        GenericPagination._get_url(request), contracts_page, count
-    )
+    return pagination.serialize(get_proxy_aware_url(request), contracts_page, count)
 
 
 @router.get(
@@ -95,6 +95,7 @@ async def list_all_contracts(
     - Paginated response containing contracts matching the address.
     """,
 )
+@cache_response(get_key_for_contract, PaginatedResponse[ContractsPublic])
 async def list_contracts(
     request: Request,
     address: Annotated[
@@ -126,6 +127,4 @@ async def list_contracts(
     contracts_page, count = await contracts_service.get_contracts(
         address=HexBytes(address), chain_ids=chain_ids
     )
-    return pagination.serialize(
-        GenericPagination._get_url(request), contracts_page, count
-    )
+    return pagination.serialize(get_proxy_aware_url(request), contracts_page, count)
