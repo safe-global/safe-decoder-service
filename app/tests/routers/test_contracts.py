@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 
 from ...config import settings
-from ...datasources.cache.redis import del_contract_key
+from ...datasources.cache.redis import del_contract_cache
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
@@ -45,7 +45,7 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["count"], 0)
 
         # Invalidate cache
-        del_contract_key(address_expected)
+        del_contract_cache(address_expected)
 
         # Should return cached response with count 0
         response = self.client.get(
@@ -64,7 +64,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.update()
 
         # Invalidate cache
-        del_contract_key(address_expected)
+        del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
@@ -97,7 +97,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.create()
 
         # Invalidate cache
-        del_contract_key(address_expected)
+        del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
@@ -116,7 +116,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.create()
 
         # Invalidate cache
-        del_contract_key(address_expected)
+        del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{contract_without_name}",

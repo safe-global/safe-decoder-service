@@ -16,7 +16,7 @@ def get_redis() -> Redis:
     return Redis.from_url(settings.REDIS_URL)
 
 
-def cache_contract_key_builder(address: str, **kwargs) -> str:
+def get_key_for_contract(address: str, **kwargs) -> str:
     """
     Build the Redis cache key for a contract by its address.
 
@@ -27,14 +27,14 @@ def cache_contract_key_builder(address: str, **kwargs) -> str:
     return f"contract:{address.lower()}"
 
 
-def del_contract_key(address: str):
+def del_contract_cache(address: str):
     """
     Delete the Redis cache entry for a specific contract by address.
 
     :param address: The contract address used to build the cache key.
     :return: None
     """
-    get_redis().unlink(cache_contract_key_builder(address))
+    get_redis().unlink(get_key_for_contract(address))
 
 
 def get_field_key(kwargs: dict) -> str:
@@ -49,7 +49,9 @@ def get_field_key(kwargs: dict) -> str:
     request = kwargs.get("request")
     url_path = ""
     if request:
-        url_path = str(get_proxy_aware_url(request))
+        url_path = str(get_proxy_aware_url(request)) if request else ""
+
+    # Add query parameters as part of key field except the request.
     cacheable_kwargs = {
         k: v for k, v in kwargs.items() if k != "request" and "request" not in k.lower()
     }
@@ -69,7 +71,7 @@ def cache_response(
     returned directly. Otherwise, the decorated function is called, and its response is
     validated and cached.
 
-    :param key_builder: Function that builds the Redis hash key from kwargs.
+    :param key_builder: Function that builds the Redis key from kwargs.
     :param model: Pydantic model used to validate and serialize the response.
     :param expire: Expiration time for the Redis key in seconds (default: 60).
     :return: The original or cached response.
