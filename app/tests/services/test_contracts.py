@@ -6,7 +6,6 @@ from app.tests.datasources.db.factory import contract_factory
 
 
 class TestContractService(AsyncDbTestCase):
-
     async def asyncSetUp(self):
         await super().asyncSetUp()
         pagination = GenericPagination(limit=None, offset=None)

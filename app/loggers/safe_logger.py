@@ -1,9 +1,9 @@
 import datetime
 import logging
 import traceback
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generator
 
 from pydantic.main import BaseModel
 
@@ -30,7 +30,7 @@ class ErrorInfo(BaseModel):
     exceptionInfo: str | None = None
 
 
-class TaskInfo(BaseModel):
+class TaskInfo(BaseModel):  # type: ignore
     name: str
     id: str
     kwargs: dict | None = None
@@ -90,9 +90,7 @@ class SafeJsonFormatter(logging.Formatter):
 
         json_log = JsonLog(
             level=record.levelname,
-            timestamp=datetime.datetime.fromtimestamp(
-                record.created, datetime.timezone.utc
-            ),
+            timestamp=datetime.datetime.fromtimestamp(record.created, datetime.UTC),
             context=f"{record.module}.{record.funcName}",
             message=record.getMessage(),
             contextMessage=(
@@ -109,7 +107,7 @@ _task_info: ContextVar["TaskInfo"] = ContextVar("task_info")
 
 
 @contextmanager
-def logging_task_context(task_message) -> Generator[None, None, None]:
+def logging_task_context(task_message) -> Generator[None]:
     """
     Set taskInfo ContextVar, at the end it will be removed.
     This context is designed to be retrieved during logs to get information about the task.

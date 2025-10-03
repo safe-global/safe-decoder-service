@@ -25,8 +25,11 @@ async def download_contract_command(address: str, chain_id: int):
     )
     if result:
         success("Success download contract metadata")
-        if proxy_implementation_address := contract_metadata_service.get_proxy_implementation_address(
-            contract_metadata
+        if (
+            proxy_implementation_address
+            := contract_metadata_service.get_proxy_implementation_address(
+                contract_metadata
+            )
         ):
             print("The contract is a proxy.")
             print(

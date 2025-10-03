@@ -31,6 +31,22 @@ class ContractSource(enum.Enum):
     SOURCIFY = "Sourcify"
     BLOCKSCOUT = "Blockscout"
 
+    @classmethod
+    def from_client(
+        cls,
+        client: AsyncEtherscanClientV2 | AsyncSourcifyClient | AsyncBlockscoutClient,
+    ) -> "ContractSource":
+        mapping = {
+            AsyncEtherscanClientV2: cls.ETHERSCAN,
+            AsyncSourcifyClient: cls.SOURCIFY,
+            AsyncBlockscoutClient: cls.BLOCKSCOUT,
+        }
+        client_type = type(client)
+        try:
+            return mapping[client_type]
+        except KeyError:
+            raise ValueError(f"Client not supported: {client_type.__name__}") from None
+
 
 @dataclass
 class EnhancedContractMetadata:
@@ -87,7 +103,7 @@ class ContractMetadataService:
             )
             return None
 
-    @cache
+    @cache  # noqa: B019
     def enabled_clients(
         self, chain_id: int
     ) -> list[AsyncEtherscanClientV2 | AsyncBlockscoutClient | AsyncSourcifyClient]:
@@ -103,26 +119,14 @@ class ContractMetadataService:
         )
         return [client for client in clients if client]
 
-    @staticmethod
-    @cache
-    def get_client_enum(
-        client: AsyncEtherscanClientV2 | AsyncSourcifyClient | AsyncBlockscoutClient,
-    ) -> ContractSource:
-        if isinstance(client, AsyncEtherscanClientV2):
-            return ContractSource.ETHERSCAN
-        if isinstance(client, AsyncSourcifyClient):
-            return ContractSource.SOURCIFY
-        if isinstance(client, AsyncBlockscoutClient):
-            return ContractSource.BLOCKSCOUT
-
     async def get_contract_metadata(
         self, contract_address: ChecksumAddress, chain_id: int
     ) -> EnhancedContractMetadata:
         """
         Get contract metadata from every enabled client
 
-        :param chain_id:
         :param contract_address: Contract address
+        :param chain_id:
         :return: Contract Metadata if found from any client, otherwise None
         """
         for client in self.enabled_clients(chain_id):
@@ -134,11 +138,11 @@ class ContractMetadataService:
                     return EnhancedContractMetadata(
                         address=contract_address,
                         metadata=contract_metadata,
-                        source=self.get_client_enum(client),
+                        source=ContractSource.from_client(client),
                         chain_id=chain_id,
                     )
 
-            except (IOError, EtherscanRateLimitError):
+            except (OSError, EtherscanRateLimitError):
                 logger.debug(
                     "Cannot get metadata for contract=%s on network=%s using client=%s",
                     contract_address,

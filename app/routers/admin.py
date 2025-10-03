@@ -2,7 +2,6 @@ import secrets
 from typing import cast
 
 from fastapi import FastAPI
-
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
@@ -17,7 +16,7 @@ from ..datasources.db.models import Contract
 class AdminAuth(AuthenticationBackend):
     async def login(self, request: Request) -> bool:
         form = await request.form()
-        username, password = form["username"], form["password"]
+        username, _password = form["username"], form["password"]
 
         # Validate username/password credentials
         if username == settings.ADMIN_USERNAME and settings.ADMIN_PASSWORD:

@@ -10,7 +10,6 @@ from app.services.safe_contracts_service import (
 
 
 class TestContractMetadataService(unittest.IsolatedAsyncioTestCase):
-
     def test_generate_safe_contract_display_name(self):
         test_cases = [
             ("GnosisSafe", "1.3.0", "Safe 1.3.0"),  # removes Gnosis, keeps Safe

@@ -7,7 +7,6 @@ from ...tests.datasources.db.async_db_test_case import AsyncDbTestCase
 
 
 class TestAbiService(AsyncDbTestCase):
-
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.abi_service = AbiService()

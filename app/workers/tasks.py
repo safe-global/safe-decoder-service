@@ -85,8 +85,11 @@ async def get_contract_metadata_task(
             else:
                 logger.info("Failed to download contract metadata")
 
-            if proxy_implementation_address := contract_metadata_service.get_proxy_implementation_address(
-                contract_metadata
+            if (
+                proxy_implementation_address
+                := contract_metadata_service.get_proxy_implementation_address(
+                    contract_metadata
+                )
             ):
                 logger.info(
                     "Adding task to download proxy implementation metadata with address %s",

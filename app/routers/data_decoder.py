@@ -1,8 +1,7 @@
 from typing import cast
 
-from fastapi import APIRouter, HTTPException
-
 from eth_typing import Address
+from fastapi import APIRouter, HTTPException
 
 from app.routers.models import (
     DataDecodedPublic,

@@ -62,7 +62,6 @@ from app.datasources.db.models import Abi, AbiSource
 
 
 class AbiService:
-
     def __init__(self):
         self.dummy_w3 = Web3()
 

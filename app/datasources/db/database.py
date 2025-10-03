@@ -1,9 +1,9 @@
 import logging
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import cache, wraps
-from typing import Generator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -49,7 +49,7 @@ def get_engine() -> AsyncEngine:
 @contextmanager
 def set_database_session_context(
     session_id: str | None = None,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """
     Set session ContextVar, at the end it will be removed.
     This context is designed to be used with `async_scoped_session` to define a context scope.

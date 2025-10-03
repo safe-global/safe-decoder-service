@@ -4,7 +4,6 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
-
 from starlette.datastructures import URL
 from starlette.requests import Request
 from starlette.responses import Response
@@ -163,7 +162,7 @@ async def http_request_middleware(request: Request, call_next):
     :param call_next:
     :return:
     """
-    start_time = datetime.datetime.now(datetime.timezone.utc)
+    start_time = datetime.datetime.now(datetime.UTC)
     with set_database_session_context():
         response: Response | None = None
         try:
@@ -174,7 +173,7 @@ async def http_request_middleware(request: Request, call_next):
             await db_session.remove()
             # Log request
             try:
-                end_time = datetime.datetime.now(datetime.timezone.utc)
+                end_time = datetime.datetime.now(datetime.UTC)
                 total_time = (
                     end_time - start_time
                 ).total_seconds() * 1000  # time in ms

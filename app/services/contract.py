@@ -3,7 +3,6 @@ from app.services.pagination import GenericPagination
 
 
 class ContractService:
-
     def __init__(self, pagination: GenericPagination):
         self.pagination = pagination
 

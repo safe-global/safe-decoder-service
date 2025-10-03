@@ -32,7 +32,6 @@ from ..mocks.contract_metadata_mocks import (
 
 
 class TestContractMetadataService(AsyncDbTestCase):
-
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )

@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-
 from hexbytes import HexBytes
 
 from ...config import settings
