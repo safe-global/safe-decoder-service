@@ -1,8 +1,9 @@
 import asyncio
 import datetime
 import logging
+from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any, AsyncIterator, NotRequired, TypedDict, Union, cast
+from typing import Any, NotRequired, TypedDict, Union, cast
 
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
@@ -112,19 +113,19 @@ class DataDecoderService:
             self.__class__.__name__,
             self.last_abi_created,
         )
-        self.fn_selectors_with_abis: dict[bytes, ABIFunction] = (
-            await self._generate_selectors_with_abis_from_abis(
-                await self.get_supported_abis()
-            )
+        self.fn_selectors_with_abis: dict[
+            bytes, ABIFunction
+        ] = await self._generate_selectors_with_abis_from_abis(
+            await self.get_supported_abis()
         )
         logger.info(
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
         self.multisend_abis: list[ABI] = [m async for m in self.get_multisend_abis()]
-        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = (
-            await self._generate_selectors_with_abis_from_abis(
-                self.get_multisend_abis()
-            )
+        self.multisend_fn_selectors_with_abis: dict[
+            bytes, ABIFunction
+        ] = await self._generate_selectors_with_abis_from_abis(
+            self.get_multisend_abis()
         )
         # lock_load_new_abis will avoid concurrent calls to load_new_abis
         self.lock_load_new_abis = asyncio.Lock()
@@ -289,7 +290,7 @@ class DataDecoderService:
             logger.warning("Cannot decode %s", to_0x_hex_str(data))
             raise UnexpectedProblemDecoding(data) from exc
 
-        return fn_abi["name"], list(zip(names, types, values))  # type: ignore
+        return fn_abi["name"], list(zip(names, types, values, strict=False))  # type: ignore
 
     async def decode_multisend_data(
         self, data: bytes | str, chain_id: int | None = None
@@ -443,10 +444,11 @@ class DataDecoderService:
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
         :raises: UnexpectedProblemDecoding if there's an unexpected problem decoding (it shouldn't happen)
         """
-        fn_name, decoded_transactions_with_types = (
-            await self.decode_transaction_with_types(
-                data, address=address, chain_id=chain_id
-            )
+        (
+            fn_name,
+            decoded_transactions_with_types,
+        ) = await self.decode_transaction_with_types(
+            data, address=address, chain_id=chain_id
         )
         decoded_transactions = {
             d["name"]: d["value"] for d in decoded_transactions_with_types
@@ -542,7 +544,7 @@ class DataDecoderService:
                 loaded_abis,
             )
             return loaded_abis
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.info(
                 "%s: Reloading of ABIs in progress by another request, not doing anything",
                 self.__class__.__name__,

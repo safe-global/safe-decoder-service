@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
-
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 

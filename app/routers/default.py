@@ -3,7 +3,6 @@ from typing import Literal
 from fastapi import APIRouter
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import RedirectResponse
-
 from starlette.requests import Request
 
 router = APIRouter()

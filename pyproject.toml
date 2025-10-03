@@ -1,0 +1,47 @@
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = [
+    ".tox", ".git", "*/migrations/*", "*/static/CACHE/*",
+    "docs", "node_modules", "venv"
+]
+
+[tool.ruff.lint]
+extend-select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = ["E501"]
+flake8-bugbear.extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.Query", "fastapi.params.Query"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+known-third-party = ["py_eth_sig_utils", "safe", "fastapi", "pydantic"]
+# src = ["src"]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+
+[tool.coverage.run]
+include = ["app/*"]
+omit = ["test_*"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  'if __name__ == "__main__":',
+  "if settings.DEBUG",
+  "^\\s*pass\\s*$",
+]

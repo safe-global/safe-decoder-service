@@ -1,6 +1,7 @@
 import logging
 from asyncio import AbstractEventLoop
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import aio_pika
 from aio_pika.abc import (
@@ -23,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class QueueProvider:
-
     _connection: AbstractRobustConnection | None
     _exchange: AbstractExchange | None
     _events_queue: AbstractQueue | None
@@ -50,7 +50,7 @@ class QueueProvider:
             )
             logger.info("Connected to RabbitMQ")
         except aio_pika.exceptions.AMQPConnectionError as e:
-            raise QueueProviderUnableToConnectException(e)
+            raise QueueProviderUnableToConnectException from e
 
         channel = await self._connection.channel()
         self._exchange = await channel.declare_exchange(

@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 
 from alembic import command
 from alembic.config import Config
@@ -12,7 +11,6 @@ from app.tests.datasources.db.async_db_test_case import AsyncDbTestCase
 
 
 class TestMigrations(AsyncDbTestCase):
-
     def setUp(self):
         super().setUp()
         self.alembic_config = Config("alembic.ini")
@@ -33,7 +31,6 @@ class TestMigrations(AsyncDbTestCase):
         previous_version = "66c1eb4456de"
         address = HexBytes("0x6eEF70Da339a98102a642969B3956DEa71A1096e")
         name = "Safe Contract"
-        now = datetime.datetime.now(datetime.timezone.utc)
         contract = await Contract(
             address=address, name=name, chain_id=1, trusted_for_delegate_call=True
         ).create()

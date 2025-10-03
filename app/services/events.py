@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class EventsService:
-
     def get_contracts_from_data(self, data: HexStr | None) -> set[ChecksumAddress]:
         """
         Extract contract addresses involved in the transaction from `data`.

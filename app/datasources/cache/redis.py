@@ -1,10 +1,10 @@
 import hashlib
 import json
+from collections.abc import Callable
 from functools import cache, wraps
-from typing import Callable, cast
+from typing import cast
 
 from pydantic import BaseModel
-
 from redis import Redis
 
 from ...config import settings

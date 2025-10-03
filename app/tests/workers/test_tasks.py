@@ -1,6 +1,7 @@
 import json
 import unittest
-from typing import Any, Awaitable
+from collections.abc import Awaitable
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -63,7 +64,6 @@ class TestTasks(unittest.TestCase):
 
 
 class TestAsyncTasks(AsyncDbTestCase):
-
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.worker = Worker(redis_broker, worker_threads=1)

@@ -1,8 +1,7 @@
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel
-
 from sqlalchemy import func
 from sqlmodel import select
 from starlette.datastructures import URL
@@ -12,7 +11,7 @@ from app.datasources.db.database import db_session
 T = TypeVar("T")
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     count: int
     next: str | None
     previous: str | None
@@ -85,7 +84,7 @@ class GenericPagination:
         )
         return count_query.scalars().one()
 
-    def serialize(self, url: URL, results: list[Any], count: int) -> PaginatedResponse:
+    def serialize(self, url: URL, results: list[T], count: int) -> PaginatedResponse:
         """
         Get serialized page of results.
 
@@ -94,7 +93,7 @@ class GenericPagination:
         :param count:
         :return:
         """
-        paginated_response = PaginatedResponse(
+        paginated_response = PaginatedResponse[T](
             count=count,
             next=self.get_next_page(url, count),
             previous=self.get_previous_page(url),

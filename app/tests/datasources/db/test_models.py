@@ -18,7 +18,6 @@ from .async_db_test_case import AsyncDbTestCase
 
 
 class TestModels(AsyncDbTestCase):
-
     @db_session_context
     async def test_contract(self):
         contract = Contract(
@@ -173,7 +172,7 @@ class TestModels(AsyncDbTestCase):
 
     @db_session_context
     async def test_abi_get_abi_newer_than(self):
-        initial_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        initial_datetime = datetime.datetime.now(tz=datetime.UTC)
         self.assertListEqual(
             [x async for x in Abi.get_abi_newer_than(initial_datetime)], []
         )
@@ -204,7 +203,7 @@ class TestModels(AsyncDbTestCase):
             [
                 x
                 async for x in Abi.get_abi_newer_than(
-                    datetime.datetime.now(tz=datetime.timezone.utc)
+                    datetime.datetime.now(tz=datetime.UTC)
                 )
             ],
             [],
@@ -291,19 +290,19 @@ class TestModels(AsyncDbTestCase):
         # Contracts with more retries shouldn't be returned
         expected_contract.fetch_retries = 1
         await expected_contract.update()
-        async for contract in Contract.get_contracts_without_abi(0):
+        async for _contract in Contract.get_contracts_without_abi(0):
             self.fail("Expected no contracts, but found one.")
 
         # Contracts with abi shouldn't be returned
         expected_contract.abi_id = abi.id
         await expected_contract.update()
-        async for contract in Contract.get_contracts_without_abi(10):
+        async for _contract in Contract.get_contracts_without_abi(10):
             self.fail("Expected no contracts, but found one.")
 
     @db_session_context
     async def test_get_proxy_contracts(self):
         # Test empty case
-        async for proxy_contract in Contract.get_proxy_contracts():
+        async for _proxy_contract in Contract.get_proxy_contracts():
             self.fail("Expected no proxies, but found one.")
 
         random_address = Account.create().address

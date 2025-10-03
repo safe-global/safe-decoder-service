@@ -1,8 +1,7 @@
 from typing import cast
 
-from fastapi.testclient import TestClient
-
 from eth_typing import ABIEvent, ABIFunction
+from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import get_empty_tx_params

@@ -1,10 +1,9 @@
 from datetime import datetime
 from typing import Any, Union
 
-from pydantic import Field, computed_field, field_validator, model_validator
-
 from eth_typing import HexStr
 from fastapi_camelcase import CamelModel
+from pydantic import Field, computed_field, field_validator, model_validator
 from safe_eth.eth.utils import (
     ChecksumAddress,
     fast_is_checksum_address,

@@ -1,5 +1,6 @@
 import datetime
-from typing import AsyncIterator, Self, cast
+from collections.abc import AsyncIterator
+from typing import Self, cast
 
 from eth_typing import ABI
 from sqlalchemy import DateTime, update
@@ -20,7 +21,6 @@ from .utils import get_md5_abi_hash
 
 
 class SqlQueryBase:
-
     @classmethod
     async def get_all(cls):
         result = await db_session.execute(select(cls))
@@ -46,18 +46,18 @@ class TimeStampedSQLModel(SQLModel):
     """
 
     created: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
+        default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),  # type: ignore
         index=True,
     )
 
     modified: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
+        default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),  # type: ignore
         sa_column_kwargs={
-            "onupdate": lambda: datetime.datetime.now(datetime.timezone.utc),
+            "onupdate": lambda: datetime.datetime.now(datetime.UTC),
         },
     )
 

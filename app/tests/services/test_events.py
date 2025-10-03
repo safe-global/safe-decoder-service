@@ -10,7 +10,6 @@ from app.tests.services.mocks_multisend import multisend_data
 
 
 class TestEventsService(unittest.TestCase):
-
     def test_get_contracts_from_data(self):
         events_service = EventsService()
         self.assertEqual(events_service.get_contracts_from_data(None), set())
