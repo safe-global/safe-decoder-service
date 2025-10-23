@@ -391,3 +391,21 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         result = await db_session.execute(query)
         await db_session.commit()
         return result.rowcount
+
+    @classmethod
+    async def remove_failed_contracts(cls, max_retries: int) -> int:
+        """
+        Remove contracts that have exceeded max_retries and don't have an ABI.
+
+        :param max_retries: Maximum number of retries allowed
+        :return: Number of contracts removed
+        """
+        # Delete matching rows and return number of rows deleted
+        delete_query = cls.__table__.delete().where(
+            cls.abi_id == None,  # noqa: E711
+            cls.fetch_retries > max_retries
+        )
+
+        result = await db_session.execute(delete_query)
+        await db_session.commit()
+        return result.rowcount

@@ -128,6 +128,16 @@ async def update_proxies_task():
             )
 
 
+@dramatiq.actor(periodic=cron("0 6 * * *"))  # Every day at 6 AM
+@db_session_context
+async def cleanup_failed_contracts_task():
+    """
+    Daily task to clean-up contracts that exceeded maximum retry attempts for ABI fetching
+    """
+    removed_count = await Contract.remove_failed_contracts(settings.CONTRACT_MAX_DOWNLOAD_RETRIES)
+    logger.info("Removed %d contracts that exceeded maximum retry attempts", removed_count)
+
+
 @dramatiq.actor(periodic=cron("0 * * * *"))  # Every hour
 @db_session_context
 async def update_safe_contracts_info_task():
