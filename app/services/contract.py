@@ -29,3 +29,29 @@ class ContractService:
         count = await self.pagination.get_count(query)
 
         return page, count
+
+    @staticmethod
+    async def get_or_create_contracts(
+            address: bytes,
+            chain_ids: list[int] | None = None,
+    ) -> list[tuple[Contract, bool]]:
+        """
+        Get existing contracts or create new ones for the given address and chain IDs.
+
+        :param address: Contract address
+        :param chain_ids: List of chain IDs to create contracts for. If None, no contracts are created
+        :return: List of tuples containing (Contract, was_created)
+        """
+        results = []
+
+        if not chain_ids:
+            return results
+
+        for chain_id in chain_ids:
+            contract, created = await Contract.get_or_create(
+                address,
+                chain_id,
+            )
+            results.append((contract, created))
+
+        return results
