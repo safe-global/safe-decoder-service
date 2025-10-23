@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from ..datasources.db.database import db_session_context
 from ..datasources.cache.redis import cache_response, get_key_for_contract
 from ..services.contract import ContractService
 from ..services.pagination import (
@@ -85,6 +86,7 @@ async def list_all_contracts(
     response_description="Paginated list of contracts matching the provided address",
     description="""
     Return a **paginated** list of contracts that match the provided **EIP-55 checksummed** address.
+    If contract doesn't exist, it will be created for future ABI processing.
 
     **Parameters:**
     - `address`: Contract address in checksum format (required).
@@ -95,6 +97,7 @@ async def list_all_contracts(
     """,
 )
 @cache_response(get_key_for_contract, PaginatedResponse[ContractsPublic])
+@db_session_context
 async def list_contracts(
     request: Request,
     address: Annotated[
@@ -121,9 +124,15 @@ async def list_contracts(
     if not fast_is_checksum_address(address):
         raise HTTPException(status_code=400, detail="Address is not checksummed")
 
+    hex_address = HexBytes(address)
     pagination = GenericPagination(pagination_params.limit, pagination_params.offset)
     contracts_service = ContractService(pagination=pagination)
     contracts_page, count = await contracts_service.get_contracts(
-        address=HexBytes(address), chain_ids=chain_ids
+        address=hex_address, chain_ids=chain_ids
     )
+
+    # Start contract creation in background without waiting
+    # noinspection PyAsyncCall
+    ContractService.get_or_create_contracts(address=hex_address, chain_ids=chain_ids)
+
     return pagination.serialize(get_proxy_aware_url(request), contracts_page, count)
