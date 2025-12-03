@@ -19,7 +19,7 @@ class AdminAuth(AuthenticationBackend):
         username, _password = form["username"], form["password"]
 
         # Validate username/password credentials
-        if username == settings.ADMIN_USERNAME and settings.ADMIN_PASSWORD:
+        if username == settings.ADMIN_USERNAME and _password == settings.ADMIN_PASSWORD:
             # And update session
             secret = secrets.token_hex(nbytes=16)
             request.session.update({"token": secret})
