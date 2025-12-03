@@ -5,6 +5,7 @@ Revises:
 Create Date: 2024-12-26 13:29:11.879091
 
 """
+# mypy: disable-error-code="attr-defined"
 
 from collections.abc import Sequence
 

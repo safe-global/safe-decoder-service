@@ -64,8 +64,11 @@ class TestContractMetadataService(unittest.IsolatedAsyncioTestCase):
         )
 
         mock_logger.info.assert_called_once_with(
-            "Updated contract with address: 0x9641d764fc13c8B624c04430C7356C1C7C8102e2 in 2 chains"
+            "Updated contract with address: %s in %d chains",
+            "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
+            2,
         )
         mock_logger.warning.assert_called_once_with(
-            "Could not find any contract with address: 0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
+            "Could not find any contract with address: %s",
+            "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526",
         )

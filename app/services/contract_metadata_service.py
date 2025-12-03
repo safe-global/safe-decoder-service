@@ -170,15 +170,24 @@ class ContractMetadataService:
         )
 
         if contract_metadata.metadata:
-            if contract_metadata.source:
-                source = await AbiSource.get_abi_source(
-                    name=contract_metadata.source.value
+            if not contract_metadata.source:
+                logging.error(
+                    "Cannot store ABI for %s: metadata present but source is missing",
+                    contract_metadata.address,
                 )
-                if source is None:
-                    logging.error(
-                        f"Abi source {contract_metadata.source.value} does not exist"
-                    )
-                    return False
+                contract.fetch_retries += 1
+                await contract.update()
+                return False
+
+            source = await AbiSource.get_abi_source(name=contract_metadata.source.value)
+            if source is None:
+                logging.error(
+                    "Abi source %s does not exist", contract_metadata.source.value
+                )
+                contract.fetch_retries += 1
+                await contract.update()
+                return False
+
             abi, _ = await Abi.get_or_create_abi(
                 abi_json=contract_metadata.metadata.abi,
                 source_id=source.id,
@@ -201,6 +210,9 @@ class ContractMetadataService:
         if contract_metadata.metadata and contract_metadata.metadata.implementation:
             return fast_to_checksum_address(contract_metadata.metadata.implementation)
         return None
+
+    # Cache TTL for should_attempt_download (1 day in seconds)
+    SHOULD_ATTEMPT_DOWNLOAD_CACHE_TTL = 24 * 60 * 60
 
     @staticmethod
     async def should_attempt_download(
@@ -229,7 +241,12 @@ class ContractMetadataService:
             )
 
             if contract and (contract.fetch_retries > max_retries or contract.abi_id):
-                redis.set(cache_key, 0)
+                # Cache with TTL so contracts can be retried after cache expires
+                redis.set(
+                    cache_key,
+                    0,
+                    ex=ContractMetadataService.SHOULD_ATTEMPT_DOWNLOAD_CACHE_TTL,
+                )
                 return False
 
             return True
