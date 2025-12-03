@@ -91,7 +91,7 @@ def db_session_context(func):
                 return await func(*args, **kwargs)
             finally:
                 logger.debug(
-                    f"Removing session context: {_get_database_session_context()}"
+                    "Removing session context: %s", _get_database_session_context()
                 )
                 await db_session.remove()
 

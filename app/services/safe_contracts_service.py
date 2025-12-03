@@ -63,9 +63,11 @@ async def update_safe_contracts_info() -> None:
         )
         if affected_rows:
             logger.info(
-                f"Updated contract with address: {contract_address} in {affected_rows} chains"
+                "Updated contract with address: %s in %d chains",
+                contract_address,
+                affected_rows,
             )
         else:
             logger.warning(
-                f"Could not find any contract with address: {contract_address}"
+                "Could not find any contract with address: %s", contract_address
             )

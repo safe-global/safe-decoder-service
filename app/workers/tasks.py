@@ -53,20 +53,20 @@ def task_to_test(message: str) -> None:
 
         async def task_to_test(message: str) -> None:
     """
-    logger.info(f"Message processed! -> {message}")
+    logger.info("Message processed! -> %s", message)
     return
 
 
 @dramatiq.actor
 @db_session_context
 async def get_contract_metadata_task(
-    address: str, chain_id: int, skip_attemp_download: bool = False
+    address: str, chain_id: int, skip_attempt_download: bool = False
 ):
     with logging_task_context(CurrentMessage.get_current_message()):
         contract_metadata_service = get_contract_metadata_service()
         # Just try the first time, following retries should be scheduled
         if (
-            skip_attemp_download
+            skip_attempt_download
             or await contract_metadata_service.should_attempt_download(
                 address, chain_id, 0
             )
@@ -112,7 +112,7 @@ async def get_missing_contract_metadata_task():
             get_contract_metadata_task.send(
                 address=to_0x_hex_str(contract.address),
                 chain_id=contract.chain_id,
-                skip_attemp_download=True,
+                skip_attempt_download=True,
             )
 
 
@@ -124,7 +124,7 @@ async def update_proxies_task():
             get_contract_metadata_task.send(
                 address=to_0x_hex_str(proxy_contract.address),
                 chain_id=proxy_contract.chain_id,
-                skip_attemp_download=True,
+                skip_attempt_download=True,
             )
 
 

@@ -68,7 +68,7 @@ class GenericPagination:
         :return:
         """
         queryset = await db_session.execute(query.offset(self.offset).limit(self.limit))
-        return queryset.scalars().all()
+        return list(queryset.scalars().all())
 
     async def get_count(self, query) -> int:
         """

@@ -137,11 +137,17 @@ class DataDecoderService:
         :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
-        return {
-            await asyncio.to_thread(function_abi_to_4byte_selector, fn_abi): fn_abi
-            for fn_abi in abi
-            if fn_abi["type"] == "function"
-        }
+        fn_abis = [fn_abi for fn_abi in abi if fn_abi["type"] == "function"]
+        if not fn_abis:
+            return {}
+
+        # Process all selectors in a single thread to avoid thread creation overhead
+        def generate_selectors():
+            return {
+                function_abi_to_4byte_selector(fn_abi): fn_abi for fn_abi in fn_abis
+            }
+
+        return await asyncio.to_thread(generate_selectors)
 
     async def _generate_selectors_with_abis_from_abis(
         self, abis: AsyncIterator[ABI]

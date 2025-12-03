@@ -167,8 +167,6 @@ async def http_request_middleware(request: Request, call_next):
         response: Response | None = None
         try:
             response = await call_next(request)
-        except Exception as e:
-            raise e
         finally:
             await db_session.remove()
             # Log request

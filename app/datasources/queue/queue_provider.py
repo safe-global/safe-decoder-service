@@ -56,13 +56,15 @@ class QueueProvider:
         self._exchange = await channel.declare_exchange(
             settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.FANOUT, durable=True
         )
-        logger.info(f"Connected to {settings.RABBITMQ_AMQP_EXCHANGE} exchange")
+        logger.info("Connected to %s exchange", settings.RABBITMQ_AMQP_EXCHANGE)
         self._events_queue = await channel.declare_queue(
             settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME, durable=True
         )
         if self._events_queue:
             await self._events_queue.bind(self._exchange)
-        logger.info(f"Reading from {settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME} queue")
+        logger.info(
+            "Reading from %s queue", settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME
+        )
 
     async def connect(self, loop: AbstractEventLoop) -> None:
         """
