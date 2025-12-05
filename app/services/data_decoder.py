@@ -292,8 +292,14 @@ class DataDecoderService:
                 [addresses_checksummed_normalizer], types, decoded
             )
             values = map(self._parse_decoded_arguments, normalized)
-        except (ValueError, DecodingError) as exc:
-            logger.warning("Cannot decode %s", to_0x_hex_str(data))
+        except (ValueError, DecodingError, ArithmeticError) as exc:
+            logger.warning(
+                "Cannot decode %s for address %s and chain-id %s",
+                to_0x_hex_str(data),
+                address,
+                chain_id,
+                exc_info=True,
+            )
             raise UnexpectedProblemDecoding(data) from exc
 
         return fn_abi["name"], list(zip(names, types, values, strict=False))  # type: ignore
