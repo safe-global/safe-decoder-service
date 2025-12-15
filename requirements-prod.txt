@@ -14,4 +14,4 @@ setuptools>=75.0.0
 sqladmin[full]==0.21.0
 sqlmodel==0.0.27
 uvicorn-worker==0.4.0
-web3==7.13.0
+web3==7.14.0
