@@ -273,6 +273,23 @@ class TestRouterContract(AsyncDbTestCase):
             untrusted_contract_next_chain.chain_id,
         )
 
+        # Test with large chain_id (> int32 max value)
+        large_chain_id = 3735928814
+        await contract_factory(
+            address="0x0000000000000000000000000000000000000002",
+            chain_id=large_chain_id,
+        )
+        response = self.client.get(
+            f"/api/v1/contracts/?chain_ids={large_chain_id}",
+        )
+        response_json = response.json()
+        self.assertEqual(response_json["count"], 1)
+        self.assertEqual(
+            response_json["results"][0]["address"],
+            "0x0000000000000000000000000000000000000002",
+        )
+        self.assertEqual(response_json["results"][0]["chainId"], large_chain_id)
+
     @db_session_context
     async def test_contracts_pagination_with_proxied_host_and_prefix(self):
         source = AbiSource(name="Etherscan", url="https://api.etherscan.io/api")

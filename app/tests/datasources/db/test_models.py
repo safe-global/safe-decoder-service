@@ -27,6 +27,16 @@ class TestModels(AsyncDbTestCase):
         result = await contract.get_all()
         self.assertEqual(result[0], contract)
 
+        # Test with large chain_id (> int32 max value)
+        large_chain_id = 3735928814
+        large_chain_contract = Contract(
+            address=b"b", name="Large chain test", chain_id=large_chain_id
+        )
+        await large_chain_contract.create()
+        retrieved = await Contract.get_contract(b"b", large_chain_id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.chain_id, large_chain_id)
+
     @db_session_context
     async def test_get_contracts_query(self):
         address = b"a"
