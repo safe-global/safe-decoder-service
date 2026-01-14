@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import CursorResult, DateTime, update
+from sqlalchemy import BigInteger, CursorResult, DateTime, update
 from sqlmodel import (
     JSON,
     Column,
@@ -230,7 +230,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     project: Project | None = Relationship(
         back_populates="contracts", sa_relationship_kwargs={"lazy": "joined"}
     )
-    chain_id: int = Field(default=None)
+    chain_id: int = Field(default=None, sa_type=BigInteger)
 
     @classmethod
     def get_contracts_query(
