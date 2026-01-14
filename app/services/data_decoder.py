@@ -302,7 +302,7 @@ class DataDecoderService:
             )
             raise UnexpectedProblemDecoding(data) from exc
 
-        return fn_abi["name"], list(zip(names, types, values, strict=False))  # type: ignore
+        return fn_abi["name"], list(zip(names, types, values, strict=False))
 
     async def decode_multisend_data(
         self, data: bytes | str, chain_id: int | None = None

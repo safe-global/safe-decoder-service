@@ -7,3 +7,5 @@ mypy
 pre-commit
 pytest
 pytest-asyncio
+sqlalchemy[mypy]
+types-setuptools

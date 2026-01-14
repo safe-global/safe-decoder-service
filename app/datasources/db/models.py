@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import CursorResult, DateTime, update
+from sqlalchemy import DateTime, update
 from sqlmodel import (
     JSON,
     Column,
@@ -388,6 +388,6 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
                 trusted_for_delegate_call=trusted_for_delegate_call,
             )
         )
-        result = cast(CursorResult, await db_session.execute(query))
+        result = await db_session.execute(query)
         await db_session.commit()
         return result.rowcount
