@@ -115,9 +115,9 @@ class QueueProvider:
 
             :param message: The incoming RabbitMQ message.
             """
-            await message.ack()
             body = message.body
             if body:
                 callback(body.decode("utf-8"))
+            await message.ack()
 
         return await self._events_queue.consume(wrapped_callback)
