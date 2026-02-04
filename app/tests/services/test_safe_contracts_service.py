@@ -113,3 +113,55 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
 
         self.assertIs(service1, service2)
         self.assertIn(5, service1._chain_exists_cache)
+
+    @db_session_context
+    async def test_create_safe_contracts_for_new_chain(self):
+        from app.config import settings
+        from app.datasources.db.models import Contract
+
+        new_chain_id = 100
+
+        is_new = await self.service.is_new_chain(new_chain_id)
+        self.assertTrue(is_new)
+
+        deployments = self.service._get_default_deployments_by_version()
+        expected_count = len(deployments)
+
+        created_count = await self.service.create_safe_contracts_for_new_chain(
+            new_chain_id
+        )
+
+        self.assertEqual(created_count, expected_count)
+
+        for version, contract_name, contract_address in deployments:
+            contract = await Contract.get_contract(
+                address=HexBytes(contract_address), chain_id=new_chain_id
+            )
+            self.assertIsNotNone(contract, f"Contract {contract_name} not found")
+            self.assertEqual(contract.name, contract_name)
+            self.assertIsNotNone(contract.display_name)
+            expected_display_name = self.service._generate_safe_contract_display_name(
+                contract_name, version
+            )
+            self.assertEqual(contract.display_name, expected_display_name)
+            expected_trusted = (
+                contract_name in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL
+            )
+            self.assertEqual(contract.trusted_for_delegate_call, expected_trusted)
+
+        is_new_after = await self.service.is_new_chain(new_chain_id)
+        self.assertFalse(is_new_after)
+
+    @db_session_context
+    async def test_create_safe_contracts_for_existing_chain(self):
+        existing_chain_id = 1
+        await contract_factory(chain_id=existing_chain_id)
+
+        is_new = await self.service.is_new_chain(existing_chain_id)
+        self.assertFalse(is_new)
+
+        created_count = await self.service.create_safe_contracts_for_new_chain(
+            existing_chain_id
+        )
+
+        self.assertEqual(created_count, 0)

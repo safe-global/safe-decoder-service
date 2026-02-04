@@ -14,8 +14,8 @@ class SafeContractsService:
     def __init__(self):
         self._chain_exists_cache: set[int] = set()
 
-    @cache
     @staticmethod
+    @cache
     def _get_default_deployments_by_version() -> list[tuple[str, str, str]]:
         """
         Get the default deployments by version that are inserted on database.
