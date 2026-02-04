@@ -384,3 +384,32 @@ class TestModels(AsyncDbTestCase):
             self.assertEqual(updated_contract.name, contract_name)
             self.assertEqual(updated_contract.display_name, contract_display_name)
             self.assertTrue(updated_contract.trusted_for_delegate_call)
+
+    @db_session_context
+    async def test_get_chain_exists(self):
+        # Test when no contracts exist for chain_id
+        chain_id_non_existent = 999
+        exists = await Contract.get_chain_exists(chain_id_non_existent)
+        self.assertFalse(exists)
+
+        # Create a contract for chain_id 1
+        contract = Contract(address=b"test_address", name="Test Contract", chain_id=1)
+        await contract.create()
+
+        # Test when contract exists for chain_id
+        exists = await Contract.get_chain_exists(1)
+        self.assertTrue(exists)
+
+        # Test when no contracts exist for a different chain_id
+        exists = await Contract.get_chain_exists(2)
+        self.assertFalse(exists)
+
+        # Create another contract for the same chain_id
+        contract2 = Contract(
+            address=b"test_address_2", name="Test Contract 2", chain_id=1
+        )
+        await contract2.create()
+
+        # Should still return True when multiple contracts exist
+        exists = await Contract.get_chain_exists(1)
+        self.assertTrue(exists)

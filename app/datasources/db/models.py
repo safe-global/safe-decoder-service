@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import BigInteger, CursorResult, DateTime, update
+from sqlalchemy import BigInteger, DateTime, exists, update
 from sqlmodel import (
     JSON,
     Column,
@@ -388,6 +388,21 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
                 trusted_for_delegate_call=trusted_for_delegate_call,
             )
         )
-        result = cast(CursorResult, await db_session.execute(query))
+        result = await db_session.execute(query)
         await db_session.commit()
         return result.rowcount
+
+    @classmethod
+    async def get_chain_exists(cls, chain_id: int) -> bool:
+        """
+        Check if any contract exists for the given chain_id.
+
+        Args:
+            chain_id: The chain ID to check for existence.
+
+        Returns:
+            True if at least one contract exists for the given chain_id, False otherwise.
+        """
+        query = select(exists(select(cls.id).where(cls.chain_id == chain_id)))
+        result = await db_session.execute(query)
+        return bool(result.scalar())
