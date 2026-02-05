@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import BigInteger, DateTime, exists, update
+from sqlalchemy import BigInteger, DateTime, func, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
@@ -306,6 +306,9 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         except IntegrityError:
             await db_session.rollback()
             contract = await cls.get_contract(address, chain_id)
+            if contract is None:
+                raise
+
             return contract, False
 
     @classmethod
@@ -399,21 +402,24 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def exists_safe_contracts(cls, chain_id: int, addresses: set[bytes]) -> bool:
         """
-        Check if any Safe contracts exist for the given chain_id.
+        Check if all Safe contracts exist for the given chain_id.
 
         Args:
             chain_id: The chain ID to check.
             addresses: Set of Safe contract addresses to check.
 
         Returns:
-            True if at least one Safe contract exists for the chain, False otherwise.
+            True if all Safe contracts exist for the chain, False otherwise.
         """
-        query = select(
-            exists(
-                select(cls.id)
-                .where(cls.chain_id == chain_id)
-                .where(col(cls.address).in_(addresses))
-            )
+        if not addresses:
+            return False
+
+        query = (
+            select(func.count())
+            .select_from(cls)
+            .where(cls.chain_id == chain_id)
+            .where(col(cls.address).in_(addresses))
         )
         result = await db_session.execute(query)
-        return bool(result.scalar())
+        count = result.scalar()
+        return count == len(addresses)

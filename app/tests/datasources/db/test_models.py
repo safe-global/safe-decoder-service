@@ -395,8 +395,29 @@ class TestModels(AsyncDbTestCase):
         )
         self.assertFalse(exists)
 
-        contract = Contract(address=b"safe_address_1", name="Safe Contract", chain_id=1)
-        await contract.create()
+        exists = await Contract.exists_safe_contracts(1, set())
+        self.assertFalse(exists)
+
+        contract1 = Contract(
+            address=b"safe_address_1", name="Safe Contract 1", chain_id=1
+        )
+        await contract1.create()
+
+        exists = await Contract.exists_safe_contracts(1, safe_addresses)
+        self.assertFalse(exists)
+
+        contract2 = Contract(
+            address=b"safe_address_2", name="Safe Contract 2", chain_id=1
+        )
+        await contract2.create()
+
+        exists = await Contract.exists_safe_contracts(1, safe_addresses)
+        self.assertFalse(exists)
+
+        contract3 = Contract(
+            address=b"safe_address_3", name="Safe Contract 3", chain_id=1
+        )
+        await contract3.create()
 
         exists = await Contract.exists_safe_contracts(1, safe_addresses)
         self.assertTrue(exists)

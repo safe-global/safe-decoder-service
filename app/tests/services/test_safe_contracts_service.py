@@ -98,6 +98,23 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
         self.assertFalse(exists)
 
     @db_session_context
+    async def test_safe_contracts_exist_partial(self):
+        from hexbytes import HexBytes
+
+        deployments = self.service._get_default_deployments_by_version()
+        chain_id = 100
+
+        _, first_contract_name, first_address = deployments[0]
+        await Contract(
+            address=HexBytes(first_address),
+            chain_id=chain_id,
+            name=first_contract_name,
+        ).create()
+
+        exists = await self.service.safe_contracts_exist(chain_id)
+        self.assertFalse(exists)
+
+    @db_session_context
     async def test_safe_contracts_exist_singleton_cache_shared(self):
         await self.service.create_safe_contracts(chain_id=5)
 

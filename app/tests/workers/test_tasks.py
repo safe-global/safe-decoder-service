@@ -192,6 +192,10 @@ class TestAsyncTasks(AsyncDbTestCase):
         )
         self.assertFalse(exists_before)
 
+        lock_key = f"lock:create_safe_contracts:{new_chain_id}"
+        redis = get_redis()
+        redis.delete(lock_key)
+
         create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
         self._wait_tasks_execution()
 
@@ -215,3 +219,22 @@ class TestAsyncTasks(AsyncDbTestCase):
             new_chain_id, safe_addresses
         )
         self.assertTrue(exists_after)
+
+        self.assertFalse(redis.exists(lock_key))
+
+    @db_session_context
+    async def test_create_safe_contracts_task_with_lock_held(self):
+        new_chain_id = 888
+        lock_key = f"lock:create_safe_contracts:{new_chain_id}"
+        redis = get_redis()
+
+        redis.set(lock_key, "1", ex=300)
+
+        create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
+        self._wait_tasks_execution()
+
+        contracts = await Contract.get_all()
+        chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]
+        self.assertEqual(len(chain_contracts), 0)
+
+        redis.delete(lock_key)
