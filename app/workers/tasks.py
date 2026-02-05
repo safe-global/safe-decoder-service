@@ -140,6 +140,6 @@ async def update_safe_contracts_info_task():
 async def create_safe_contracts_task_for_new_chains(chain_id: int):
     with logging_task_context(CurrentMessage.get_current_message()):
         safe_contract_service = get_safe_contract_service()
-        if await safe_contract_service.is_new_chain(chain_id):
-            logger.info("New chain %d detected adding contracts", chain_id)
+        if not await safe_contract_service.safe_contracts_exist(chain_id):
+            logger.info("Creating Safe contracts for chain %d", chain_id)
             await safe_contract_service.create_safe_contracts(chain_id=chain_id)

@@ -10,14 +10,13 @@ from app.services.safe_contracts_service import (
     get_safe_contract_service,
 )
 from app.tests.datasources.db.async_db_test_case import AsyncDbTestCase
-from app.tests.datasources.db.factory import contract_factory
 
 
 class TestSafeContractsServiceIntegration(AsyncDbTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.service = get_safe_contract_service()
-        self.service._chain_exists_cache.clear()
+        self.service._safe_contracts_cache.clear()
 
     def test_generate_safe_contract_display_name(self):
         service = SafeContractsService()
@@ -83,35 +82,35 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
         )
 
     @db_session_context
-    async def test_is_new_chain(self):
-        is_new = await self.service.is_new_chain(999)
-        self.assertTrue(is_new)
+    async def test_safe_contracts_exist(self):
+        exists = await self.service.safe_contracts_exist(999)
+        self.assertFalse(exists)
 
-        await contract_factory(chain_id=1)
+        await self.service.create_safe_contracts(chain_id=1)
 
-        is_new = await self.service.is_new_chain(1)
-        self.assertFalse(is_new)
+        exists = await self.service.safe_contracts_exist(1)
+        self.assertTrue(exists)
 
-        is_new = await self.service.is_new_chain(1)
-        self.assertFalse(is_new)
+        exists = await self.service.safe_contracts_exist(1)
+        self.assertTrue(exists)
 
-        is_new = await self.service.is_new_chain(999)
-        self.assertTrue(is_new)
+        exists = await self.service.safe_contracts_exist(999)
+        self.assertFalse(exists)
 
     @db_session_context
-    async def test_is_new_chain_singleton_cache_shared(self):
-        await contract_factory(chain_id=5)
+    async def test_safe_contracts_exist_singleton_cache_shared(self):
+        await self.service.create_safe_contracts(chain_id=5)
 
         service1 = get_safe_contract_service()
-        is_new = await service1.is_new_chain(5)
-        self.assertFalse(is_new)
+        exists = await service1.safe_contracts_exist(5)
+        self.assertTrue(exists)
 
         service2 = get_safe_contract_service()
-        is_new = await service2.is_new_chain(5)
-        self.assertFalse(is_new)
+        exists = await service2.safe_contracts_exist(5)
+        self.assertTrue(exists)
 
         self.assertIs(service1, service2)
-        self.assertIn(5, service1._chain_exists_cache)
+        self.assertIn(5, service1._safe_contracts_cache)
 
     @db_session_context
     async def test_create_safe_contracts(self):

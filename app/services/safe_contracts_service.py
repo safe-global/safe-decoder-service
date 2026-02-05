@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class SafeContractsService:
     def __init__(self):
-        self._chain_exists_cache: set[int] = set()
+        self._safe_contracts_cache: set[int] = set()
 
     @staticmethod
     @cache
@@ -46,29 +46,29 @@ class SafeContractsService:
         else:
             return f"{contract_name} {version}"
 
-    async def is_new_chain(self, chain_id: int) -> bool:
+    async def safe_contracts_exist(self, chain_id: int) -> bool:
         """
-        Check if the given chain_id is new (has no contracts yet).
-
-        Results are cached when the chain is not new, as once a chain has contracts,
-        it will always have contracts (they are never deleted).
+        Check if Safe contracts exist for the given chain_id.
 
         Args:
             chain_id: The chain ID to check.
 
         Returns:
-            True if the chain is new (no contracts exist), False if contracts already exist.
+            True if Safe contracts exist, False otherwise.
         """
-        if chain_id in self._chain_exists_cache:
-            return False
+        if chain_id in self._safe_contracts_cache:
+            return True
 
-        exists = await Contract.get_chain_exists(chain_id)
+        safe_addresses: set[bytes] = {
+            HexBytes(address)
+            for _, _, address in self._get_default_deployments_by_version()
+        }
+        exists = await Contract.exists_safe_contracts(chain_id, safe_addresses)
 
         if exists:
-            self._chain_exists_cache.add(chain_id)
-            return False
+            self._safe_contracts_cache.add(chain_id)
 
-        return True
+        return exists
 
     async def create_safe_contracts(self, chain_id: int) -> int:
         """

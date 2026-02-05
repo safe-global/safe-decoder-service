@@ -386,30 +386,31 @@ class TestModels(AsyncDbTestCase):
             self.assertTrue(updated_contract.trusted_for_delegate_call)
 
     @db_session_context
-    async def test_get_chain_exists(self):
-        # Test when no contracts exist for chain_id
+    async def test_exists_safe_contracts(self):
+        safe_addresses = {b"safe_address_1", b"safe_address_2", b"safe_address_3"}
         chain_id_non_existent = 999
-        exists = await Contract.get_chain_exists(chain_id_non_existent)
+
+        exists = await Contract.exists_safe_contracts(
+            chain_id_non_existent, safe_addresses
+        )
         self.assertFalse(exists)
 
-        # Create a contract for chain_id 1
-        contract = Contract(address=b"test_address", name="Test Contract", chain_id=1)
+        contract = Contract(address=b"safe_address_1", name="Safe Contract", chain_id=1)
         await contract.create()
 
-        # Test when contract exists for chain_id
-        exists = await Contract.get_chain_exists(1)
+        exists = await Contract.exists_safe_contracts(1, safe_addresses)
         self.assertTrue(exists)
 
-        # Test when no contracts exist for a different chain_id
-        exists = await Contract.get_chain_exists(2)
+        exists = await Contract.exists_safe_contracts(2, safe_addresses)
         self.assertFalse(exists)
 
-        # Create another contract for the same chain_id
-        contract2 = Contract(
-            address=b"test_address_2", name="Test Contract 2", chain_id=1
+        other_contract = Contract(
+            address=b"other_address", name="Other Contract", chain_id=1
         )
-        await contract2.create()
+        await other_contract.create()
 
-        # Should still return True when multiple contracts exist
-        exists = await Contract.get_chain_exists(1)
+        exists = await Contract.exists_safe_contracts(1, safe_addresses)
         self.assertTrue(exists)
+
+        exists = await Contract.exists_safe_contracts(1, {b"non_existent_address"})
+        self.assertFalse(exists)

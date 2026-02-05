@@ -181,11 +181,16 @@ class TestAsyncTasks(AsyncDbTestCase):
 
         new_chain_id = 999
 
-        is_new = await Contract.get_chain_exists(new_chain_id)
-        self.assertFalse(is_new)
-
         deployments = SafeContractsService._get_default_deployments_by_version()
         expected_count = len(deployments)
+        safe_addresses: set[bytes] = {
+            HexBytes(address) for _, _, address in deployments
+        }
+
+        exists_before = await Contract.exists_safe_contracts(
+            new_chain_id, safe_addresses
+        )
+        self.assertFalse(exists_before)
 
         create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
         self._wait_tasks_execution()
@@ -206,5 +211,7 @@ class TestAsyncTasks(AsyncDbTestCase):
             )
             self.assertEqual(contract.trusted_for_delegate_call, expected_trusted)
 
-        is_new_after = await Contract.get_chain_exists(new_chain_id)
-        self.assertTrue(is_new_after)
+        exists_after = await Contract.exists_safe_contracts(
+            new_chain_id, safe_addresses
+        )
+        self.assertTrue(exists_after)

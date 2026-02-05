@@ -4,6 +4,7 @@ from typing import Self, cast
 
 from eth_typing import ABI
 from sqlalchemy import BigInteger, DateTime, exists, update
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
     JSON,
     Column,
@@ -286,6 +287,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     ) -> tuple["Contract", bool]:
         """
         Update or create the given params.
+        Handles concurrent inserts gracefully by catching IntegrityError.
 
         :param address:
         :param chain_id:
@@ -293,16 +295,17 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: A tuple containing the Contract object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        if contract := await cls.get_contract(address, chain_id):
-            return contract, False
-        else:
-            contract = cls(address=address, chain_id=chain_id)
-            # Add optional fields
-            for key, value in kwargs.items():
-                setattr(contract, key, value)
+        contract = cls(address=address, chain_id=chain_id)
+        for key, value in kwargs.items():
+            setattr(contract, key, value)
 
+        try:
             await contract.create()
             return contract, True
+        except IntegrityError:
+            await db_session.rollback()
+            contract = await cls.get_contract(address, chain_id)
+            return contract, False
 
     @classmethod
     async def get_abi_by_contract_address(
@@ -393,16 +396,23 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return result.rowcount
 
     @classmethod
-    async def get_chain_exists(cls, chain_id: int) -> bool:
+    async def exists_safe_contracts(cls, chain_id: int, addresses: set[bytes]) -> bool:
         """
-        Check if any contract exists for the given chain_id.
+        Check if any Safe contracts exist for the given chain_id.
 
         Args:
-            chain_id: The chain ID to check for existence.
+            chain_id: The chain ID to check.
+            addresses: Set of Safe contract addresses to check.
 
         Returns:
-            True if at least one contract exists for the given chain_id, False otherwise.
+            True if at least one Safe contract exists for the chain, False otherwise.
         """
-        query = select(exists(select(cls.id).where(cls.chain_id == chain_id)))
+        query = select(
+            exists(
+                select(cls.id)
+                .where(cls.chain_id == chain_id)
+                .where(col(cls.address).in_(addresses))
+            )
+        )
         result = await db_session.execute(query)
         return bool(result.scalar())
