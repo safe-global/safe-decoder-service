@@ -6,7 +6,10 @@ from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 
-from ..workers.tasks import get_contract_metadata_task
+from ..workers.tasks import (
+    create_safe_contracts_task_for_new_chains,
+    get_contract_metadata_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +48,8 @@ class EventsService:
                     contracts_from_data: set[ChecksumAddress] = (
                         self.get_contracts_from_data(data)
                     )
-
+                    # Create missing Safe contract if is a new chain
+                    create_safe_contracts_task_for_new_chains.send(chain_id=chain_id)
                     for contract_address in {to, *contracts_from_data}:
                         get_contract_metadata_task.send(
                             address=contract_address, chain_id=chain_id

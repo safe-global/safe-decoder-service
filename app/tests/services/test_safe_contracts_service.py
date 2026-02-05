@@ -1,9 +1,10 @@
-import unittest
 from unittest.mock import AsyncMock, patch
 
 from hexbytes import HexBytes
 
+from app.config import settings
 from app.datasources.db.database import db_session_context
+from app.datasources.db.models import Contract
 from app.services.safe_contracts_service import (
     SafeContractsService,
     get_safe_contract_service,
@@ -12,7 +13,12 @@ from app.tests.datasources.db.async_db_test_case import AsyncDbTestCase
 from app.tests.datasources.db.factory import contract_factory
 
 
-class TestSafeContractsService(unittest.IsolatedAsyncioTestCase):
+class TestSafeContractsServiceIntegration(AsyncDbTestCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.service = get_safe_contract_service()
+        self.service._chain_exists_cache.clear()
+
     def test_generate_safe_contract_display_name(self):
         service = SafeContractsService()
         test_cases = [
@@ -76,13 +82,6 @@ class TestSafeContractsService(unittest.IsolatedAsyncioTestCase):
             "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526",
         )
 
-
-class TestSafeContractsServiceIntegration(AsyncDbTestCase):
-    async def asyncSetUp(self):
-        await super().asyncSetUp()
-        self.service = get_safe_contract_service()
-        self.service._chain_exists_cache.clear()
-
     @db_session_context
     async def test_is_new_chain(self):
         is_new = await self.service.is_new_chain(999)
@@ -115,21 +114,13 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
         self.assertIn(5, service1._chain_exists_cache)
 
     @db_session_context
-    async def test_create_safe_contracts_for_new_chain(self):
-        from app.config import settings
-        from app.datasources.db.models import Contract
-
+    async def test_create_safe_contracts(self):
         new_chain_id = 100
-
-        is_new = await self.service.is_new_chain(new_chain_id)
-        self.assertTrue(is_new)
 
         deployments = self.service._get_default_deployments_by_version()
         expected_count = len(deployments)
 
-        created_count = await self.service.create_safe_contracts_for_new_chain(
-            new_chain_id
-        )
+        created_count = await self.service.create_safe_contracts(new_chain_id)
 
         self.assertEqual(created_count, expected_count)
 
@@ -149,19 +140,6 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
             )
             self.assertEqual(contract.trusted_for_delegate_call, expected_trusted)
 
-        is_new_after = await self.service.is_new_chain(new_chain_id)
-        self.assertFalse(is_new_after)
-
-    @db_session_context
-    async def test_create_safe_contracts_for_existing_chain(self):
-        existing_chain_id = 1
-        await contract_factory(chain_id=existing_chain_id)
-
-        is_new = await self.service.is_new_chain(existing_chain_id)
-        self.assertFalse(is_new)
-
-        created_count = await self.service.create_safe_contracts_for_new_chain(
-            existing_chain_id
-        )
-
-        self.assertEqual(created_count, 0)
+        # Try to create again should return 0
+        created_count = await self.service.create_safe_contracts(new_chain_id)
+        assert created_count == 0

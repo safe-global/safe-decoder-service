@@ -133,3 +133,13 @@ async def update_proxies_task():
 async def update_safe_contracts_info_task():
     with logging_task_context(CurrentMessage.get_current_message()):
         await get_safe_contract_service().update_safe_contracts_info()
+
+
+@dramatiq.actor
+@db_session_context
+async def create_safe_contracts_task_for_new_chains(chain_id: int):
+    with logging_task_context(CurrentMessage.get_current_message()):
+        safe_contract_service = get_safe_contract_service()
+        if await safe_contract_service.is_new_chain(chain_id):
+            logger.info("New chain %d detected adding contracts", chain_id)
+            await safe_contract_service.create_safe_contracts(chain_id=chain_id)

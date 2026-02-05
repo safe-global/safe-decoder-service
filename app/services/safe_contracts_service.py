@@ -70,22 +70,16 @@ class SafeContractsService:
 
         return True
 
-    async def create_safe_contracts_for_new_chain(self, chain_id: int) -> int:
+    async def create_safe_contracts(self, chain_id: int) -> int:
         """
-        Create Safe contracts for a new chain if it doesn't exist yet.
+        Create Safe contracts
 
         Args:
-            chain_id: The chain ID to check and create contracts for.
+            chain_id: The chain ID to create contracts for.
 
         Returns:
             Number of contracts created, 0 if chain already exists.
         """
-        if not await self.is_new_chain(chain_id):
-            logger.debug(
-                "Chain %d already exists, skipping Safe contract creation", chain_id
-            )
-            return 0
-
         created_count = 0
         for (
             version,
@@ -114,7 +108,7 @@ class SafeContractsService:
 
         if created_count:
             logger.info(
-                "Created %d Safe contracts for new chain %d", created_count, chain_id
+                "Created %d Safe contracts for chain %d", created_count, chain_id
             )
 
         return created_count
