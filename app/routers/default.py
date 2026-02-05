@@ -24,12 +24,12 @@ async def swagger_ui_html() -> RedirectResponse:
 
 
 @router.get("/redoc", include_in_schema=False)
-async def redoc_html():
+async def redoc_html(req: Request):
+    forwarded_prefix = req.headers.get("x-forwarded-prefix", "")
     return get_redoc_html(
-        openapi_url="/openapi.json",
+        openapi_url=f"{forwarded_prefix}/openapi.json",
         title="Safe Decoder Service - ReDoc",
-        redoc_js_url="https://unpkg.com/redoc@next/bundles/redoc.standalone.js",
-        redoc_favicon_url="/static/favicon.ico",
+        redoc_favicon_url=f"{forwarded_prefix}/static/favicon.ico",
     )
 
 
