@@ -117,7 +117,7 @@ class QueueProvider:
             """
             body = message.body
             if body:
-                callback(body.decode("utf-8"))
+                await callback(body.decode("utf-8"))
             await message.ack()
 
         return await self._events_queue.consume(wrapped_callback)

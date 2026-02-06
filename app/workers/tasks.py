@@ -151,8 +151,7 @@ async def create_safe_contracts_task_for_new_chains(chain_id: int):
 
         try:
             safe_contract_service = get_safe_contract_service()
-            if not await safe_contract_service.safe_contracts_exist(chain_id):
-                logger.info("Creating Safe contracts for chain %d", chain_id)
-                await safe_contract_service.create_safe_contracts(chain_id=chain_id)
+            logger.info("Creating Safe contracts for chain %d", chain_id)
+            await safe_contract_service.create_safe_contracts(chain_id=chain_id)
         finally:
             redis.delete(lock_key)

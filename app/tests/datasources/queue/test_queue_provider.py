@@ -45,7 +45,7 @@ class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
 
         received_messages = []
 
-        def callback(message: str):
+        async def callback(message: str):
             received_messages.append(message)
 
         await self.provider.consume(callback)
