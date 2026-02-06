@@ -3,7 +3,9 @@ from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import BigInteger, CursorResult, DateTime, update
+from sqlalchemy import BigInteger, DateTime, func, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
     JSON,
     Column,
@@ -286,6 +288,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     ) -> tuple["Contract", bool]:
         """
         Update or create the given params.
+        Handles concurrent inserts gracefully by catching IntegrityError.
 
         :param address:
         :param chain_id:
@@ -293,16 +296,20 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: A tuple containing the Contract object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        if contract := await cls.get_contract(address, chain_id):
-            return contract, False
-        else:
-            contract = cls(address=address, chain_id=chain_id)
-            # Add optional fields
-            for key, value in kwargs.items():
-                setattr(contract, key, value)
+        contract = cls(address=address, chain_id=chain_id)
+        for key, value in kwargs.items():
+            setattr(contract, key, value)
 
+        try:
             await contract.create()
             return contract, True
+        except IntegrityError:
+            await db_session.rollback()
+            contract = await cls.get_contract(address, chain_id)
+            if contract is None:
+                raise
+
+            return contract, False
 
     @classmethod
     async def get_abi_by_contract_address(
@@ -391,3 +398,28 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         result = cast(CursorResult, await db_session.execute(query))
         await db_session.commit()
         return result.rowcount
+
+    @classmethod
+    async def exists_safe_contracts(cls, chain_id: int, addresses: set[bytes]) -> bool:
+        """
+        Check if all Safe contracts exist for the given chain_id.
+
+        Args:
+            chain_id: The chain ID to check.
+            addresses: Set of Safe contract addresses to check.
+
+        Returns:
+            True if all Safe contracts exist for the chain, False otherwise.
+        """
+        if not addresses:
+            return False
+
+        query = (
+            select(func.count())
+            .select_from(cls)
+            .where(cls.chain_id == chain_id)
+            .where(col(cls.address).in_(addresses))
+        )
+        result = await db_session.execute(query)
+        count = result.scalar()
+        return count == len(addresses)

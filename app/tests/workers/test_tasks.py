@@ -14,7 +14,13 @@ from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import AbiSource, Contract
-from app.workers.tasks import get_contract_metadata_task, redis_broker, task_to_test
+from app.services.safe_contracts_service import SafeContractsService
+from app.workers.tasks import (
+    create_safe_contracts_task_for_new_chains,
+    get_contract_metadata_task,
+    redis_broker,
+    task_to_test,
+)
 
 from ...datasources.cache.redis import get_redis
 from ...services.contract_metadata_service import ContractMetadataService
@@ -168,3 +174,67 @@ class TestAsyncTasks(AsyncDbTestCase):
         self.assertEqual(contract.implementation, proxy_implementation.address)
 
         self.assertEqual(etherscan_get_contract_metadata_mock.call_count, 2)
+
+    @db_session_context
+    async def test_create_safe_contracts_task_for_new_chains(self):
+        from app.config import settings
+
+        new_chain_id = 999
+
+        deployments = SafeContractsService._get_default_deployments_by_version()
+        expected_count = len(deployments)
+        safe_addresses: set[bytes] = {
+            HexBytes(address) for _, _, address in deployments
+        }
+
+        exists_before = await Contract.exists_safe_contracts(
+            new_chain_id, safe_addresses
+        )
+        self.assertFalse(exists_before)
+
+        lock_key = f"lock:create_safe_contracts:{new_chain_id}"
+        redis = get_redis()
+        redis.delete(lock_key)
+
+        create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
+        self._wait_tasks_execution()
+
+        contracts = await Contract.get_all()
+        chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]
+        self.assertEqual(len(chain_contracts), expected_count)
+
+        for _, contract_name, contract_address in deployments:
+            contract = await Contract.get_contract(
+                address=HexBytes(contract_address), chain_id=new_chain_id
+            )
+            self.assertIsNotNone(contract, f"Contract {contract_name} not found")
+            self.assertEqual(contract.name, contract_name)
+            self.assertIsNotNone(contract.display_name)
+            expected_trusted = (
+                contract_name in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL
+            )
+            self.assertEqual(contract.trusted_for_delegate_call, expected_trusted)
+
+        exists_after = await Contract.exists_safe_contracts(
+            new_chain_id, safe_addresses
+        )
+        self.assertTrue(exists_after)
+
+        self.assertFalse(redis.exists(lock_key))
+
+    @db_session_context
+    async def test_create_safe_contracts_task_with_lock_held(self):
+        new_chain_id = 888
+        lock_key = f"lock:create_safe_contracts:{new_chain_id}"
+        redis = get_redis()
+
+        redis.set(lock_key, "1", ex=300)
+
+        create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
+        self._wait_tasks_execution()
+
+        contracts = await Contract.get_all()
+        chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]
+        self.assertEqual(len(chain_contracts), 0)
+
+        redis.delete(lock_key)

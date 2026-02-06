@@ -8,12 +8,12 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
-from app.datasources.cache.redis import del_contract_cache
+from app.datasources.cache.redis import del_contract_cache, get_redis
 from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import get_task_info, logging_task_context
 from app.services.contract_metadata_service import get_contract_metadata_service
-from app.services.safe_contracts_service import update_safe_contracts_info
+from app.services.safe_contracts_service import get_safe_contract_service
 
 
 def log_record_factory_for_task(*args, **kwargs):
@@ -132,4 +132,26 @@ async def update_proxies_task():
 @db_session_context
 async def update_safe_contracts_info_task():
     with logging_task_context(CurrentMessage.get_current_message()):
-        await update_safe_contracts_info()
+        await get_safe_contract_service().update_safe_contracts_info()
+
+
+@dramatiq.actor
+@db_session_context
+async def create_safe_contracts_task_for_new_chains(chain_id: int):
+    with logging_task_context(CurrentMessage.get_current_message()):
+        lock_key = f"lock:create_safe_contracts:{chain_id}"
+        redis = get_redis()
+        lock_acquired = redis.set(lock_key, "1", nx=True, ex=300)
+
+        if not lock_acquired:
+            logger.debug(
+                "Another task is already creating Safe contracts for chain %d", chain_id
+            )
+            return
+
+        try:
+            safe_contract_service = get_safe_contract_service()
+            logger.info("Creating Safe contracts for chain %d", chain_id)
+            await safe_contract_service.create_safe_contracts(chain_id=chain_id)
+        finally:
+            redis.delete(lock_key)
