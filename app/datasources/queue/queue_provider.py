@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 from asyncio import AbstractEventLoop
 from collections.abc import Callable
@@ -116,8 +117,12 @@ class QueueProvider:
             :param message: The incoming RabbitMQ message.
             """
             body = message.body
-            if body:
-                await callback(body.decode("utf-8"))
-            await message.ack()
+            try:
+                if body:
+                    await callback(body.decode("utf-8"))
+            except Exception:
+                logger.exception("Error processing message with body: %s", body)
+            finally:
+                await message.ack()
 
         return await self._events_queue.consume(wrapped_callback)
