@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import datetime
 import logging
@@ -523,7 +524,7 @@ class DataDecoderService:
         try:
             await asyncio.wait_for(self.lock_load_new_abis.acquire(), timeout=0.01)
             acquired = True
-            logger.info(
+            logger.debug(
                 "%s: Reloading contract ABIs",
                 self.__class__.__name__,
             )
@@ -540,7 +541,7 @@ class DataDecoderService:
                     # Only reload if new ABIs were inserted
                     abis = Abi.get_abi_newer_than(previous_last_abi_created)
                 else:
-                    logger.info(
+                    logger.debug(
                         "%s: No new contract ABIs to load",
                         self.__class__.__name__,
                     )
@@ -550,14 +551,14 @@ class DataDecoderService:
             async for abi in abis:
                 if await self.add_abi(abi):
                     loaded_abis += 1
-            logger.info(
+            logger.debug(
                 "%s: Loaded new %d contract ABIs",
                 self.__class__.__name__,
                 loaded_abis,
             )
             return loaded_abis
         except TimeoutError:
-            logger.info(
+            logger.debug(
                 "%s: Reloading of ABIs in progress by another request, not doing anything",
                 self.__class__.__name__,
             )
