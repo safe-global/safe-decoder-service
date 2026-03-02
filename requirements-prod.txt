@@ -8,7 +8,7 @@ fastapi[all]==0.124.0
 gunicorn==23.0.0
 periodiq==0.13.0
 pydantic-settings==2.12.0
-redis[hiredis]==6.4.0
+redis[hiredis]==7.1.0
 safe-eth-py==7.17.1
 setuptools>=75.0.0,<82
 sqladmin[full]==0.22.0
