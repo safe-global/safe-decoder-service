@@ -1,9 +1,0 @@
--r requirements-prod.txt
-coverage
-faker
-freezegun
-httpx
-mypy
-pre-commit
-pytest
-pytest-asyncio

@@ -5,7 +5,13 @@ ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 ENV PYTHONUNBUFFERED=1
 
-COPY requirements-prod.txt ./requirements.txt
+# Install uv — copy binary from official image, no pip bootstrap needed
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV VIRTUAL_ENV=${APP_HOME}/.venv
+ENV PATH="${APP_HOME}/.venv/bin:${PATH}"
+
+COPY pyproject.toml uv.lock ./
 RUN set -ex \
 	&& buildDeps=" \
 		build-essential \
@@ -15,18 +21,11 @@ RUN set -ex \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends postgresql-client $buildDeps \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
-	&& export PATH="$PATH:$HOME/.cargo/bin" \
-    && pip install -U --no-cache-dir wheel setuptools pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir ipython \
+	&& export PATH="$PATH:/root/.cargo/bin" \
+    && uv sync --no-dev --frozen --no-install-project \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
-    && rustup self uninstall -y \
-    && find /usr/local \
-        \( -type d -a -name test -o -name tests \) \
-        -o \( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
-        -exec rm -rf '{}' +
-
+    && rustup self uninstall -y
 
 # /nginx mount point must be created before so it doesn't have root permissions
 # ${APP_HOME} root folder will not be updated by COPY --chown, so permissions need to be adjusted

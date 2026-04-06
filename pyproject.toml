@@ -1,3 +1,46 @@
+[project]
+name = "safe-decoder-service"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "aio-pika==9.5.8",
+    "alembic==1.17.2",
+    "async-lru==2.0.5",
+    "asyncpg==0.30.0",
+    "dramatiq[redis,watch]==1.18.0",
+    "fastapi-camelcase==2.0.0",
+    "fastapi[all]==0.124.0",
+    "gunicorn==23.0.0",
+    "periodiq==0.13.0",
+    "pydantic-settings==2.12.0",
+    "redis[hiredis]==6.4.0",
+    "safe-eth-py==7.17.1",
+    "setuptools>=75.0.0,<82",
+    "sqladmin[full]==0.22.0",
+    "sqlmodel==0.0.27",
+    "uvicorn-worker==0.4.0",
+    "web3==7.14.0",
+]
+
+[dependency-groups]
+dev = [
+    "coverage",
+    "coveralls",
+    "faker",
+    "freezegun",
+    "httpx",
+    "ipython",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.uv]
+# Reject packages published less than 7 days ago to avoid supply-chain attacks
+exclude-newer = "7 days"
+compile-bytecode = true
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
