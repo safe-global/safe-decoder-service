@@ -17,14 +17,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - name: Install dependencies
-        run: pip install pre-commit
+        run: uv sync --group dev --frozen --no-install-project
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
         env:
           SKIP: mypy,insert-license
 
@@ -66,34 +68,28 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v6
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: 'requirements*.txt'
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
     - name: Install dependencies
-      run: |
-        pip install wheel
-        pip install -r requirements.txt coveralls
-      env:
-        PIP_USE_MIRRORS: true
+      run: uv sync --group dev --frozen --no-install-project
     - name: Run database migrations
-      run: |
-        alembic upgrade head
+      run: uv run alembic upgrade head
       env:
         ENV_FILE: .env.test
     - name: Run mypy
-      run: mypy .
+      run: uv run mypy .
     - name: Run tests and coverage
-      run: |
-        coverage run --source=$SOURCE_FOLDER -m pytest -rxXs
+      run: uv run coverage run --source=$SOURCE_FOLDER -m pytest -rxXs
       env:
         SOURCE_FOLDER: app
         ENV_FILE: .env.test
     - name: Send results to coveralls
       continue-on-error: true  # Ignore coveralls problems
-      run: coveralls --service=github
+      run: uv run coveralls --service=github
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Required for coveralls
 

@@ -23,17 +23,11 @@ docker compose up
 Then go to http://localhost:8000 to see the service documentation.
 
 ## Setup for development
-Use a virtualenv if possible:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then install the
+dependencies (uv manages the virtualenv automatically):
 
 ```bash
-python -m venv venv
-```
-
-Then enter the virtualenv and install the dependencies:
-
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync --group dev --frozen
 pre-commit install -f
 cp .env.sample .env
 ```
