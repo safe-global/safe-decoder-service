@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
-import datetime
 import logging
 from collections.abc import AsyncIterator
 from enum import Enum
@@ -99,7 +98,7 @@ class DataDecoderService:
     fn_selectors_with_abis: dict[bytes, ABIFunction]
     multisend_abis: list[ABI]
     multisend_fn_selectors_with_abis: dict[bytes, ABIFunction]
-    last_abi_created: datetime.datetime | None
+    last_abi_id: int | None
 
     async def init(self) -> None:
         """
@@ -107,12 +106,13 @@ class DataDecoderService:
         in memory
         """
 
-        # last_abi_created will be used to reload ABIs on the database only getting the newer ones
-        self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
+        # last_abi_id is used as a monotonic cursor to reload only new ABIs on
+        # subsequent calls, avoiding the timestamp-collision edge case.
+        self.last_abi_id = await Abi.get_last_inserted_id()
         logger.info(
-            "%s: Loading contract ABIs for decoding. Last inserted ABI on the database: %s",
+            "%s: Loading contract ABIs for decoding. Last inserted ABI id on the database: %s",
             self.__class__.__name__,
-            self.last_abi_created,
+            self.last_abi_id,
         )
         self.fn_selectors_with_abis: dict[
             bytes, ABIFunction
@@ -516,7 +516,8 @@ class DataDecoderService:
     async def load_new_abis(self) -> int:
         """
         Load new ABIs stored on the database after the decoder was started.
-        Use `last_abi_created` property to only load the latest ABIs
+        Uses a monotonic `id` cursor (``last_abi_id``) so that ABIs inserted
+        with identical timestamps are never skipped.
 
         :return: Number of new ABIs loaded
         """
@@ -528,18 +529,18 @@ class DataDecoderService:
                 "%s: Reloading contract ABIs",
                 self.__class__.__name__,
             )
-            previous_last_abi_created = self.last_abi_created
-            self.last_abi_created = await Abi.get_creation_date_for_last_inserted()
-            if not previous_last_abi_created:
+            previous_last_abi_id = self.last_abi_id
+            self.last_abi_id = await Abi.get_last_inserted_id()
+            if previous_last_abi_id is None:
                 # No reference to compare, so we get all the ABIs
                 abis = Abi.get_abis_sorted_by_relevance()
             else:
                 if (
-                    self.last_abi_created
-                    and self.last_abi_created > previous_last_abi_created
+                    self.last_abi_id is not None
+                    and self.last_abi_id > previous_last_abi_id
                 ):
                     # Only reload if new ABIs were inserted
-                    abis = Abi.get_abi_newer_than(previous_last_abi_created)
+                    abis = Abi.get_abis_with_id_greater_than(previous_last_abi_id)
                 else:
                     logger.debug(
                         "%s: No new contract ABIs to load",

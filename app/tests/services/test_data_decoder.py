@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -636,18 +637,18 @@ class TestDataDecoderService(AsyncDbTestCase):
 
         # Service should not have any ABI loaded
         self.assertEqual(decoder_service.fn_selectors_with_abis, {})
-        self.assertIsNone(decoder_service.last_abi_created)
+        self.assertIsNone(decoder_service.last_abi_id)
 
         # Try to load new ABIs, none should be loaded
         self.assertEqual(await decoder_service.load_new_abis(), 0)
         self.assertEqual(decoder_service.fn_selectors_with_abis, {})
-        self.assertIsNone(decoder_service.last_abi_created)
+        self.assertIsNone(decoder_service.last_abi_id)
 
         # Store ABIs in the database and load them
         await self._store_safe_contract_abi()
         self.assertGreater(await decoder_service.load_new_abis(), 0)
         self.assertNotEqual(decoder_service.fn_selectors_with_abis, {})
-        self.assertIsNotNone(decoder_service.last_abi_created)
+        self.assertIsNotNone(decoder_service.last_abi_id)
 
         # No new ABIs to load
         # Store ABIs in the database and load them
@@ -668,4 +669,4 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertGreater(
             len(decoder_service.fn_selectors_with_abis), len_previous_selectors
         )
-        self.assertEqual(decoder_service.last_abi_created, abi.created)
+        self.assertEqual(decoder_service.last_abi_id, abi.id)
