@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 
@@ -44,7 +45,7 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["count"], 0)
 
         # Invalidate cache
-        del_contract_cache(address_expected)
+        await del_contract_cache(address_expected)
 
         # Should return cached response with count 0
         response = self.client.get(
@@ -63,7 +64,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.update()
 
         # Invalidate cache
-        del_contract_cache(address_expected)
+        await del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}",
@@ -96,7 +97,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.create()
 
         # Invalidate cache
-        del_contract_cache(address_expected)
+        await del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
@@ -115,7 +116,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.create()
 
         # Invalidate cache
-        del_contract_cache(address_expected)
+        await del_contract_cache(address_expected)
 
         response = self.client.get(
             f"/api/v1/contracts/{contract_without_name}",

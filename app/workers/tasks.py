@@ -62,7 +62,7 @@ async def get_contract_metadata_task(
             if result:
                 logger.info("Success download contract metadata")
                 # Force invalidate contract cache view
-                del_contract_cache(address)
+                await del_contract_cache(address)
             else:
                 logger.info("Failed to download contract metadata")
 
@@ -122,7 +122,7 @@ async def create_safe_contracts_task_for_new_chains(chain_id: int):
     with logging_task_context(CurrentMessage.get_current_message()):
         lock_key = f"lock:create_safe_contracts:{chain_id}"
         redis = get_redis()
-        lock_acquired = redis.set(lock_key, "1", nx=True, ex=300)
+        lock_acquired = await redis.set(lock_key, "1", nx=True, ex=300)
 
         if not lock_acquired:
             logger.debug(
@@ -135,4 +135,4 @@ async def create_safe_contracts_task_for_new_chains(chain_id: int):
             logger.info("Creating Safe contracts for chain %d", chain_id)
             await safe_contract_service.create_safe_contracts(chain_id=chain_id)
         finally:
-            redis.delete(lock_key)
+            await redis.delete(lock_key)

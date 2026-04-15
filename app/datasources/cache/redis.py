@@ -1,19 +1,30 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
+import asyncio
 import hashlib
 import json
 from collections.abc import Callable
-from functools import cache, wraps
+from functools import wraps
 from typing import cast
+from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel
-from redis import Redis
+from redis.asyncio import Redis
 
 from ...config import settings
 from ...utils import get_proxy_aware_url
 
+_redis_clients: WeakKeyDictionary[asyncio.AbstractEventLoop, Redis] = (
+    WeakKeyDictionary()
+)
 
-@cache
+
 def get_redis() -> Redis:
-    return Redis.from_url(settings.REDIS_URL)
+    loop = asyncio.get_running_loop()
+    redis = _redis_clients.get(loop)
+    if redis is None:
+        redis = Redis.from_url(settings.REDIS_URL)
+        _redis_clients[loop] = redis
+    return redis
 
 
 def get_key_for_contract(address: str, **kwargs) -> str:
@@ -27,14 +38,14 @@ def get_key_for_contract(address: str, **kwargs) -> str:
     return f"contract:{address.lower()}"
 
 
-def del_contract_cache(address: str):
+async def del_contract_cache(address: str):
     """
     Delete the Redis cache entry for a specific contract by address.
 
     :param address: The contract address used to build the cache key.
     :return: None
     """
-    get_redis().unlink(get_key_for_contract(address))
+    await get_redis().unlink(get_key_for_contract(address))
 
 
 def get_field_key(kwargs: dict) -> str:
@@ -86,7 +97,7 @@ def cache_response(
 
             # Try to fetch from Redis cache
             redis = get_redis()
-            cached_response = redis.hget(hash_key, field_key)
+            cached_response = await redis.hget(hash_key, field_key)  # type: ignore[misc]
             if cached_response:
                 # Return cached response if it exists
                 return json.loads(cast(str, cached_response))
@@ -97,12 +108,12 @@ def cache_response(
             # Store the response in cache for later
             # Force validation to trigger field validators that convert bytes
             validated_response = model.model_validate(response)
-            redis.hset(
+            await redis.hset(  # type: ignore[misc]
                 hash_key, field_key, validated_response.model_dump_json(by_alias=True)
             )
             # Set expiration just if is not configured
-            if redis.ttl(hash_key) == -1:
-                redis.expire(hash_key, expire)
+            if await redis.ttl(hash_key) == -1:
+                await redis.expire(hash_key, expire)
 
             return response
 
