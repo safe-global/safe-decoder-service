@@ -175,7 +175,7 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    @alru_cache(maxsize=2048)
+    @alru_cache(maxsize=2048, ttl=600)
     async def get_contract_abi(
         self,
         address: Address,
@@ -190,7 +190,7 @@ class DataDecoderService:
         """
         return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
 
-    @alru_cache(maxsize=2048)
+    @alru_cache(maxsize=2048, ttl=600)
     async def get_contract_abi_selectors_with_functions(
         self, address: Address, chain_id: int | None
     ) -> dict[bytes, ABIFunction] | None:
@@ -497,6 +497,24 @@ class DataDecoderService:
             if await self.get_contract_abi(address, None):
                 return DecodingAccuracyEnum.PARTIAL_MATCH
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
+
+    def invalidate_contract_abi_cache(
+        self, address: Address | ChecksumAddress, chain_id: int | None
+    ) -> None:
+        """
+        Evict a specific contract from both per-contract ABI caches.
+
+        Call this whenever a contract's ABI is updated in the database so
+        that the next decode request re-fetches the latest ABI rather than
+        serving stale data from the in-memory cache.
+
+        :param address: Contract address
+        :param chain_id: Chain id for the contract
+        """
+        self.get_contract_abi.cache_invalidate(self, address, chain_id)
+        self.get_contract_abi_selectors_with_functions.cache_invalidate(
+            self, address, chain_id
+        )
 
     async def add_abi(self, abi: ABI) -> bool:
         """

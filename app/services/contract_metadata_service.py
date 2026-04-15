@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import enum
 import logging
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from app.config import settings
 from app.datasources.cache.redis import get_redis
 from app.datasources.db.models import Abi, AbiSource, Contract
+from app.services.data_decoder import get_data_decoder_service
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +200,14 @@ class ContractMetadataService:
                 contract.implementation = HexBytes(
                     contract_metadata.metadata.implementation
                 )
+
+            # Evict stale per-contract ABI cache entries so the decoder
+            # picks up the newly linked ABI on the next request.
+            decoder = await get_data_decoder_service()
+            decoder.invalidate_contract_abi_cache(
+                contract_metadata.address,
+                contract_metadata.chain_id,
+            )
 
         contract.fetch_retries += 1
         await contract.update()
