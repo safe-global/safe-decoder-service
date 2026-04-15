@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import enum
 import logging
 from dataclasses import dataclass
@@ -232,7 +233,7 @@ class ContractMetadataService:
             f"should_attempt_download:{contract_address}:{chain_id}:{max_retries}"
         )
         # Try from cache first
-        cached_retries: bytes = cast(bytes, redis.get(cache_key))
+        cached_retries: bytes = cast(bytes, await redis.get(cache_key))
         if cached_retries is not None:
             return bool(int(cached_retries.decode()))
         else:
@@ -242,7 +243,7 @@ class ContractMetadataService:
 
             if contract and (contract.fetch_retries > max_retries or contract.abi_id):
                 # Cache with TTL so contracts can be retried after cache expires
-                redis.set(
+                await redis.set(
                     cache_key,
                     0,
                     ex=ContractMetadataService.SHOULD_ATTEMPT_DOWNLOAD_CACHE_TTL,

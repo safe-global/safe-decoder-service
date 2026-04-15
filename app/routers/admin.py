@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import secrets
 from typing import cast
 
@@ -25,7 +26,7 @@ class AdminAuth(AuthenticationBackend):
             request.session.update({"token": secret})
 
             # Use redis to store the token
-            get_redis().set(
+            await get_redis().set(
                 f"admin:token:{secret}", 1, ex=settings.ADMIN_TOKEN_EXPIRATION_SECONDS
             )
 
@@ -42,7 +43,7 @@ class AdminAuth(AuthenticationBackend):
         if not secret:
             return False
 
-        return bool(get_redis().exists(f"admin:token:{secret}"))
+        return bool(await get_redis().exists(f"admin:token:{secret}"))
 
 
 class ContractAdmin(ModelView, model=Contract):

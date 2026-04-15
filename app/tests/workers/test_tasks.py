@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import json
 import unittest
 from collections.abc import Awaitable
@@ -79,7 +80,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         await super().asyncTearDown()
         self.worker.stop()
         redis = get_redis()
-        redis.flushall()
+        await redis.flushall()
 
     def _wait_tasks_execution(self):
         # Ensure that all the messages on redis were consumed
@@ -105,7 +106,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         chain_id = 100
         cache_key = f"should_attempt_download:{contract_address}:{chain_id}:0"
         redis = get_redis()
-        redis.delete(cache_key)
+        await redis.delete(cache_key)
         await AbiSource(name="Etherscan", url="").create()
         etherscan_get_contract_metadata_mock.return_value = None
         mock_enabled_clients.return_value = [
@@ -131,7 +132,7 @@ class TestAsyncTasks(AsyncDbTestCase):
 
         # After reset cache and database retries should download the contract
         contract.fetch_retries = 0
-        redis.delete(cache_key)
+        await redis.delete(cache_key)
         await contract.update()
         get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
         self._wait_tasks_execution()
@@ -194,7 +195,7 @@ class TestAsyncTasks(AsyncDbTestCase):
 
         lock_key = f"lock:create_safe_contracts:{new_chain_id}"
         redis = get_redis()
-        redis.delete(lock_key)
+        await redis.delete(lock_key)
 
         create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
         self._wait_tasks_execution()
@@ -220,7 +221,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         )
         self.assertTrue(exists_after)
 
-        self.assertFalse(redis.exists(lock_key))
+        self.assertFalse(await redis.exists(lock_key))
 
     @db_session_context
     async def test_create_safe_contracts_task_with_lock_held(self):
@@ -228,7 +229,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         lock_key = f"lock:create_safe_contracts:{new_chain_id}"
         redis = get_redis()
 
-        redis.set(lock_key, "1", ex=300)
+        await redis.set(lock_key, "1", ex=300)
 
         create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
         self._wait_tasks_execution()
@@ -237,4 +238,4 @@ class TestAsyncTasks(AsyncDbTestCase):
         chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]
         self.assertEqual(len(chain_contracts), 0)
 
-        redis.delete(lock_key)
+        await redis.delete(lock_key)
