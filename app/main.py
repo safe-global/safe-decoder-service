@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import datetime
 import logging
@@ -195,7 +196,7 @@ async def http_request_middleware(request: Request, call_next):
                         "http_request": http_request.model_dump(),
                     },
                 )
-            except ValueError as e:
+            except Exception as e:
                 logger.error(f"Validation log error {e}")
 
     return response
