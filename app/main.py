@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import datetime
 import logging
@@ -140,12 +141,17 @@ async def http_redirect_middleware(request: Request, call_next):
         host = request.headers.get("x-forwarded-host")
         protocol = request.headers.get("x-forwarded-proto")
         port = request.headers.get("x-forwarded-port")
+        new_path = (
+            prefix + original_url.path
+            if not original_url.path.startswith(prefix)
+            else original_url.path
+        )
         response.headers["location"] = str(
             original_url.replace(
                 scheme=protocol,
                 hostname=host,
                 port=port,
-                path=prefix + original_url.path,
+                path=new_path,
             )
         )
     return response
