@@ -16,12 +16,25 @@ from ..datasources.db.models import Contract
 
 
 class AdminAuth(AuthenticationBackend):
+    @staticmethod
+    def _compare_credentials(candidate: str, expected: str) -> bool:
+        return secrets.compare_digest(
+            candidate.encode("utf-8"), expected.encode("utf-8")
+        )
+
     async def login(self, request: Request) -> bool:
         form = await request.form()
-        username, _password = form["username"], form["password"]
+        username = form.get("username")
+        _password = form.get("password")
 
-        # Validate username/password credentials
-        if username == settings.ADMIN_USERNAME and _password == settings.ADMIN_PASSWORD:
+        if not isinstance(username, str) or not isinstance(_password, str):
+            return False
+
+        # Validate username/password credentials using constant-time comparison
+        # to prevent timing-based username/password enumeration attacks.
+        username_ok = self._compare_credentials(username, settings.ADMIN_USERNAME)
+        password_ok = self._compare_credentials(_password, settings.ADMIN_PASSWORD)
+        if username_ok and password_ok:
             # And update session
             secret = secrets.token_hex(nbytes=16)
             request.session.update({"token": secret})
