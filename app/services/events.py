@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import json
 import logging
 
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_is_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 
@@ -58,6 +60,8 @@ class EventsService:
                             chain_id=chain_id
                         )
                     for contract_address in {to, *contracts_from_data}:
+                        if contract_address == NULL_ADDRESS:
+                            continue
                         get_contract_metadata_task.send(
                             address=contract_address, chain_id=chain_id
                         )

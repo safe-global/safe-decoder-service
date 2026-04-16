@@ -18,6 +18,7 @@ from safe_eth.eth.clients import (
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.config import settings
@@ -195,7 +196,10 @@ class ContractMetadataService:
             )
             contract.abi_id = abi.id
             contract.name = contract_metadata.metadata.name
-            if contract_metadata.metadata.implementation:
+            if (
+                contract_metadata.metadata.implementation
+                and contract_metadata.metadata.implementation != NULL_ADDRESS
+            ):
                 contract.implementation = HexBytes(
                     contract_metadata.metadata.implementation
                 )
@@ -209,7 +213,11 @@ class ContractMetadataService:
     def get_proxy_implementation_address(
         contract_metadata: EnhancedContractMetadata,
     ) -> ChecksumAddress | None:
-        if contract_metadata.metadata and contract_metadata.metadata.implementation:
+        if (
+            contract_metadata.metadata
+            and contract_metadata.metadata.implementation
+            and contract_metadata.metadata.implementation != NULL_ADDRESS
+        ):
             return fast_to_checksum_address(contract_metadata.metadata.implementation)
         return None
 

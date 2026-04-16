@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from eth_typing import HexStr
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.util.util import to_0x_hex_str
 
 from app.services.events import EventsService, logger
@@ -164,6 +166,40 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
                 call(address="0x5B9ea52Aaa931D4EEf74C8aEaf0Fe759434FeD74", chain_id=1),
             ],
             any_order=True,
+        )
+
+    @patch("app.workers.tasks.get_contract_metadata_task.send")
+    @patch("app.services.events.get_safe_contract_service")
+    async def test_process_event_skips_null_address(
+        self,
+        mock_get_safe_contract_service: MagicMock,
+        mock_get_contract_metadata_task: MagicMock,
+    ):
+        mock_safe_contract_service = AsyncMock()
+        mock_safe_contract_service.safe_contracts_exist.return_value = True
+        mock_get_safe_contract_service.return_value = mock_safe_contract_service
+
+        real_address = "0x6ED857dc1da2c41470A95589bB482152000773e9"
+        valid_message = json.dumps(
+            {
+                "chainId": "1",
+                "type": "EXECUTED_MULTISIG_TRANSACTION",
+                "to": real_address,
+                "data": HexStr("0x1234"),
+            }
+        )
+
+        events_service = EventsService()
+        with patch.object(
+            events_service,
+            "get_contracts_from_data",
+            return_value={NULL_ADDRESS, real_address},
+        ):
+            await events_service.process_event(valid_message)
+
+        # NULL_ADDRESS should be filtered out; only real_address queued (once, as a set)
+        mock_get_contract_metadata_task.assert_called_once_with(
+            address=real_address, chain_id=1
         )
 
     @patch("app.workers.tasks.create_safe_contracts_task_for_new_chains.send")

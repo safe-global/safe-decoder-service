@@ -48,17 +48,17 @@ class TimeStampedSQLModel(SQLModel):
 
     """
 
-    created: datetime.datetime = Field(
+    created: datetime.datetime = Field(  # type: ignore[call-overload]
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
-        sa_type=DateTime(timezone=True),  # type: ignore
+        sa_type=DateTime(timezone=True),
         index=True,
     )
 
-    modified: datetime.datetime = Field(
+    modified: datetime.datetime = Field(  # type: ignore[call-overload]
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
-        sa_type=DateTime(timezone=True),  # type: ignore
+        sa_type=DateTime(timezone=True),
         sa_column_kwargs={
             "onupdate": lambda: datetime.datetime.now(datetime.UTC),
         },

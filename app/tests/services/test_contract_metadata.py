@@ -13,6 +13,7 @@ from safe_eth.eth.clients import (
     EtherscanClientConfigurationProblem,
     SourcifyClientConfigurationProblem,
 )
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.datasources.db.database import db_session, db_session_context
@@ -304,6 +305,21 @@ class TestContractMetadataService(AsyncDbTestCase):
         )
         self.assertIsNone(
             ContractMetadataService.get_proxy_implementation_address(contract_data)
+        )
+
+        # NULL_ADDRESS implementation should be treated as no implementation
+        null_impl_contract_data = EnhancedContractMetadata(
+            address=random_address,
+            metadata=copy(etherscan_proxy_metadata_mock),
+            source=ContractSource.ETHERSCAN,
+            chain_id=1,
+        )
+        assert null_impl_contract_data.metadata is not None
+        null_impl_contract_data.metadata.implementation = str(NULL_ADDRESS)
+        self.assertIsNone(
+            ContractMetadataService.get_proxy_implementation_address(
+                null_impl_contract_data
+            )
         )
 
     @db_session_context
