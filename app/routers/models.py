@@ -1,9 +1,10 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from datetime import datetime
 from typing import Any, Union
 
 from eth_typing import HexStr
 from fastapi_camelcase import CamelModel
-from pydantic import Field, computed_field, field_validator, model_validator
+from pydantic import ConfigDict, Field, computed_field, field_validator, model_validator
 from safe_eth.eth.utils import (
     ChecksumAddress,
     fast_is_checksum_address,
@@ -20,20 +21,18 @@ class AboutPublic(CamelModel):
 
 
 class ProjectPublic(CamelModel):
+    model_config = ConfigDict(from_attributes=True)
+
     description: str
     logo_file: str
 
-    class Config:
-        from_attributes = True
-
 
 class AbiPublic(CamelModel):
+    model_config = ConfigDict(from_attributes=True)
+
     abi_json: list[dict] | dict | None
     abi_hash: bytes | str
     modified: datetime
-
-    class Config:
-        from_attributes = True
 
     @field_validator("abi_hash")
     @classmethod
@@ -50,6 +49,8 @@ class AbiPublic(CamelModel):
 
 
 class ContractsPublic(CamelModel):
+    model_config = ConfigDict(from_attributes=True)
+
     address: ChecksumAddress
     name: str | None
     display_name: str | None
@@ -59,9 +60,6 @@ class ContractsPublic(CamelModel):
     modified: datetime
     trusted_for_delegate_call: bool
     fetch_retries: int
-
-    class Config:
-        from_attributes = True
 
     @field_validator("address", mode="before")
     @classmethod
