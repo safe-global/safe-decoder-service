@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from copy import copy
 from unittest import mock
 from unittest.mock import MagicMock
@@ -177,7 +178,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertIsNone(contract.implementation)
         self.assertEqual(contract.abi.abi_json, etherscan_metadata_mock.abi)
         self.assertEqual(contract.chain_id, 1)
-        self.assertEqual(contract.fetch_retries, 1)
+        self.assertEqual(contract.fetch_retries, 0)
 
         # New proxy contract
         proxy_contract_data = EnhancedContractMetadata(
