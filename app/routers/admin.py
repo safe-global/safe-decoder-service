@@ -1,7 +1,9 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import secrets
 from typing import cast
 
 from fastapi import FastAPI
+from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
@@ -52,7 +54,7 @@ class ContractAdmin(ModelView, model=Contract):
 
     column_formatters = {
         cast(str, Contract.address): lambda m, a: fast_to_checksum_address(
-            cast(Contract, m).address
+            HexBytes(cast(Contract, m).address)
         ),
     }
 
