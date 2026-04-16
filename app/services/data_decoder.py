@@ -16,7 +16,6 @@ from safe_eth.eth.contracts import get_multi_send_contract
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 from safe_eth.util.util import to_0x_hex_str
-from sqlmodel.ext.asyncio.session import AsyncSession
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import implicitly_identity
@@ -94,7 +93,6 @@ class DataDecoderService:
     EXEC_TRANSACTION_SELECTOR = HexBytes("0x6a761202")
 
     dummy_w3 = Web3()
-    session: AsyncSession | None
 
     fn_selectors_with_abis: dict[bytes, ABIFunction]
     multisend_abis: list[ABI]
