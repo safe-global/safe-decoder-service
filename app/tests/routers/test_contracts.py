@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 
@@ -77,7 +78,6 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(results[0]["name"], "A Test Contracts")
         self.assertEqual(results[0]["address"], address_expected)
         self.assertEqual(results[0]["abi"]["abiJson"], mock_abi_json)
-        self.assertEqual(results[0]["abi"]["abiHash"], "0xb4b61541")
         self.assertEqual(results[0]["abi"]["modified"], datetime_to_str(abi.modified))
         self.assertEqual(results[0]["displayName"], None)
         self.assertEqual(results[0]["chainId"], 1)

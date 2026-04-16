@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from typing import cast
 
 from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_to_checksum_address
+from sqlalchemy.exc import IntegrityError
 
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract, Project
@@ -77,9 +79,7 @@ class TestModels(AsyncDbTestCase):
         abi_json = {"name": "A Test Project with relevance 10"}
         source = AbiSource(name="local", url="")
         await source.create()
-        abi = Abi(
-            abi_hash=b"A Test Abi", abi_json=abi_json, relevance=10, source_id=source.id
-        )
+        abi = Abi(abi_json=abi_json, relevance=10, source_id=source.id)
         await abi.create()
         contract = Contract(address=b"a", name="A test contract", chain_id=1, abi=abi)
         await contract.create()
@@ -110,11 +110,7 @@ class TestModels(AsyncDbTestCase):
     async def test_abi(self):
         abi_source = AbiSource(name="A Test Source", url="https://test.com")
         abi_source = await abi_source.create()
-        abi = Abi(
-            abi_hash=b"A Test Abi",
-            abi_json={"name": "A Test Project"},
-            source_id=abi_source.id,
-        )
+        abi = Abi(abi_json={"name": "A Test Project"}, source_id=abi_source.id)
         await abi.create()
         result = await abi.get_all()
         self.assertEqual(result[0], abi)
@@ -129,20 +125,10 @@ class TestModels(AsyncDbTestCase):
         ]
         source = AbiSource(name="A Test Source", url="https://test.com")
         await source.create()
-        abi = Abi(
-            abi_hash=abi_jsons[0]["name"].encode(),
-            abi_json=abi_jsons[0],
-            relevance=100,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=abi_jsons[0], relevance=100, source_id=source.id)
         await abi.create()
 
-        last_abi = Abi(
-            abi_hash=abi_jsons[1]["name"].encode(),
-            abi_json=abi_jsons[1],
-            relevance=100,
-            source_id=source.id,
-        )
+        last_abi = Abi(abi_json=abi_jsons[1], relevance=100, source_id=source.id)
         await last_abi.create()
 
         last_inserted = await Abi.get_creation_date_for_last_inserted()
@@ -158,21 +144,11 @@ class TestModels(AsyncDbTestCase):
         await source.create()
         abi_by_abi_json = await Abi.get_abi(abi_jsons[0])
         self.assertIsNone(abi_by_abi_json)
-        abi = Abi(
-            abi_hash=b"A Test Abi",
-            abi_json=abi_jsons[0],
-            relevance=100,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=abi_jsons[0], relevance=100, source_id=source.id)
         await abi.create()
         abi_by_abi_json = await Abi.get_abi(abi_jsons[0])
         self.assertEqual(abi_by_abi_json, abi)
-        abi = Abi(
-            abi_hash=b"A Test Abi2",
-            abi_json=abi_jsons[1],
-            relevance=10,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=abi_jsons[1], relevance=10, source_id=source.id)
         await abi.create()
         results = abi.get_abis_sorted_by_relevance()
         result = await anext(results)
@@ -193,20 +169,10 @@ class TestModels(AsyncDbTestCase):
         ]
         source = AbiSource(name="A Test Source", url="https://test.com")
         await source.create()
-        abi = Abi(
-            abi_hash=abi_jsons[0]["name"].encode(),
-            abi_json=abi_jsons[0],
-            relevance=100,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=abi_jsons[0], relevance=100, source_id=source.id)
         await abi.create()
 
-        last_abi = Abi(
-            abi_hash=abi_jsons[1]["name"].encode(),
-            abi_json=abi_jsons[1],
-            relevance=100,
-            source_id=source.id,
-        )
+        last_abi = Abi(abi_json=abi_jsons[1], relevance=100, source_id=source.id)
         await last_abi.create()
 
         self.assertListEqual(
@@ -237,11 +203,7 @@ class TestModels(AsyncDbTestCase):
         await abi_source.create()
         result = await abi_source.get_all()
         self.assertEqual(result[0], abi_source)
-        abi = Abi(
-            abi_hash=b"A Test Abi",
-            abi_json={"name": "A Test Project"},
-            source_id=abi_source.id,
-        )
+        abi = Abi(abi_json={"name": "A Test Project"}, source_id=abi_source.id)
         await abi.create()
         result = await abi.get_all()
         self.assertEqual(result[0], abi)
@@ -435,3 +397,46 @@ class TestModels(AsyncDbTestCase):
 
         exists = await Contract.exists_safe_contracts(1, {b"non_existent_address"})
         self.assertFalse(exists)
+
+    @db_session_context
+    async def test_abi_hash_generated_column(self):
+        """abi_hash is a GENERATED ALWAYS AS column — PostgreSQL fills it automatically.
+
+        Verifies that after create():
+        - abi_hash is populated (not None)
+        - abi_hash is exactly 32 bytes (SHA-256 output)
+        - Two ABIs with the same logical content but different key ordering get
+          the same hash (JSONB normalises before hashing)
+        - Two ABIs with different content get different hashes
+        """
+        source = AbiSource(name="hash_test_source", url="")
+        await source.create()
+        source_id = source.id  # capture before any rollback expires the object
+
+        abi_json = [{"type": "function", "name": "transfer"}]
+        abi = Abi(abi_json=abi_json, source_id=source_id)
+        await abi.create()
+
+        self.assertIsNotNone(abi.abi_hash)
+        assert abi.abi_hash is not None  # narrow type for len()
+        self.assertEqual(len(abi.abi_hash), 32)
+        first_hash = abi.abi_hash
+
+        # Same logical content, keys in different order — must produce the same hash
+        # (JSONB normalises key ordering before hashing)
+        abi_json_reordered = [{"name": "transfer", "type": "function"}]
+        abi2 = Abi(abi_json=abi_json_reordered, source_id=source_id)
+        with self.assertRaisesRegex(
+            IntegrityError,
+            r'duplicate key value violates unique constraint "ix_abi_abi_hash"',
+        ):
+            await abi2.create()
+        await db_session.rollback()
+
+        # Different content — different hash
+        abi3 = Abi(
+            abi_json=[{"type": "function", "name": "approve"}], source_id=source_id
+        )
+        await abi3.create()
+        self.assertIsNotNone(abi3.abi_hash)
+        self.assertNotEqual(first_hash, abi3.abi_hash)
