@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from collections.abc import AsyncIterator
 from typing import Self, cast
@@ -129,11 +130,11 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         """
         :return: Abi JSON, with the ones with less relevance first
         """
-        results = await db_session.execute(
+        result = await db_session.stream(
             select(cls.abi_json).order_by(col(cls.relevance))
         )
-        for result in results.scalars().all():
-            yield cast(ABI, result)
+        async for (abi_json,) in result:
+            yield cast(ABI, abi_json)
 
     @classmethod
     async def get_abi_newer_than(cls, when: datetime.datetime) -> AsyncIterator[ABI]:
@@ -143,13 +144,13 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :param when: It will be compared with ABI `created` field
         :return: Abi JSONs, sorted by the oldest ones first
         """
-        results = await db_session.execute(
+        result = await db_session.stream(
             select(cls.abi_json)
             .where(col(cls.created) > when)
             .order_by(col(cls.created).asc())
         )
-        for result in results.scalars().all():
-            yield cast(ABI, result)
+        async for (abi_json,) in result:
+            yield cast(ABI, abi_json)
 
     async def create(self):
         self.abi_hash = get_md5_abi_hash(self.abi_json)
