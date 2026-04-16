@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import logging
 import traceback
@@ -104,6 +105,29 @@ class SafeJsonFormatter(logging.Formatter):
 
 
 _task_info: ContextVar["TaskInfo"] = ContextVar("task_info")
+
+
+def log_record_factory(*args, **kwargs) -> logging.LogRecord:
+    """
+    Inject both db_session and task_detail into every log record.
+    """
+    record = logging.LogRecord(*args, **kwargs)
+    try:
+        from app.datasources.db.database import (  # noqa: PLC0415
+            _db_session_context,
+        )
+
+        record.db_session = _db_session_context.get()
+    except LookupError:
+        pass
+    try:
+        record.task_detail = _task_info.get()
+    except LookupError:
+        pass
+    return record
+
+
+logging.setLogRecordFactory(log_record_factory)
 
 
 @contextmanager

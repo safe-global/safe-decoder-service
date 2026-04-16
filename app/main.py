@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import datetime
 import logging
@@ -12,7 +13,6 @@ from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
 
 from . import VERSION
 from .datasources.db.database import (
-    _get_database_session_context,
     db_session,
     set_database_session_context,
 )
@@ -24,28 +24,6 @@ from .services.data_decoder import get_data_decoder_service
 from .services.events import EventsService
 
 logger = logging.getLogger()
-
-
-def log_record_factory_for_request(*args, **kwargs) -> logging.LogRecord:
-    """
-    Inject session database identifier in log record.
-
-    :param args:
-    :param kwargs:
-    :return:
-    """
-    # Create a log record with additional context
-    record = logging.LogRecord(*args, **kwargs)
-    try:
-        record.db_session = _get_database_session_context()
-    except LookupError:
-        # This error means that there is not session
-        pass
-
-    return record
-
-
-logging.setLogRecordFactory(log_record_factory_for_request)
 
 
 @asynccontextmanager
