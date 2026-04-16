@@ -120,9 +120,9 @@ class QueueProvider:
             try:
                 if body:
                     await callback(body.decode("utf-8"))
+                await message.ack()
             except Exception:
                 logger.exception("Error processing message with body: %s", body)
-            finally:
-                await message.ack()
+                await message.nack(requeue=False)
 
         return await self._events_queue.consume(wrapped_callback)
