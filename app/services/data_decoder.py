@@ -123,11 +123,11 @@ class DataDecoderService:
             "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
         )
         self.multisend_abis: list[ABI] = [m async for m in self.get_multisend_abis()]
-        self.multisend_fn_selectors_with_abis: dict[
-            bytes, ABIFunction
-        ] = await self._generate_selectors_with_abis_from_abis(
-            self.get_multisend_abis()
-        )
+        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = {}
+        for abi in self.multisend_abis:
+            self.multisend_fn_selectors_with_abis.update(
+                await self._generate_selectors_with_abis_from_abi(abi)
+            )
         # lock_load_new_abis will avoid concurrent calls to load_new_abis
         self.lock_load_new_abis = asyncio.Lock()
 
