@@ -1,4 +1,4 @@
-import datetime
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_account import Account
@@ -120,8 +120,8 @@ class TestModels(AsyncDbTestCase):
         self.assertEqual(result[0], abi)
 
     @db_session_context
-    async def test_abi_get_creation_date_for_last_inserted(self):
-        self.assertIsNone(await Abi.get_creation_date_for_last_inserted())
+    async def test_abi_get_last_inserted_id(self):
+        self.assertIsNone(await Abi.get_last_inserted_id())
 
         abi_jsons = [
             {"name": "A Test Project with relevance 100"},
@@ -145,8 +145,8 @@ class TestModels(AsyncDbTestCase):
         )
         await last_abi.create()
 
-        last_inserted = await Abi.get_creation_date_for_last_inserted()
-        self.assertEqual(last_inserted, last_abi.created)
+        last_inserted = await Abi.get_last_inserted_id()
+        self.assertEqual(last_inserted, last_abi.id)
 
     @db_session_context
     async def test_abi_get_abis_sorted_by_relevance(self):
@@ -181,10 +181,9 @@ class TestModels(AsyncDbTestCase):
         self.assertEqual(result, abi_jsons[0])
 
     @db_session_context
-    async def test_abi_get_abi_newer_than(self):
-        initial_datetime = datetime.datetime.now(tz=datetime.UTC)
+    async def test_abi_get_abis_with_id_greater_than(self):
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_than(initial_datetime)], []
+            [x async for x in Abi.get_abis_with_id_greater_than(0)], []
         )
 
         abi_jsons = [
@@ -209,25 +208,18 @@ class TestModels(AsyncDbTestCase):
         )
         await last_abi.create()
 
+        assert abi.id is not None
+        assert last_abi.id is not None
         self.assertListEqual(
-            [
-                x
-                async for x in Abi.get_abi_newer_than(
-                    datetime.datetime.now(tz=datetime.UTC)
-                )
-            ],
+            [x async for x in Abi.get_abis_with_id_greater_than(last_abi.id)],
             [],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_than(last_abi.created)],
-            [],
-        )
-        self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_than(abi.created)],
+            [x async for x in Abi.get_abis_with_id_greater_than(abi.id)],
             [last_abi.abi_json],
         )
         self.assertListEqual(
-            [x async for x in Abi.get_abi_newer_than(initial_datetime)],
+            [x async for x in Abi.get_abis_with_id_greater_than(0)],
             [abi.abi_json, last_abi.abi_json],
         )
 
