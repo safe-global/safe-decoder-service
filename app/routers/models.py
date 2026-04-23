@@ -29,8 +29,16 @@ class ProjectPublic(CamelModel):
 class AbiPublic(CamelModel):
     model_config = ConfigDict(from_attributes=True)
 
+    abi_hash: str | None = None
     abi_json: list[dict] | dict | None
     modified: datetime
+
+    @field_validator("abi_hash", mode="before")
+    @classmethod
+    def bytes_to_hex(cls, v: bytes | str | None) -> str | None:
+        if isinstance(v, bytes):
+            return "0x" + v.hex()
+        return v
 
 
 class ContractsPublic(CamelModel):
