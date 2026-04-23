@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import enum
 import logging
 from dataclasses import dataclass
@@ -199,7 +200,8 @@ class ContractMetadataService:
                     contract_metadata.metadata.implementation
                 )
 
-        contract.fetch_retries += 1
+        if not contract_metadata.metadata:
+            contract.fetch_retries += 1
         await contract.update()
         return bool(contract_metadata.metadata)
 
