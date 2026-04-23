@@ -1,6 +1,6 @@
 [project]
 name = "safe-decoder-service"
-version = "0.1.0"
+dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
     "aio-pika==9.6.2",
@@ -35,6 +35,17 @@ dev = [
     "pytest",
     "pytest-asyncio",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "app/__init__.py"
+pattern = 'VERSION = "(?P<version>[^"]+)"'
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [tool.uv]
 # Reject packages published less than 7 days ago to avoid supply-chain attacks
