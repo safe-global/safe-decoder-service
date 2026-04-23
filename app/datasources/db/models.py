@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 from collections.abc import AsyncIterator
 from typing import Self, cast
@@ -113,12 +114,12 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     contracts: list["Contract"] = Relationship(back_populates="abi")
 
     @classmethod
-    async def get_creation_date_for_last_inserted(cls) -> datetime.datetime | None:
+    async def get_last_inserted_id(cls) -> int | None:
         """
-        :return: Creation date for last inserted ABI, `None` if table is empty
+        :return: The `id` of the most recently inserted ABI, `None` if the table is empty.
         """
         results = await db_session.execute(
-            select(cls.created).order_by(col(cls.created).desc()).limit(1)
+            select(cls.id).order_by(col(cls.id).desc()).limit(1)
         )
         if result := results.first():
             return result[0]
@@ -136,17 +137,22 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield cast(ABI, result)
 
     @classmethod
-    async def get_abi_newer_than(cls, when: datetime.datetime) -> AsyncIterator[ABI]:
+    async def get_abis_with_id_greater_than(cls, last_id: int) -> AsyncIterator[ABI]:
         """
-        Get ABI json with `created` newer than provided `when` parameter.
+        Get ABI json for rows whose `id` is strictly greater than `last_id`.
 
-        :param when: It will be compared with ABI `created` field
-        :return: Abi JSONs, sorted by the oldest ones first
+        Using the autoincremental id as cursor instead of a timestamp avoids
+        the edge case where two ABIs share the same `created` timestamp and
+        the newer one would be permanently skipped by a strict `>` timestamp
+        comparison.
+
+        :param last_id: Exclusive lower bound on the `id` column.
+        :return: Abi JSONs ordered by ascending `id`.
         """
         results = await db_session.execute(
             select(cls.abi_json)
-            .where(col(cls.created) > when)
-            .order_by(col(cls.created).asc())
+            .where(col(cls.id) > last_id)
+            .order_by(col(cls.id).asc())
         )
         for result in results.scalars().all():
             yield cast(ABI, result)
