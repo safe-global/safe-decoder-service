@@ -409,7 +409,7 @@ class TestModels(AsyncDbTestCase):
         await abi.create()
 
         self.assertIsNotNone(abi.abi_hash)
-        assert abi.abi_hash is not None  # narrow type for len()
+        assert abi.abi_hash is not None
         self.assertEqual(len(abi.abi_hash), 32)
         first_hash = abi.abi_hash
 
