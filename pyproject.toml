@@ -39,6 +39,7 @@ dev = [
 [tool.uv]
 # Reject packages published less than 7 days ago to avoid supply-chain attacks
 exclude-newer = "7 days"
+exclude-newer-package = { safe-eth-py = false }
 compile-bytecode = true
 
 [tool.ruff]
