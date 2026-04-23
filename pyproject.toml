@@ -9,7 +9,7 @@ dependencies = [
     "asyncpg==0.31.0",
     "dramatiq[redis,watch]==1.18.0",
     "fastapi-camelcase==2.0.0",
-    "fastapi[all]==0.135.3",
+    "fastapi[all]==0.136.0",
     "gunicorn==25.3.0",
     "periodiq==0.13.0",
     "pydantic-settings==2.13.1",
