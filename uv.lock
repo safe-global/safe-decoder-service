@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-16T12:14:05.309096777Z"
+exclude-newer = "2026-04-16T12:19:32.610611313Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -2437,8 +2437,7 @@ wheels = [
 
 [[package]]
 name = "safe-decoder-service"
-version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aio-pika" },
     { name = "alembic" },
