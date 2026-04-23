@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_typing import ABIEvent, ABIFunction
@@ -118,12 +119,7 @@ class TestRouterAbout(AsyncDbTestCase):
         await source.create()
 
         contract_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-        abi = Abi(
-            abi_hash=b"ExampleABI",
-            abi_json=example_abi,
-            relevance=101,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=example_abi, relevance=101, source_id=source.id)
         await abi.create()
         contract = Contract(
             address=HexBytes(contract_address),
@@ -134,10 +130,7 @@ class TestRouterAbout(AsyncDbTestCase):
         await contract.create()
 
         swapped_abi = Abi(
-            abi_hash=b"SwappedABI",
-            abi_json=example_swapped_abi,
-            relevance=100,
-            source_id=source.id,
+            abi_json=example_swapped_abi, relevance=100, source_id=source.id
         )
         await swapped_abi.create()
         contract = Contract(
