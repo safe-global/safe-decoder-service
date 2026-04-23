@@ -53,60 +53,19 @@ class TestDataDecoderService(AsyncDbTestCase):
 
         # Add Safe Contract Abi and decode it
         for abi in (
+            Abi(abi_json=erc20_contract.abi, relevance=150, source_id=source.id),
+            Abi(abi_json=safe_v1_1_1_contract.abi, relevance=100, source_id=source.id),
+            Abi(abi_json=safe_v1_4_1_contract.abi, relevance=100, source_id=source.id),
+            Abi(abi_json=multisend_contract.abi, relevance=100, source_id=source.id),
+            Abi(abi_json=gnosis_protocol_abi, relevance=50, source_id=source.id),
             Abi(
-                abi_hash=b"ERC20Contract",
-                abi_json=erc20_contract.abi,
-                relevance=150,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"SafeContractV1_1_1_ABI",
-                abi_json=safe_v1_1_1_contract.abi,
-                relevance=100,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"SafeContractV1_4_1_ABI",
-                abi_json=safe_v1_4_1_contract.abi,
-                relevance=100,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"MultiSendContractABI",
-                abi_json=multisend_contract.abi,
-                relevance=100,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"GnosisProtocolABI",
-                abi_json=gnosis_protocol_abi,
-                relevance=50,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"FleetFactoryDeterministic",
                 abi_json=fleet_factory_deterministic_abi,
                 relevance=50,
                 source_id=source.id,
             ),
-            Abi(
-                abi_hash=b"FleetFactory",
-                abi_json=fleet_factory_abi,
-                relevance=50,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"cTokenABI",
-                abi_json=ctoken_abi,
-                relevance=50,
-                source_id=source.id,
-            ),
-            Abi(
-                abi_hash=b"comptrollerABI",
-                abi_json=comptroller_abi,
-                relevance=50,
-                source_id=source.id,
-            ),
+            Abi(abi_json=fleet_factory_abi, relevance=50, source_id=source.id),
+            Abi(abi_json=ctoken_abi, relevance=50, source_id=source.id),
+            Abi(abi_json=comptroller_abi, relevance=50, source_id=source.id),
         ):
             await abi.create()
 
@@ -441,12 +400,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         source = AbiSource(name="local", url="")
         await source.create()
         # Test load a new DbTxDecoder
-        abi = Abi(
-            abi_hash=b"ExampleABI",
-            abi_json=example_abi,
-            relevance=100,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=example_abi, relevance=100, source_id=source.id)
         await abi.create()
         decoder_service = DataDecoderService()
         await decoder_service.init()
@@ -454,12 +408,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
 
-        abi = Abi(
-            abi_hash=b"SwappedABI",
-            abi_json=example_swapped_abi,
-            relevance=100,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=example_swapped_abi, relevance=100, source_id=source.id)
         await abi.create()
         contract = Contract(address=b"c", abi=abi, name="SwappedContract", chain_id=1)
         await contract.create()
@@ -486,19 +435,11 @@ class TestDataDecoderService(AsyncDbTestCase):
 
         # Both ABIs generate the same function selector, but with differently ordered parameter names, so
         # decoding will be different
-        abi = Abi(
-            abi_hash=b"ExampleABI",
-            abi_json=example_abi,
-            relevance=1,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=example_abi, relevance=1, source_id=source.id)
         await abi.create()
 
         abi_reversed = Abi(
-            abi_hash=b"ExampleABIReversed",
-            abi_json=example_swapped_abi,
-            relevance=100,
-            source_id=source.id,
+            abi_json=example_swapped_abi, relevance=100, source_id=source.id
         )
         await abi_reversed.create()
 
@@ -608,10 +549,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         source = AbiSource(name="local", url="")
         await source.create()
         contract_fallback_abi = Abi(
-            abi_hash=b"TupleABI",
-            abi_json=tuple_abi,
-            relevance=100,
-            source_id=source.id,
+            abi_json=tuple_abi, relevance=100, source_id=source.id
         )
         await contract_fallback_abi.create()
 
@@ -657,12 +595,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         # Add a new ABI
         source = AbiSource(name="local", url="")
         await source.create()
-        abi = Abi(
-            abi_hash=b"ExampleABI",
-            abi_json=example_abi,
-            relevance=1,
-            source_id=source.id,
-        )
+        abi = Abi(abi_json=example_abi, relevance=1, source_id=source.id)
         await abi.create()
         len_previous_selectors = len(decoder_service.fn_selectors_with_abis)
         self.assertEqual(await decoder_service.load_new_abis(), 1)

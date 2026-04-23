@@ -259,7 +259,6 @@ class TestContractMetadataService(AsyncDbTestCase):
         # Should be false if contract has abi_id
         source, _ = await AbiSource.get_or_create("Etherscan", "")
         abi = Abi(
-            abi_hash=b"A Test Abi",
             abi_json=etherscan_metadata_mock.abi,
             relevance=10,
             source_id=source.id,

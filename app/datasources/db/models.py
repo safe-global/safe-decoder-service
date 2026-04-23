@@ -1,10 +1,21 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
+import json
 from collections.abc import AsyncIterator
 from typing import Self, cast
 
 from eth_typing import ABI
-from sqlalchemy import BigInteger, DateTime, func, update
+from sqlalchemy import (
+    BigInteger,
+    Computed,
+    DateTime,
+    LargeBinary,
+    func,
+    literal,
+    update,
+)
+from sqlalchemy import cast as sa_cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
@@ -20,7 +31,6 @@ from sqlmodel import (
 from sqlmodel.sql._expression_select_cls import SelectBase
 
 from .database import db_session
-from .utils import get_md5_abi_hash
 
 
 class SqlQueryBase:
@@ -103,7 +113,15 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
 
 class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    abi_hash: bytes | None = Field(nullable=False, index=True, unique=True)
+    abi_hash: bytes | None = Field(
+        default=None,
+        sa_column=Column(
+            LargeBinary,
+            Computed("sha256(abi_json::jsonb::text::bytea)", persisted=True),
+            index=True,
+            unique=True,
+        ),
+    )
     relevance: int | None = Field(nullable=False, default=0, index=True)
     abi_json: list[dict] | dict = Field(default_factory=dict, sa_column=Column(JSON))
     source_id: int | None = Field(
@@ -158,7 +176,6 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
             yield cast(ABI, abi_json)
 
     async def create(self):
-        self.abi_hash = get_md5_abi_hash(self.abi_json)
         return await self._save()
 
     @classmethod
@@ -167,21 +184,23 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         abi_json: list[dict] | dict,
     ):
         """
-        Checks if an Abi exists based on the 'abi_json' by its calculated 'abi_hash'.
-        If it exists, returns the existing Abi. If not,
-        returns None.
+        Checks if an Abi with the given 'abi_json' exists using JSONB equality,
+        which normalises key ordering so the lookup is independent of how the
+        caller serialised the dict.
 
         :param abi_json: The ABI JSON to check.
         :return: The Abi object if it exists, or None if it doesn't.
         """
-        abi_hash = get_md5_abi_hash(abi_json)
-        query = select(cls).where(cls.abi_hash == abi_hash).limit(1)
+        query = (
+            select(cls)
+            .where(
+                sa_cast(cls.abi_json, JSONB)
+                == sa_cast(literal(json.dumps(abi_json)), JSONB)
+            )
+            .limit(1)
+        )
         result = await db_session.execute(query)
-
-        if existing_abi := result.scalars().first():
-            return existing_abi
-
-        return None
+        return result.scalars().first()
 
     @classmethod
     async def get_or_create_abi(
@@ -191,8 +210,9 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         relevance: int | None = 0,
     ) -> tuple["Abi", bool]:
         """
-        Checks if an Abi with the given 'abi_json' exists.
-        If found, returns it with False. If not, creates and returns it with True.
+        Returns the existing Abi for the given 'abi_json' or creates a new one.
+        Deduplication is enforced by the unique index on the generated abi_hash
+        column; concurrent inserts are handled by catching IntegrityError.
 
         :param abi_json: The ABI JSON to check.
         :param relevance:
@@ -200,12 +220,16 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: A tuple containing the Abi object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        if abi := await cls.get_abi(abi_json):
-            return abi, False
-        else:
-            new_item = cls(abi_json=abi_json, relevance=relevance, source_id=source_id)
+        new_item = cls(abi_json=abi_json, relevance=relevance, source_id=source_id)
+        try:
             await new_item.create()
             return new_item, True
+        except IntegrityError:
+            await db_session.rollback()
+            existing = await cls.get_abi(abi_json)
+            if existing is None:
+                raise
+            return existing, False
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
