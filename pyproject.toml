@@ -11,7 +11,7 @@ dependencies = [
     "fastapi-camelcase==2.0.0",
     "fastapi[all]==0.136.0",
     "gunicorn==25.3.0",
-    "periodiq==0.13.0",
+    "periodiq==0.14.0",
     "pydantic-settings==2.13.1",
     "redis[hiredis]==6.4.0",
     "safe-eth-py==7.21.0",
