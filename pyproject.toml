@@ -12,7 +12,7 @@ dependencies = [
     "fastapi[all]==0.136.0",
     "gunicorn==25.3.0",
     "periodiq==0.13.0",
-    "pydantic-settings==2.13.1",
+    "pydantic-settings==2.14.0",
     "redis[hiredis]==6.4.0",
     "safe-eth-py==7.21.0",
     "setuptools>=75.0.0,<82",
