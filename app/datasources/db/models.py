@@ -10,6 +10,7 @@ from sqlalchemy import (
     Computed,
     DateTime,
     LargeBinary,
+    Text,
     func,
     literal,
     update,
@@ -184,21 +185,21 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         abi_json: list[dict] | dict,
     ):
         """
-        Checks if an Abi with the given 'abi_json' exists using JSONB equality,
-        which normalises key ordering so the lookup is independent of how the
-        caller serialised the dict.
+        Checks if an Abi with the given 'abi_json' exists by matching the
+        sha256 of its JSONB-normalised text form against the indexed
+        `abi_hash` generated column. JSONB normalisation makes the hash
+        stable regardless of key ordering in the input.
 
         :param abi_json: The ABI JSON to check.
         :return: The Abi object if it exists, or None if it doesn't.
         """
-        query = (
-            select(cls)
-            .where(
-                sa_cast(cls.abi_json, JSONB)
-                == sa_cast(literal(json.dumps(abi_json)), JSONB)
+        computed_hash = func.sha256(
+            sa_cast(
+                sa_cast(sa_cast(literal(json.dumps(abi_json)), JSONB), Text),
+                LargeBinary,
             )
-            .limit(1)
         )
+        query = select(cls).where(cls.abi_hash == computed_hash).limit(1)
         result = await db_session.execute(query)
         return result.scalars().first()
 
