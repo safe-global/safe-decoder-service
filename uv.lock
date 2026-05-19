@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-16T12:19:32.610611313Z"
+exclude-newer = "2026-04-20T23:14:48.270874752Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -1754,15 +1754,15 @@ wheels = [
 
 [[package]]
 name = "periodiq"
-version = "0.13.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dramatiq" },
     { name = "pendulum" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/89/792352ff691f21f51e299ad67f98399c762b1b744cf38a2d128485b34c14/periodiq-0.13.0.tar.gz", hash = "sha256:ecd83d7614bb9e019aa2718b63c4ffe0a6c77fa0d49f33fd90c309982ddcf7cb", size = 20217, upload-time = "2024-10-16T09:30:31.606Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/47/c31ebbad6190d287020fb5cec98e433a4a3f3646492cc6ec8dc1fc1c6115/periodiq-0.14.0.tar.gz", hash = "sha256:88a61d4b5872b24c4cfdd70c0885952673bb6f748a29301b9aa08cb87f5d23a7", size = 6208, upload-time = "2026-04-16T13:19:26.536Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/f1/3ddb6669e523068b009ca0f4a2e76e847a709df5a4b78ae015a73dd091e5/periodiq-0.13.0-py3-none-any.whl", hash = "sha256:f30d0d80ff7fa005958d1730e03f5a085420bb79aaa3b8331265d20d8a2e57af", size = 36897, upload-time = "2024-10-16T09:30:29.845Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/f8/0a278b00593578d8fccf709b198034291d21a4772b6171bd2e84bfaaedc1/periodiq-0.14.0-py3-none-any.whl", hash = "sha256:2aeebd8a10e11ca211b4ce0e05785c5848e2d2002d7b4d33cbaae9a330c0bb69", size = 7014, upload-time = "2026-04-16T13:19:27.314Z" },
 ]
 
 [[package]]
@@ -2482,7 +2482,7 @@ requires-dist = [
     { name = "fastapi", extras = ["all"], specifier = "==0.136.0" },
     { name = "fastapi-camelcase", specifier = "==2.0.0" },
     { name = "gunicorn", specifier = "==25.3.0" },
-    { name = "periodiq", specifier = "==0.13.0" },
+    { name = "periodiq", specifier = "==0.14.0" },
     { name = "pydantic-settings", specifier = "==2.13.1" },
     { name = "redis", extras = ["hiredis"], specifier = "==6.4.0" },
     { name = "safe-eth-py", specifier = "==7.21.0" },
