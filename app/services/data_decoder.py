@@ -206,6 +206,27 @@ class DataDecoderService:
             return await self._generate_selectors_with_abis_from_abi(abi)
         return None
 
+    @alru_cache(maxsize=2048)
+    async def get_contract_implementation_abi_selectors_with_functions(
+        self, address: Address, chain_id: int | None
+    ) -> dict[bytes, ABIFunction] | None:
+        """
+        :param address: Proxy contract address
+        :param chain_id: Chain for the contract
+        :return: Dictionary of function selectors with `ABIFunction` for the
+            implementation contract if found, `None` otherwise.
+        """
+        if chain_id is None:
+            return None
+
+        contract = await Contract.get_contract(HexBytes(address), chain_id)
+        if not contract or not contract.implementation:
+            return None
+
+        return await self.get_contract_abi_selectors_with_functions(
+            Address(contract.implementation), chain_id
+        )
+
     async def get_abi_function(
         self, data: bytes, address: Address | None = None, chain_id: int | None = None
     ) -> ABIFunction | None:
@@ -232,6 +253,16 @@ class DataDecoderService:
                     # If the selector is available in the abi specific for the address we will use that one
                     # Otherwise we fall back to the general abi that matches the selector
                     return contract_selectors_with_abis[selector]
+                implementation_selectors_with_abis = (
+                    await self.get_contract_implementation_abi_selectors_with_functions(
+                        address, chain_id
+                    )
+                )
+                if (
+                    implementation_selectors_with_abis
+                    and selector in implementation_selectors_with_abis
+                ):
+                    return implementation_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
         return None
 

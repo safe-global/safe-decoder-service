@@ -590,6 +590,107 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
     @db_session_context
+    async def test_decode_proxy_using_implementation_abi(self):
+        proxy_address = Address(HexBytes("0x1000000000000000000000000000000000000001"))
+        implementation_address = Address(
+            HexBytes("0x2000000000000000000000000000000000000002")
+        )
+        source = AbiSource(name="local", url="")
+        await source.create()
+
+        proxy_abi = [
+            {
+                "type": "function",
+                "name": "implementation",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "address"}],
+                "stateMutability": "view",
+            }
+        ]
+        implementation_abi = [
+            {
+                "type": "function",
+                "name": "mint",
+                "inputs": [
+                    {"name": "depositAddr", "type": "address"},
+                    {"name": "amount", "type": "uint256"},
+                    {"name": "validUntil", "type": "uint256"},
+                ],
+                "outputs": [],
+                "stateMutability": "nonpayable",
+            }
+        ]
+        generic_mint_abi = [
+            {
+                "type": "function",
+                "name": "mint",
+                "inputs": [
+                    {"name": "to", "type": "address"},
+                    {"name": "value", "type": "uint256"},
+                    {"name": "deadline", "type": "uint256"},
+                ],
+                "outputs": [],
+                "stateMutability": "nonpayable",
+            }
+        ]
+        proxy_abi_model = await Abi(
+            abi_hash=b"ProxyABI",
+            abi_json=proxy_abi,
+            relevance=1,
+            source_id=source.id,
+        ).create()
+        implementation_abi_model = await Abi(
+            abi_hash=b"ImplementationABI",
+            abi_json=implementation_abi,
+            relevance=1,
+            source_id=source.id,
+        ).create()
+        await Abi(
+            abi_hash=b"GenericMintABI",
+            abi_json=generic_mint_abi,
+            relevance=100,
+            source_id=source.id,
+        ).create()
+        await Contract(
+            address=proxy_address,
+            abi=proxy_abi_model,
+            implementation=implementation_address,
+            name="ProxyContract",
+            chain_id=11155111,
+        ).create()
+        await Contract(
+            address=implementation_address,
+            abi=implementation_abi_model,
+            name="ImplementationContract",
+            chain_id=11155111,
+        ).create()
+
+        data = (
+            Web3()
+            .eth.contract(abi=implementation_abi)
+            .functions.mint(NULL_ADDRESS, 1, 2)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 11155111}
+            )["data"]
+        )
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        fn_name, arguments = await decoder_service.decode_transaction(
+            data, address=proxy_address, chain_id=11155111
+        )
+        self.assertEqual(fn_name, "mint")
+        self.assertEqual(
+            arguments,
+            {
+                "depositAddr": NULL_ADDRESS,
+                "amount": "1",
+                "validUntil": "2",
+            },
+        )
+
+    @db_session_context
     async def test_decode_tuples(self):
         """
         Test tuple parameters are decoded as expected
