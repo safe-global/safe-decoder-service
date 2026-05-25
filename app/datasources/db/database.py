@@ -43,6 +43,7 @@ def get_engine() -> AsyncEngine:
             future=True,
             poolclass=pool_classes.get(settings.DATABASE_POOL_CLASS),
             pool_size=settings.DATABASE_POOL_SIZE,
+            pool_pre_ping=True,
         )
 
 
