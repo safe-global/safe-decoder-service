@@ -1,11 +1,15 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_is_checksum_address
 
+from ..config import settings
 from ..datasources.cache.redis import cache_response, get_key_for_contract
 from ..services.contract import ContractService
+from ..services.contract_metadata_service import get_contract_metadata_service
 from ..services.pagination import (
     GenericPagination,
     PaginatedResponse,
@@ -13,6 +17,8 @@ from ..services.pagination import (
 )
 from ..utils import get_proxy_aware_url
 from .models import ContractsPublic
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/contracts",
@@ -126,4 +132,21 @@ async def list_contracts(
     contracts_page, count = await contracts_service.get_contracts(
         address=HexBytes(address), chain_ids=chain_ids
     )
+
+    if chain_ids and settings.ON_DEMAND_ABI_FETCH_ENABLED:
+        chains_with_abi = {c.chain_id for c in contracts_page if c.abi_id is not None}
+        if missing_chains := [cid for cid in chain_ids if cid not in chains_with_abi]:
+            metadata_service = get_contract_metadata_service()
+            for chain_id in missing_chains:
+                logger.info(
+                    "On-demand ABI fetch for address=%s chain_id=%s", address, chain_id
+                )
+                contract_metadata = await metadata_service.get_contract_metadata(
+                    address, chain_id
+                )
+                await metadata_service.process_contract_metadata(contract_metadata)
+            contracts_page, count = await contracts_service.get_contracts(
+                address=HexBytes(address), chain_ids=chain_ids
+            )
+
     return pagination.serialize(get_proxy_aware_url(request), contracts_page, count)
