@@ -318,6 +318,19 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             return contract, False
 
     @classmethod
+    async def get_implementation_address(
+        cls, address: bytes, chain_id: int | None
+    ) -> bytes | None:
+        """
+        :return: The implementation address if the contract is a proxy, `None` otherwise.
+        """
+        query = select(cls.implementation).where(cls.address == address)
+        if chain_id is not None:
+            query = query.where(cls.chain_id == chain_id)
+        results = await db_session.execute(query)
+        return results.scalars().first()
+
+    @classmethod
     async def get_abi_by_contract_address(
         cls, address: bytes, chain_id: int | None
     ) -> ABI | None:

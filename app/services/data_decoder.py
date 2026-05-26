@@ -197,7 +197,20 @@ class DataDecoderService:
         :param chain_id: Chain for the contract
         :return: Dictionary of function selects with `ABIFunction` if found, `None` otherwise
             If contract is not found for the chain, return the first one that matches in other chain.
+            For proxy contracts, the implementation ABI is used so parameter names are correct.
         """
+        # For proxy contracts, prefer the implementation ABI for accurate parameter names
+        implementation = await Contract.get_implementation_address(
+            HexBytes(address), chain_id
+        )
+        if implementation:
+            impl_address = cast(Address, implementation)
+            abi = await self.get_contract_abi(impl_address, chain_id)
+            if not abi and chain_id is not None:
+                abi = await self.get_contract_abi(impl_address, None)
+            if abi:
+                return await self._generate_selectors_with_abis_from_abi(abi)
+
         abi = await self.get_contract_abi(address, chain_id)
         if not abi and chain_id is not None:
             # Try to find an ABI in other network
