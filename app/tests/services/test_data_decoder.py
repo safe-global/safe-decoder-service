@@ -20,6 +20,7 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
+from ...datasources.cache.redis import del_contract_cache
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -516,6 +517,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         expected_arguments_reversed = {"numberOfDroids": "4", "droidId": "10"}
 
         contract_address = Address(b"a")
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
@@ -575,7 +577,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(arguments, expected_arguments)
         self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
-        # Init a new service to remove caches
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         decoder_service = DataDecoderService()
         await decoder_service.init()
 

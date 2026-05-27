@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 Base settings file for FastApi application.
 """
@@ -51,6 +52,7 @@ class Settings(BaseSettings):
         "SignMessageLib",
         "SafeMigration",
     ]
+    CONTRACT_SELECTORS_CACHE_TTL: int = 60 * 60  # 1 hour
 
 
 settings = Settings()
