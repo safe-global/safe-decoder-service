@@ -269,8 +269,7 @@ class DataDecoderService:
                 ),
             ),
         )
-        if await redis.ttl(redis_key) == -1:
-            await redis.expire(redis_key, settings.CONTRACT_SELECTORS_CACHE_TTL)
+        await redis.expire(redis_key, settings.CONTRACT_SELECTORS_CACHE_TTL, nx=True)
         return selectors
 
     async def get_abi_function(

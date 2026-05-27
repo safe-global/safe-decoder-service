@@ -139,9 +139,7 @@ def cache_response(
             await redis.hset(  # type: ignore[misc]
                 hash_key, field_key, validated_response.model_dump_json(by_alias=True)
             )
-            # Set expiration just if is not configured
-            if await redis.ttl(hash_key) == -1:
-                await redis.expire(hash_key, expire)
+            await redis.expire(hash_key, expire, nx=True)
 
             return response
 
