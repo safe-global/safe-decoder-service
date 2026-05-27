@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from collections.abc import Awaitable
 from copy import copy
+from typing import cast
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -16,6 +18,7 @@ from safe_eth.eth.clients import (
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
+from app.datasources.cache.redis import get_key_for_contract, get_redis
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
@@ -363,3 +366,37 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertEqual(
             fast_to_checksum_address(contract.implementation), implementation_address
         )
+
+    @db_session_context
+    async def test_process_contract_metadata_invalidates_cache_on_implementation_change(
+        self,
+    ):
+        contract_address = Account.create().address
+        await AbiSource(name="Etherscan", url="").create()
+
+        proxy_metadata = copy(etherscan_proxy_metadata_mock)
+        contract_metadata = EnhancedContractMetadata(
+            address=contract_address,
+            metadata=proxy_metadata,
+            source=ContractSource.ETHERSCAN,
+            chain_id=1,
+        )
+        await ContractMetadataService.process_contract_metadata(contract_metadata)
+
+        # Seed a Redis entry to simulate a previously cached result for this proxy
+        redis = get_redis()
+        redis_key = get_key_for_contract(contract_address)
+        await cast(
+            Awaitable[int], redis.hset(redis_key, "selectors:1", '{"cached": "data"}')
+        )
+        self.assertTrue(await redis.exists(redis_key))
+
+        # Same implementation → cache must NOT be invalidated
+        await ContractMetadataService.process_contract_metadata(contract_metadata)
+        self.assertTrue(await redis.exists(redis_key))
+
+        # Changed implementation → cache MUST be invalidated
+        assert contract_metadata.metadata is not None
+        contract_metadata.metadata.implementation = Account.create().address
+        await ContractMetadataService.process_contract_metadata(contract_metadata)
+        self.assertFalse(await redis.exists(redis_key))
