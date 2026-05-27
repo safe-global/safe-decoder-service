@@ -19,7 +19,11 @@ from safe_eth.eth.clients import (
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
-from app.datasources.cache.redis import get_key_for_contract, get_redis
+from app.datasources.cache.redis import (
+    get_field_key_for_selectors,
+    get_key_for_contract,
+    get_redis,
+)
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
@@ -395,17 +399,18 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertIsNotNone(selectors)
         redis = get_redis()
         redis_key = get_key_for_contract(contract_address)
-        self.assertTrue(await redis.exists(redis_key))
+        field_key = get_field_key_for_selectors(chain_id)
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
         # Same implementation → cache must NOT be invalidated
         await ContractMetadataService.process_contract_metadata(contract_metadata)
-        self.assertTrue(await redis.exists(redis_key))
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
-        # Changed implementation → cache MUST be invalidated
+        # Changed implementation → only this chain's selector field must be invalidated
         assert contract_metadata.metadata is not None
         contract_metadata.metadata.implementation = Account.create().address
         await ContractMetadataService.process_contract_metadata(contract_metadata)
-        self.assertFalse(await redis.exists(redis_key))
+        self.assertFalse(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
     @db_session_context
     async def test_process_contract_metadata_does_not_invalidate_cache_for_non_proxy(
@@ -425,11 +430,12 @@ class TestContractMetadataService(AsyncDbTestCase):
 
         redis = get_redis()
         redis_key = get_key_for_contract(contract_address)
+        field_key = get_field_key_for_selectors(chain_id)
         await cast(
-            Awaitable[int], redis.hset(redis_key, "selectors:1", '{"cached": "data"}')
+            Awaitable[int], redis.hset(redis_key, field_key, '{"cached": "data"}')
         )
-        self.assertTrue(await redis.exists(redis_key))
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
         # Processing a non-proxy contract must NOT touch the cache
         await ContractMetadataService.process_contract_metadata(contract_metadata)
-        self.assertTrue(await redis.exists(redis_key))
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]

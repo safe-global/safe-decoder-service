@@ -22,7 +22,7 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.config import settings
-from app.datasources.cache.redis import del_contract_cache, get_redis
+from app.datasources.cache.redis import del_contract_selectors_cache, get_redis
 from app.datasources.db.models import Abi, AbiSource, Contract
 
 logger = logging.getLogger(__name__)
@@ -210,7 +210,9 @@ class ContractMetadataService:
             contract.fetch_retries += 1
         await contract.update()
         if implementation_changed:
-            await del_contract_cache(contract_metadata.address)
+            await del_contract_selectors_cache(
+                contract_metadata.address, contract_metadata.chain_id
+            )
         return bool(contract_metadata.metadata)
 
     @staticmethod
