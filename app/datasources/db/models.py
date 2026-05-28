@@ -322,6 +322,8 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         cls, address: bytes, chain_id: int | None
     ) -> bytes | None:
         """
+        :param address: Contract address to look up.
+        :param chain_id: Chain to filter by, or `None` to match any chain.
         :return: The implementation address if the contract is a proxy, `None` otherwise.
         """
         query = select(cls.implementation).where(cls.address == address)
