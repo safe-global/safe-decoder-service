@@ -200,24 +200,28 @@ class DataDecoderService:
     ) -> ABI | None:
         """
         Resolves the ABI to use for decoding using the following priority:
-            1. Implementation ABI (if the contract is a proxy and the implementation has an ABI)
+            1. Implementation ABI (if chain is known and contract is a proxy with a known ABI)
             2. Contract own ABI on the given chain
             3. Contract own ABI on any chain
+
+        Proxy implementation resolution is skipped when chain_id is None because the
+        implementation address can differ across chains.
 
         :param address: Contract address
         :param chain_id: Chain for the contract
         :return: ABI if found, `None` otherwise
         """
-        implementation = await Contract.get_implementation_address(
-            HexBytes(address), chain_id
-        )
-        if implementation:
-            impl_address = cast(Address, implementation)
-            abi = await self.get_contract_abi(impl_address, chain_id)
-            if not abi and chain_id is not None:
-                abi = await self.get_contract_abi(impl_address, None)
-            if abi:
-                return abi
+        if chain_id is not None:
+            implementation = await Contract.get_implementation_address(
+                HexBytes(address), chain_id
+            )
+            if implementation:
+                impl_address = cast(Address, implementation)
+                abi = await self.get_contract_abi(impl_address, chain_id)
+                if not abi:
+                    abi = await self.get_contract_abi(impl_address, None)
+                if abi:
+                    return abi
 
         abi = await self.get_contract_abi(address, chain_id)
         if not abi and chain_id is not None:
