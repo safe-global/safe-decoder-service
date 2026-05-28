@@ -21,7 +21,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.datasources.cache.redis import (
     get_field_key_for_selectors,
-    get_key_for_contract,
+    get_key_for_contract_selectors,
     get_redis,
 )
 from app.datasources.db.database import db_session, db_session_context
@@ -398,7 +398,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         )
         self.assertIsNotNone(selectors)
         redis = get_redis()
-        redis_key = get_key_for_contract(contract_address)
+        redis_key = get_key_for_contract_selectors(contract_address)
         field_key = get_field_key_for_selectors(chain_id)
         self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
@@ -429,7 +429,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         await ContractMetadataService.process_contract_metadata(contract_metadata)
 
         redis = get_redis()
-        redis_key = get_key_for_contract(contract_address)
+        redis_key = get_key_for_contract_selectors(contract_address)
         field_key = get_field_key_for_selectors(chain_id)
         await cast(
             Awaitable[int], redis.hset(redis_key, field_key, '{"cached": "data"}')

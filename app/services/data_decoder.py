@@ -23,7 +23,7 @@ from web3._utils.normalizers import implicitly_identity
 from ..config import settings
 from ..datasources.cache.redis import (
     get_field_key_for_selectors,
-    get_key_for_contract,
+    get_key_for_contract_selectors,
     get_redis,
 )
 from ..datasources.db.models import Abi, Contract
@@ -234,7 +234,7 @@ class DataDecoderService:
             If contract is not found for the chain, return the first one that matches in other chain.
             For proxy contracts, the implementation ABI is used so parameter names are correct.
         """
-        redis_key = get_key_for_contract(to_0x_hex_str(HexBytes(address)))
+        redis_key = get_key_for_contract_selectors(to_0x_hex_str(HexBytes(address)))
         field_key = get_field_key_for_selectors(chain_id)
 
         redis = get_redis()

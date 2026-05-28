@@ -38,6 +38,16 @@ def get_key_for_contract(address: str, **kwargs) -> str:
     return f"contract:{address.lower()}"
 
 
+def get_key_for_contract_selectors(address: str) -> str:
+    """
+    Build the Redis key for ABI selector caching, separate from the API response cache.
+
+    :param address: The contract address.
+    :return: A string key in the format 'contract:<address>:selectors'.
+    """
+    return f"contract:{address.lower()}:selectors"
+
+
 async def del_contract_cache(address: str):
     """
     Delete the Redis cache entry for a specific contract by address.
@@ -46,7 +56,10 @@ async def del_contract_cache(address: str):
     :param address: The contract address used to build the cache key.
     :return: None
     """
-    await get_redis().unlink(get_key_for_contract(address))
+    await get_redis().unlink(
+        get_key_for_contract(address),
+        get_key_for_contract_selectors(address),
+    )
 
 
 def get_field_key_for_selectors(chain_id: int | None) -> str:
@@ -62,16 +75,20 @@ def get_field_key_for_selectors(chain_id: int | None) -> str:
 async def del_contract_selectors_cache(address: str, chain_id: int | None):
     """
     Delete the cached ABI selectors for a specific contract on a specific chain.
+    Always also deletes the chain-agnostic (None) field so chainless queries are invalidated too.
 
     :param address: The contract address used to build the cache key.
     :param chain_id: The chain id whose selector cache should be invalidated.
     :return: None
     """
+    fields_to_delete = [get_field_key_for_selectors(chain_id)]
+    if chain_id is not None:
+        fields_to_delete.append(get_field_key_for_selectors(None))
     await cast(
         Awaitable[int],
         get_redis().hdel(
-            get_key_for_contract(address),
-            get_field_key_for_selectors(chain_id),
+            get_key_for_contract_selectors(address),
+            *fields_to_delete,
         ),
     )
 
