@@ -229,7 +229,7 @@ class DataDecoderService:
             return own_abi
 
         # Last chance: any ABI on any chain with the same address
-        if not own_abi and chain_id is not None:
+        if chain_id is not None:
             return await self.get_contract_abi(address, None)
 
         return None
