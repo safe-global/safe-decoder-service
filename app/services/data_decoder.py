@@ -200,7 +200,9 @@ class DataDecoderService:
     ) -> ABI | None:
         """
         Resolves the ABI to use for decoding using the following priority:
-            1. Implementation ABI (if chain is known and contract is a proxy with a known ABI)
+            1. Proxy own ABI merged with implementation ABI (if chain is known and contract
+               is a proxy with a known implementation ABI). Implementation selectors take
+               priority over proxy selectors on collision so parameter names are correct.
             2. Contract own ABI on the given chain
             3. Contract own ABI on any chain
 
@@ -211,22 +213,26 @@ class DataDecoderService:
         :param chain_id: Chain for the contract
         :return: ABI if found, `None` otherwise
         """
+        own_abi = await self.get_contract_abi(address, chain_id)
+
         if chain_id is not None:
             implementation = await Contract.get_implementation_address(
                 HexBytes(address), chain_id
             )
             if implementation:
                 impl_address = cast(Address, implementation)
-                abi = await self.get_contract_abi(impl_address, chain_id)
-                if not abi:
-                    abi = await self.get_contract_abi(impl_address, None)
-                if abi:
-                    return abi
+                impl_abi = await self.get_contract_abi(impl_address, chain_id)
+                if impl_abi:
+                    return list(own_abi or []) + list(impl_abi)
 
-        abi = await self.get_contract_abi(address, chain_id)
-        if not abi and chain_id is not None:
-            abi = await self.get_contract_abi(address, None)
-        return abi
+        if own_abi:
+            return own_abi
+
+        # Last chance: any ABI on any chain with the same address
+        if not own_abi and chain_id is not None:
+            return await self.get_contract_abi(address, None)
+
+        return None
 
     async def get_contract_abi_selectors_with_functions(
         self, address: Address, chain_id: int | None
