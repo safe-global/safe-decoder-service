@@ -10,7 +10,6 @@ from safe_eth.eth.utils import (
     fast_is_checksum_address,
     fast_to_checksum_address,
 )
-from safe_eth.util.util import to_0x_hex_str
 
 from ..config import settings
 from ..services.data_decoder import DecodingAccuracyEnum
@@ -30,22 +29,16 @@ class ProjectPublic(CamelModel):
 class AbiPublic(CamelModel):
     model_config = ConfigDict(from_attributes=True)
 
+    abi_hash: str | None = None
     abi_json: list[dict] | dict | None
-    abi_hash: bytes | str
     modified: datetime
 
-    @field_validator("abi_hash")
+    @field_validator("abi_hash", mode="before")
     @classmethod
-    def convert_bytes_to_hex(cls, abi_hash: bytes):
-        """
-        Convert bytes to hex
-
-        :param abi_hash:
-        :return:
-        """
-        if isinstance(abi_hash, bytes):
-            return to_0x_hex_str(abi_hash)  # Convert bytes to a hex string
-        return abi_hash
+    def bytes_to_hex(cls, v: bytes | str | None) -> str | None:
+        if isinstance(v, bytes):
+            return "0x" + v.hex()
+        return v
 
 
 class ContractsPublic(CamelModel):
