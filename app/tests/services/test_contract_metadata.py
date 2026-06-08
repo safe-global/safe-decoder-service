@@ -37,8 +37,20 @@ class TestContractMetadataService(AsyncDbTestCase):
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )
+    @mock.patch.object(
+        AsyncBlockscoutClient, "async_get_contract_metadata", autospec=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "is_chain_supported", autospec=True, return_value=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "async_get_contract_metadata", autospec=True
+    )
     async def test_get_contract_metadata_skips_partial_match(
         self,
+        sourcify_get_contract_metadata_mock: MagicMock,
+        sourcify_is_chain_supported: MagicMock,
+        blockscout_get_contract_metadata_mock: MagicMock,
         etherscan_get_contract_metadata_mock: MagicMock,
     ):
         from safe_eth.eth.clients import ContractMetadata
@@ -51,18 +63,19 @@ class TestContractMetadataService(AsyncDbTestCase):
             partial_match=True,
         )
         etherscan_get_contract_metadata_mock.return_value = partial_metadata
+        sourcify_get_contract_metadata_mock.return_value = None
+        blockscout_get_contract_metadata_mock.return_value = None
         contract_metadata_service = ContractMetadataService("")
         random_address = Account.create().address
 
-        with self.assertLogs(
-            "app.services.contract_metadata_service", level="WARNING"
-        ) as log_ctx:
+        with mock.patch("app.services.contract_metadata_service.logger") as mock_logger:
             result = await contract_metadata_service.get_contract_metadata(
-                random_address, 1
+                random_address, 100
             )
 
         self.assertIsNone(result.metadata)
-        self.assertTrue(any("partial match" in line.lower() for line in log_ctx.output))
+        warning_messages = [call.args[0] for call in mock_logger.warning.call_args_list]
+        self.assertTrue(any("partial match" in msg.lower() for msg in warning_messages))
 
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
@@ -100,6 +113,8 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertIsNotNone(contract_data.source)
         self.assertEqual(contract_data.source.value, "Etherscan")  # type: ignore
 
+        # sourcify_metadata_mock has partial_match=True, so it is skipped and
+        # Blockscout is returned instead.
         etherscan_get_contract_metadata_mock.return_value = None
         contract_data = await contract_metadata_service.get_contract_metadata(
             random_address, chain_id
@@ -107,10 +122,10 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertEqual(contract_data.address, random_address)
         self.assertEqual(
             contract_data.metadata,
-            sourcify_metadata_mock,
+            blockscout_metadata_mock,
         )
         self.assertIsNotNone(contract_data.source)
-        self.assertEqual(contract_data.source.value, "Sourcify")  # type: ignore
+        self.assertEqual(contract_data.source.value, "Blockscout")  # type: ignore
 
         sourcify_get_contract_metadata_mock.side_effect = IOError
         contract_data = await contract_metadata_service.get_contract_metadata(

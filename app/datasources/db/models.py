@@ -124,7 +124,9 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         ),
     )
     relevance: int | None = Field(nullable=False, default=0, index=True)
-    abi_json: list[dict] | dict = Field(sa_column=Column(JSON, nullable=False))
+    abi_json: list[dict] | dict = Field(
+        sa_column=Column(JSON(none_as_null=True), nullable=False)
+    )
     source_id: int | None = Field(
         nullable=False, default=None, foreign_key="abisource.id"
     )

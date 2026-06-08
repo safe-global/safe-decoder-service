@@ -431,3 +431,12 @@ class TestModels(AsyncDbTestCase):
         await abi3.create()
         self.assertIsNotNone(abi3.abi_hash)
         self.assertNotEqual(first_hash, abi3.abi_hash)
+
+    @db_session_context
+    async def test_abi_json_not_null_constraint(self):
+        source = AbiSource(name="null_test_source", url="")
+        await source.create()
+
+        abi = Abi(abi_json=None, source_id=source.id)
+        with self.assertRaises(IntegrityError):
+            await abi.create()
