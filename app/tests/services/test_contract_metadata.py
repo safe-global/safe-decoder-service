@@ -37,6 +37,36 @@ class TestContractMetadataService(AsyncDbTestCase):
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )
+    async def test_get_contract_metadata_skips_partial_match(
+        self,
+        etherscan_get_contract_metadata_mock: MagicMock,
+    ):
+        from safe_eth.eth.clients import ContractMetadata
+
+        # Partial matches can carry abi=None even though the type hint says otherwise,
+        # because ContractMetadata is a plain dataclass with no runtime validation.
+        partial_metadata = ContractMetadata(
+            name="Partial Contract",
+            abi=None,  # type: ignore[arg-type]
+            partial_match=True,
+        )
+        etherscan_get_contract_metadata_mock.return_value = partial_metadata
+        contract_metadata_service = ContractMetadataService("")
+        random_address = Account.create().address
+
+        with self.assertLogs(
+            "app.services.contract_metadata_service", level="WARNING"
+        ) as log_ctx:
+            result = await contract_metadata_service.get_contract_metadata(
+                random_address, 1
+            )
+
+        self.assertIsNone(result.metadata)
+        self.assertTrue(any("partial match" in line.lower() for line in log_ctx.output))
+
+    @mock.patch.object(
+        AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
+    )
     @mock.patch.object(
         AsyncBlockscoutClient, "async_get_contract_metadata", autospec=True
     )

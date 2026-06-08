@@ -137,12 +137,19 @@ class ContractMetadataService:
                     contract_address
                 )
                 if contract_metadata:
-                    return EnhancedContractMetadata(
-                        address=contract_address,
-                        metadata=contract_metadata,
-                        source=ContractSource.from_client(client),
-                        chain_id=chain_id,
-                    )
+                    if contract_metadata.partial_match:
+                        logger.warning(
+                            "Skipping partial match for contract=%s from client=%s",
+                            contract_address,
+                            client.__class__.__name__,
+                        )
+                    else:
+                        return EnhancedContractMetadata(
+                            address=contract_address,
+                            metadata=contract_metadata,
+                            source=ContractSource.from_client(client),
+                            chain_id=chain_id,
+                        )
 
             except (OSError, EtherscanRateLimitError):
                 logger.debug(
