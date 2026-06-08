@@ -97,8 +97,6 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertIsNotNone(contract_data.source)
         self.assertEqual(contract_data.source.value, "Etherscan")  # type: ignore
 
-        # sourcify_metadata_mock has partial_match=True but carries a valid ABI,
-        # so it is accepted and returned.
         etherscan_get_contract_metadata_mock.return_value = None
         contract_data = await contract_metadata_service.get_contract_metadata(
             random_address, chain_id
