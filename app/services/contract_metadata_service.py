@@ -137,19 +137,12 @@ class ContractMetadataService:
                     contract_address
                 )
                 if contract_metadata:
-                    if contract_metadata.partial_match:
-                        logger.warning(
-                            "Skipping partial match for contract=%s from client=%s",
-                            contract_address,
-                            client.__class__.__name__,
-                        )
-                    else:
-                        return EnhancedContractMetadata(
-                            address=contract_address,
-                            metadata=contract_metadata,
-                            source=ContractSource.from_client(client),
-                            chain_id=chain_id,
-                        )
+                    return EnhancedContractMetadata(
+                        address=contract_address,
+                        metadata=contract_metadata,
+                        source=ContractSource.from_client(client),
+                        chain_id=chain_id,
+                    )
 
             except (OSError, EtherscanRateLimitError):
                 logger.debug(
@@ -192,6 +185,15 @@ class ContractMetadataService:
             if source is None:
                 logging.error(
                     "Abi source %s does not exist", contract_metadata.source.value
+                )
+                contract.fetch_retries += 1
+                await contract.update()
+                return False
+
+            if not contract_metadata.metadata.abi:
+                logging.error(
+                    "Cannot store ABI for %s: ABI is empty or null",
+                    contract_metadata.address,
                 )
                 contract.fetch_retries += 1
                 await contract.update()
