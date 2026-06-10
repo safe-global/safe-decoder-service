@@ -173,7 +173,7 @@ class ContractMetadataService:
 
         if contract_metadata.metadata:
             if not contract_metadata.source:
-                logging.error(
+                logger.error(
                     "Cannot store ABI for %s: metadata present but source is missing",
                     contract_metadata.address,
                 )
@@ -183,7 +183,7 @@ class ContractMetadataService:
 
             source = await AbiSource.get_abi_source(name=contract_metadata.source.value)
             if source is None:
-                logging.error(
+                logger.error(
                     "Abi source %s does not exist", contract_metadata.source.value
                 )
                 contract.fetch_retries += 1
@@ -191,7 +191,7 @@ class ContractMetadataService:
                 return False
 
             if not contract_metadata.metadata.abi:
-                logging.error(
+                logger.error(
                     "Cannot store ABI for %s: ABI is empty or null",
                     contract_metadata.address,
                 )

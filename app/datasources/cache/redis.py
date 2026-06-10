@@ -60,7 +60,7 @@ def get_field_key(kwargs: dict) -> str:
     request = kwargs.get("request")
     url_path = ""
     if request:
-        url_path = str(get_proxy_aware_url(request)) if request else ""
+        url_path = str(get_proxy_aware_url(request))
 
     # Add query parameters as part of key field except the request.
     cacheable_kwargs = {
