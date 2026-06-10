@@ -9,7 +9,11 @@ from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
-from app.datasources.cache.redis import del_contract_cache, get_redis
+from app.datasources.cache.redis import (
+    del_contract_cache,
+    del_contract_selectors_cache,
+    get_redis,
+)
 from app.datasources.db.database import db_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import logging_task_context
@@ -76,11 +80,42 @@ async def get_contract_metadata_task(
                     "Adding task to download proxy implementation metadata with address %s",
                     proxy_implementation_address,
                 )
-                get_contract_metadata_task.send(
-                    address=proxy_implementation_address, chain_id=chain_id
+                get_proxy_implementation_metadata_task.send(
+                    proxy_address=address,
+                    implementation_address=proxy_implementation_address,
+                    chain_id=chain_id,
                 )
         else:
             logger.debug("Skipping contract")
+
+
+@dramatiq.actor
+@db_session_context
+async def get_proxy_implementation_metadata_task(
+    proxy_address: str, implementation_address: str, chain_id: int
+):
+    with logging_task_context(CurrentMessage.get_current_message()):
+        contract_metadata_service = get_contract_metadata_service()
+        if await contract_metadata_service.should_attempt_download(
+            implementation_address, chain_id, 0
+        ):
+            logger.info("Downloading proxy implementation contract metadata")
+            contract_metadata = await contract_metadata_service.get_contract_metadata(
+                fast_to_checksum_address(implementation_address), chain_id
+            )
+            result = await contract_metadata_service.process_contract_metadata(
+                contract_metadata
+            )
+            if result:
+                logger.info(
+                    "Success downloading proxy implementation contract metadata"
+                )
+                await del_contract_cache(implementation_address)
+                await del_contract_selectors_cache(proxy_address, chain_id)
+            else:
+                logger.info("Failed to download proxy implementation contract metadata")
+        else:
+            logger.debug("Skipping proxy implementation contract")
 
 
 @dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight

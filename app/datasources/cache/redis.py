@@ -2,7 +2,7 @@
 import asyncio
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import cast
 from weakref import WeakKeyDictionary
@@ -38,14 +38,59 @@ def get_key_for_contract(address: str, **kwargs) -> str:
     return f"contract:{address.lower()}"
 
 
+def get_key_for_contract_selectors(address: str) -> str:
+    """
+    Build the Redis key for ABI selector caching, separate from the API response cache.
+
+    :param address: The contract address.
+    :return: A string key in the format 'contract:<address>:selectors'.
+    """
+    return f"contract:{address.lower()}:selectors"
+
+
 async def del_contract_cache(address: str):
     """
     Delete the Redis cache entry for a specific contract by address.
+    This removes all cached data for the contract across all chains.
 
     :param address: The contract address used to build the cache key.
     :return: None
     """
-    await get_redis().unlink(get_key_for_contract(address))
+    await get_redis().unlink(
+        get_key_for_contract(address),
+        get_key_for_contract_selectors(address),
+    )
+
+
+def get_field_key_for_selectors(chain_id: int | None) -> str:
+    """
+    Build the Redis hash field key for cached ABI selectors of a contract on a specific chain.
+
+    :param chain_id: Chain id for the contract.
+    :return: A string field key in the format 'selectors:<chain_id>'.
+    """
+    return f"selectors:{chain_id}"
+
+
+async def del_contract_selectors_cache(address: str, chain_id: int | None):
+    """
+    Delete the cached ABI selectors for a specific contract on a specific chain.
+    Always also deletes the chain-agnostic (None) field so chainless queries are invalidated too.
+
+    :param address: The contract address used to build the cache key.
+    :param chain_id: The chain id whose selector cache should be invalidated.
+    :return: None
+    """
+    fields_to_delete = [get_field_key_for_selectors(chain_id)]
+    if chain_id is not None:
+        fields_to_delete.append(get_field_key_for_selectors(None))
+    await cast(
+        Awaitable[int],
+        get_redis().hdel(
+            get_key_for_contract_selectors(address),
+            *fields_to_delete,
+        ),
+    )
 
 
 def get_field_key(kwargs: dict) -> str:
@@ -111,9 +156,7 @@ def cache_response(
             await redis.hset(  # type: ignore[misc]
                 hash_key, field_key, validated_response.model_dump_json(by_alias=True)
             )
-            # Set expiration just if is not configured
-            if await redis.ttl(hash_key) == -1:
-                await redis.expire(hash_key, expire)
+            await redis.expire(hash_key, expire, nx=True)
 
             return response
 

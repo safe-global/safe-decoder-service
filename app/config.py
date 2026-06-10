@@ -54,6 +54,7 @@ class Settings(BaseSettings):
         "SignMessageLib",
         "SafeMigration",
     ]
+    CONTRACT_SELECTORS_CACHE_TTL: int = 60 * 60  # 1 hour
 
 
 settings = Settings()

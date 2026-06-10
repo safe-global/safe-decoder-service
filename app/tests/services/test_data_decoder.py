@@ -20,6 +20,7 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
+from ...datasources.cache.redis import del_contract_cache
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -457,6 +458,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         expected_arguments_reversed = {"numberOfDroids": "4", "droidId": "10"}
 
         contract_address = Address(b"a")
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
@@ -516,7 +518,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(arguments, expected_arguments)
         self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
-        # Init a new service to remove caches
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         decoder_service = DataDecoderService()
         await decoder_service.init()
 
@@ -603,3 +605,88 @@ class TestDataDecoderService(AsyncDbTestCase):
             len(decoder_service.fn_selectors_with_abis), len_previous_selectors
         )
         self.assertEqual(decoder_service.last_abi_id, abi.id)
+
+    @db_session_context
+    async def test_proxy_contract_uses_implementation_abi(self):
+        """
+        When decoding calldata sent to a proxy contract, the implementation's ABI should
+        be used so that parameter names are correct. Accuracy must still be FULL_MATCH
+        because the proxy address itself is registered on that chain.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+
+        # Proxy has an ABI with generic/incorrect parameter names
+        proxy_abi_obj = Abi(
+            abi_hash=b"ProxyABI",
+            abi_json=example_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await proxy_abi_obj.create()
+
+        # Implementation has the correct parameter names (swapped in this test)
+        impl_abi_obj = Abi(
+            abi_hash=b"ImplABI",
+            abi_json=example_swapped_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await impl_abi_obj.create()
+
+        proxy_address = b"proxy"
+        impl_address = b"impl"
+
+        impl_contract = Contract(
+            address=impl_address,
+            abi=impl_abi_obj,
+            name="Implementation",
+            chain_id=1,
+        )
+        await impl_contract.create()
+
+        proxy_contract = Contract(
+            address=proxy_address,
+            abi=proxy_abi_obj,
+            name="Proxy",
+            chain_id=1,
+            implementation=impl_address,
+        )
+        await proxy_contract.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        # Decoding against the implementation directly uses its own ABI
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(impl_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+
+        # Decoding against the proxy must follow the proxy → implementation chain
+        # and use the implementation ABI for correct parameter names
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(
+            arguments,
+            {"numberOfDroids": "4", "droidId": "10"},
+            "Proxy decoding should use implementation ABI parameter names",
+        )
+
+        # Accuracy must still be FULL_MATCH because the proxy is registered on chain 1
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
