@@ -94,6 +94,7 @@ class DataDecoderInput(CamelModel):
     )
 
     @field_validator("to")
+    @classmethod
     def validate_checksum_address(cls, value):
         if value and not fast_is_checksum_address(value):
             raise ValueError("Address is not checksummed")

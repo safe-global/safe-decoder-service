@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 from functools import cache
 
@@ -40,7 +41,7 @@ class SafeContractsService:
         :param version:
         :return: display_name
         """
-        contract_name = contract_name.replace("Gnosis", "")
+        contract_name = contract_name.replace("Gnosis", "").strip()
         if "safe" not in contract_name.lower():
             return f"Safe: {contract_name} {version}"
         else:
