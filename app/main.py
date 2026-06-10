@@ -12,10 +12,7 @@ from starlette.responses import Response
 from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
 
 from . import VERSION
-from .datasources.db.database import (
-    db_session,
-    set_database_session_context,
-)
+from .datasources.db.database import with_db_session_context
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -55,7 +52,7 @@ async def lifespan(app: FastAPI):
             )
             logger.debug("Created task to consume elements from Queue Provider")
 
-        with set_database_session_context("InitializeDataDecoderServiceOnStartup"):
+        async with with_db_session_context("InitializeDataDecoderServiceOnStartup"):
             # Load hardcoded ABIs in database
             await abi_service.load_local_abis_in_database()
             # Initializes DataDecoderService
@@ -141,39 +138,36 @@ async def http_request_middleware(request: Request, call_next):
     :return:
     """
     start_time = datetime.datetime.now(datetime.UTC)
-    with set_database_session_context():
-        response: Response | None = None
-        try:
+    response: Response | None = None
+    try:
+        async with with_db_session_context():
             response = await call_next(request)
-        finally:
-            await db_session.remove()
-            # Log request
-            try:
-                end_time = datetime.datetime.now(datetime.UTC)
-                total_time = (
-                    end_time - start_time
-                ).total_seconds() * 1000  # time in ms
-                route = request.scope.get("route")
-                http_request = HttpRequestLog(
-                    url=str(request.url),
-                    route=route.path if route else None,
-                    method=request.method,
-                    startTime=start_time,
-                )
-                status_code = response.status_code if response else 500
-                http_response = HttpResponseLog(
-                    status=status_code,
-                    endTime=end_time,
-                    totalTime=int(total_time),
-                )
-                logger.info(
-                    "Http request",
-                    extra={
-                        "http_response": http_response.model_dump(),
-                        "http_request": http_request.model_dump(),
-                    },
-                )
-            except Exception as e:
-                logger.error(f"Validation log error {e}")
+    finally:
+        # Log request
+        try:
+            end_time = datetime.datetime.now(datetime.UTC)
+            total_time = (end_time - start_time).total_seconds() * 1000  # time in ms
+            route = request.scope.get("route")
+            http_request = HttpRequestLog(
+                url=str(request.url),
+                route=route.path if route else None,
+                method=request.method,
+                startTime=start_time,
+            )
+            status_code = response.status_code if response else 500
+            http_response = HttpResponseLog(
+                status=status_code,
+                endTime=end_time,
+                totalTime=int(total_time),
+            )
+            logger.info(
+                "Http request",
+                extra={
+                    "http_response": http_response.model_dump(),
+                    "http_request": http_request.model_dump(),
+                },
+            )
+        except Exception as e:
+            logger.error(f"Validation log error {e}")
 
     return response

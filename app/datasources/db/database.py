@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import uuid
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from functools import cache, wraps
 
@@ -46,6 +46,13 @@ def get_engine() -> AsyncEngine:
             pool_size=settings.DATABASE_POOL_SIZE,
             max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,
             pool_pre_ping=True,
+            connect_args={
+                "server_settings": {
+                    "idle_in_transaction_session_timeout": str(
+                        settings.DATABASE_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS
+                    )
+                }
+            },
         )
 
 
@@ -80,23 +87,42 @@ def _get_database_session_context() -> str:
     return _db_session_context.get()
 
 
+@asynccontextmanager
+async def with_db_session_context(
+    session_id: str | None = None,
+) -> AsyncGenerator[None]:
+    """
+    Async context manager that opens a database session scope and guarantees the
+    scoped session (and its connection) is released on exit via `db_session.remove()`.
+
+    Use it to bound a unit of database work so the connection is returned to the
+    pool as soon as that work is done, instead of being held until the end of the
+    surrounding request/task.
+
+    :param session_id:
+    :return:
+    """
+    with set_database_session_context(session_id):
+        try:
+            yield
+        finally:
+            logger.debug(
+                "Removing session context: %s", _get_database_session_context()
+            )
+            await db_session.remove()
+
+
 def db_session_context(func):
     """
-    Wrap the decorated function in the `set_database_session_context` context.
+    Wrap the decorated function in the `with_db_session_context` context.
     Decorated function will share the same database session.
     Remove the session at the end of the context.
     """
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        with set_database_session_context():
-            try:
-                return await func(*args, **kwargs)
-            finally:
-                logger.debug(
-                    "Removing session context: %s", _get_database_session_context()
-                )
-                await db_session.remove()
+        async with with_db_session_context():
+            return await func(*args, **kwargs)
 
     return wrapper
 

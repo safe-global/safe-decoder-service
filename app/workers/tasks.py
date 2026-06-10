@@ -10,7 +10,7 @@ from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
 from app.datasources.cache.redis import del_contract_cache, get_redis
-from app.datasources.db.database import db_session_context
+from app.datasources.db.database import db_session_context, with_db_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import logging_task_context
 from app.services.contract_metadata_service import get_contract_metadata_service
@@ -45,13 +45,15 @@ async def get_contract_metadata_task(
 ):
     with logging_task_context(CurrentMessage.get_current_message()):
         contract_metadata_service = get_contract_metadata_service()
-        # Just try the first time, following retries should be scheduled
-        if (
-            skip_attempt_download
-            or await contract_metadata_service.should_attempt_download(
-                address, chain_id, 0
+        async with with_db_session_context():
+            # Just try the first time, following retries should be scheduled
+            should_download = (
+                skip_attempt_download
+                or await contract_metadata_service.should_attempt_download(
+                    address, chain_id, 0
+                )
             )
-        ):
+        if should_download:
             logger.info("Downloading contract metadata")
             contract_metadata = await contract_metadata_service.get_contract_metadata(
                 fast_to_checksum_address(address), chain_id

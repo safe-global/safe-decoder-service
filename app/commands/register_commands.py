@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import inspect
 from collections.abc import Callable
@@ -10,7 +11,7 @@ from app.commands.download_contract import download_contract_command
 from app.commands.safe_contracts import (
     setup_safe_contracts,
 )
-from app.datasources.db.database import db_session, set_database_session_context
+from app.datasources.db.database import with_db_session_context
 
 
 def async_command(func: Callable) -> Callable:
@@ -27,11 +28,8 @@ def async_command(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any):
             async def run_with_context():
-                with set_database_session_context():
-                    try:
-                        return await func(*args, **kwargs)
-                    finally:
-                        await db_session.remove()
+                async with with_db_session_context():
+                    return await func(*args, **kwargs)
 
             return asyncio.run(run_with_context())
 
