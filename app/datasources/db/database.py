@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import uuid
 from collections.abc import Generator
@@ -43,6 +44,8 @@ def get_engine() -> AsyncEngine:
             future=True,
             poolclass=pool_classes.get(settings.DATABASE_POOL_CLASS),
             pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,
+            pool_pre_ping=True,
         )
 
 
