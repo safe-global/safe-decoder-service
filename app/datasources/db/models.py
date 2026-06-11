@@ -16,9 +16,8 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy import cast as sa_cast
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import (
     JSON,
     Column,
@@ -42,7 +41,7 @@ class SqlQueryBase:
 
     async def _save(self):
         db_session.add(self)
-        await db_session.commit()
+        await db_session.flush()
         return self
 
     async def update(self):
@@ -215,7 +214,8 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         """
         Returns the existing Abi for the given 'abi_json' or creates a new one.
         Deduplication is enforced by the unique index on the generated abi_hash
-        column; concurrent inserts are handled by catching IntegrityError.
+        column; concurrent inserts are handled with INSERT ... ON CONFLICT DO
+        NOTHING so the surrounding transaction is never rolled back.
 
         :param abi_json: The ABI JSON to check.
         :param relevance:
@@ -223,16 +223,14 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: A tuple containing the Abi object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        new_item = cls(abi_json=abi_json, relevance=relevance, source_id=source_id)
-        try:
-            await new_item.create()
-            return new_item, True
-        except IntegrityError:
-            await db_session.rollback()
-            existing = await cls.get_abi(abi_json)
-            if existing is None:
-                raise
-            return existing, False
+        insert_stmt = (
+            insert(cls)
+            .values(abi_json=abi_json, relevance=relevance, source_id=source_id)
+            .on_conflict_do_nothing()
+        )
+        result = cast(CursorResult, await db_session.execute(insert_stmt))
+        abi = await cls.get_abi(abi_json)
+        return cast("Abi", abi), bool(result.rowcount)
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
@@ -321,7 +319,8 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     ) -> tuple["Contract", bool]:
         """
         Update or create the given params.
-        Handles concurrent inserts gracefully by catching IntegrityError.
+        Handles concurrent inserts gracefully with INSERT ... ON CONFLICT DO
+        NOTHING so the surrounding transaction is never rolled back.
 
         :param address:
         :param chain_id:
@@ -329,20 +328,14 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         :return: A tuple containing the Contract object and a boolean indicating
                  whether it was created `True` or already exists `False`.
         """
-        contract = cls(address=address, chain_id=chain_id)
-        for key, value in kwargs.items():
-            setattr(contract, key, value)
-
-        try:
-            await contract.create()
-            return contract, True
-        except IntegrityError:
-            await db_session.rollback()
-            contract = await cls.get_contract(address, chain_id)
-            if contract is None:
-                raise
-
-            return contract, False
+        insert_stmt = (
+            insert(cls)
+            .values(address=address, chain_id=chain_id, **kwargs)
+            .on_conflict_do_nothing()
+        )
+        result = cast(CursorResult, await db_session.execute(insert_stmt))
+        contract = await cls.get_contract(address, chain_id)
+        return cast("Contract", contract), bool(result.rowcount)
 
     @classmethod
     async def get_abi_by_contract_address(
@@ -429,7 +422,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             )
         )
         result = cast(CursorResult, await db_session.execute(query))
-        await db_session.commit()
+        await db_session.flush()
         return result.rowcount
 
     @classmethod

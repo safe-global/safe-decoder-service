@@ -6,6 +6,7 @@ from hexbytes import HexBytes
 from safe_eth.safe.safe_deployments import default_safe_deployments
 
 from app.config import settings
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Contract
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,8 @@ class SafeContractsService:
             HexBytes(address)
             for _, _, address in self._get_default_deployments_by_version()
         }
-        exists = await Contract.exists_safe_contracts(chain_id, safe_addresses)
+        async with transactional_session_context():
+            exists = await Contract.exists_safe_contracts(chain_id, safe_addresses)
 
         if exists:
             self._safe_contracts_cache.add(chain_id)
@@ -82,30 +84,31 @@ class SafeContractsService:
             Number of contracts created, 0 if chain already exists.
         """
         created_count = 0
-        for (
-            version,
-            contract_name,
-            contract_address,
-        ) in self._get_default_deployments_by_version():
-            display_name = self._generate_safe_contract_display_name(
-                contract_name, version
-            )
-            contract, created = await Contract.get_or_create(
-                address=HexBytes(contract_address),
-                chain_id=chain_id,
-                name=contract_name,
-                display_name=display_name,
-                trusted_for_delegate_call=contract_name
-                in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
-            )
-            if created:
-                created_count += 1
-                logger.info(
-                    "Created Safe contract %s (%s) for chain %d",
-                    contract_name,
-                    contract_address,
-                    chain_id,
+        async with transactional_session_context():
+            for (
+                version,
+                contract_name,
+                contract_address,
+            ) in self._get_default_deployments_by_version():
+                display_name = self._generate_safe_contract_display_name(
+                    contract_name, version
                 )
+                contract, created = await Contract.get_or_create(
+                    address=HexBytes(contract_address),
+                    chain_id=chain_id,
+                    name=contract_name,
+                    display_name=display_name,
+                    trusted_for_delegate_call=contract_name
+                    in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
+                )
+                if created:
+                    created_count += 1
+                    logger.info(
+                        "Created Safe contract %s (%s) for chain %d",
+                        contract_name,
+                        contract_address,
+                        chain_id,
+                    )
 
         if created_count:
             logger.info(
@@ -118,31 +121,33 @@ class SafeContractsService:
         """
         Update contracts from given deployments list.
         """
-        for (
-            version,
-            contract_name,
-            contract_address,
-        ) in self._get_default_deployments_by_version():
-            display_name = self._generate_safe_contract_display_name(
-                contract_name, version
-            )
-            affected_rows = await Contract.update_contract_info(
-                address=HexBytes(contract_address),
-                name=contract_name,
-                display_name=display_name,
-                trusted_for_delegate_call=contract_name
-                in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
-            )
-            if affected_rows:
-                logger.info(
-                    "Updated contract with address: %s in %d chains",
-                    contract_address,
-                    affected_rows,
+        async with transactional_session_context():
+            for (
+                version,
+                contract_name,
+                contract_address,
+            ) in self._get_default_deployments_by_version():
+                display_name = self._generate_safe_contract_display_name(
+                    contract_name, version
                 )
-            else:
-                logger.warning(
-                    "Could not find any contract with address: %s", contract_address
+                affected_rows = await Contract.update_contract_info(
+                    address=HexBytes(contract_address),
+                    name=contract_name,
+                    display_name=display_name,
+                    trusted_for_delegate_call=contract_name
+                    in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
                 )
+                if affected_rows:
+                    logger.info(
+                        "Updated contract with address: %s in %d chains",
+                        contract_address,
+                        affected_rows,
+                    )
+                else:
+                    logger.warning(
+                        "Could not find any contract with address: %s",
+                        contract_address,
+                    )
 
 
 @cache

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Contract
 from app.services.pagination import GenericPagination
 
@@ -25,7 +27,8 @@ class ContractService:
             chain_ids=chain_ids,
             trusted_for_delegate_call=trusted_for_delegate_call,
         )
-        page = await self.pagination.get_page(query)
-        count = await self.pagination.get_count(query)
+        async with transactional_session_context():
+            page = await self.pagination.get_page(query)
+            count = await self.pagination.get_count(query)
 
         return page, count

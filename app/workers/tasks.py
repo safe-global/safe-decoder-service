@@ -10,7 +10,7 @@ from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
 from app.datasources.cache.redis import del_contract_cache, get_redis
-from app.datasources.db.database import db_session_context, with_db_session_context
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import logging_task_context
 from app.services.contract_metadata_service import get_contract_metadata_service
@@ -39,20 +39,18 @@ def task_to_test(message: str) -> None:
 
 
 @dramatiq.actor
-@db_session_context
 async def get_contract_metadata_task(
     address: str, chain_id: int, skip_attempt_download: bool = False
 ):
     with logging_task_context(CurrentMessage.get_current_message()):
         contract_metadata_service = get_contract_metadata_service()
-        async with with_db_session_context():
-            # Just try the first time, following retries should be scheduled
-            should_download = (
-                skip_attempt_download
-                or await contract_metadata_service.should_attempt_download(
-                    address, chain_id, 0
-                )
+        # Just try the first time, following retries should be scheduled
+        should_download = (
+            skip_attempt_download
+            or await contract_metadata_service.should_attempt_download(
+                address, chain_id, 0
             )
+        )
         if should_download:
             logger.info("Downloading contract metadata")
             contract_metadata = await contract_metadata_service.get_contract_metadata(
@@ -86,40 +84,46 @@ async def get_contract_metadata_task(
 
 
 @dramatiq.actor(periodic=cron("0 0 * * *"))  # Every midnight
-@db_session_context
 async def get_missing_contract_metadata_task():
     with logging_task_context(CurrentMessage.get_current_message()):
-        async for contract in Contract.get_contracts_without_abi(
-            settings.CONTRACT_MAX_DOWNLOAD_RETRIES
-        ):
+        async with transactional_session_context():
+            targets = [
+                (to_0x_hex_str(contract.address), contract.chain_id)
+                async for contract in Contract.get_contracts_without_abi(
+                    settings.CONTRACT_MAX_DOWNLOAD_RETRIES
+                )
+            ]
+        for address, chain_id in targets:
             get_contract_metadata_task.send(
-                address=to_0x_hex_str(contract.address),
-                chain_id=contract.chain_id,
+                address=address,
+                chain_id=chain_id,
                 skip_attempt_download=True,
             )
 
 
 @dramatiq.actor(periodic=cron("0 5 * * *"))  # Every day at 5 am
-@db_session_context
 async def update_proxies_task():
     with logging_task_context(CurrentMessage.get_current_message()):
-        async for proxy_contract in Contract.get_proxy_contracts():
+        async with transactional_session_context():
+            targets = [
+                (to_0x_hex_str(proxy_contract.address), proxy_contract.chain_id)
+                async for proxy_contract in Contract.get_proxy_contracts()
+            ]
+        for address, chain_id in targets:
             get_contract_metadata_task.send(
-                address=to_0x_hex_str(proxy_contract.address),
-                chain_id=proxy_contract.chain_id,
+                address=address,
+                chain_id=chain_id,
                 skip_attempt_download=True,
             )
 
 
 @dramatiq.actor(periodic=cron("0 * * * *"))  # Every hour
-@db_session_context
 async def update_safe_contracts_info_task():
     with logging_task_context(CurrentMessage.get_current_message()):
         await get_safe_contract_service().update_safe_contracts_info()
 
 
 @dramatiq.actor
-@db_session_context
 async def create_safe_contracts_task_for_new_chains(chain_id: int):
     with logging_task_context(CurrentMessage.get_current_message()):
         lock_key = f"lock:create_safe_contracts:{chain_id}"

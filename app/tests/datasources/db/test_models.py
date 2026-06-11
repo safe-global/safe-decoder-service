@@ -407,6 +407,9 @@ class TestModels(AsyncDbTestCase):
         abi_json = [{"type": "function", "name": "transfer"}]
         abi = Abi(abi_json=abi_json, source_id=source_id)
         await abi.create()
+        # Persist source/abi so the rollback after the duplicate-insert check
+        # below only discards the failed insert, not these prerequisites.
+        await db_session.commit()
 
         self.assertIsNotNone(abi.abi_hash)
         assert abi.abi_hash is not None
@@ -440,3 +443,4 @@ class TestModels(AsyncDbTestCase):
         abi = Abi(abi_json=None, source_id=source.id)
         with self.assertRaises(IntegrityError):
             await abi.create()
+        await db_session.rollback()

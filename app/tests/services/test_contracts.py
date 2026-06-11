@@ -1,4 +1,9 @@
-from app.datasources.db.database import db_session_context
+# SPDX-License-Identifier: FSL-1.1-MIT
+from app.datasources.db.database import (
+    _get_database_session_context,
+    db_session_context,
+    transactional_session_context,
+)
 from app.services.contract import ContractService
 from app.services.pagination import GenericPagination
 from app.tests.datasources.db.async_db_test_case import AsyncDbTestCase
@@ -10,6 +15,20 @@ class TestContractService(AsyncDbTestCase):
         await super().asyncSetUp()
         pagination = GenericPagination(limit=None, offset=None)
         self.service = ContractService(pagination=pagination)
+
+    async def test_get_contracts_releases_session(self):
+        async with transactional_session_context():
+            target_contract = await contract_factory()
+            address = target_contract.address
+
+        page, count = await self.service.get_contracts(address=address)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(page), 1)
+        # The service released its scope on return, so any post-query work
+        # (serialization, cache write) runs without a held DB connection.
+        with self.assertRaises(LookupError):
+            _get_database_session_context()
 
     @db_session_context
     async def test_get_contracts_by_address_and_chain_id(self):

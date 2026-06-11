@@ -108,6 +108,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         redis = get_redis()
         await redis.delete(cache_key)
         await AbiSource(name="Etherscan", url="").create()
+        await db_session.commit()
         etherscan_get_contract_metadata_mock.return_value = None
         mock_enabled_clients.return_value = [
             AsyncEtherscanClientV2(EthereumNetwork(chain_id))
@@ -134,6 +135,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         contract.fetch_retries = 0
         await redis.delete(cache_key)
         await contract.update()
+        await db_session.commit()
         get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
         self._wait_tasks_execution()
         await db_session.refresh(contract)
@@ -150,6 +152,7 @@ class TestAsyncTasks(AsyncDbTestCase):
         self, etherscan_get_contract_metadata_mock: MagicMock
     ):
         await AbiSource(name="Etherscan", url="").create()
+        await db_session.commit()
         etherscan_get_contract_metadata_mock.side_effect = [
             etherscan_proxy_metadata_mock,
             etherscan_metadata_mock,
