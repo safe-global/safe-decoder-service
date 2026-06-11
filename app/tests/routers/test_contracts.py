@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from fastapi.testclient import TestClient
 from hexbytes import HexBytes
+from httpx import ASGITransport, AsyncClient
 
 from ...config import settings
-from ...datasources.cache.redis import del_contract_cache
-from ...datasources.db.database import db_session_context
+from ...datasources.cache.redis import del_contract_cache, get_redis
+from ...datasources.db.database import db_session, db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...utils import datetime_to_str
@@ -14,16 +14,22 @@ from ..mocks.abi_mock import mock_abi_json
 
 
 class TestRouterContract(AsyncDbTestCase):
-    client: TestClient
+    client: AsyncClient
 
-    @classmethod
-    def setUpClass(cls):
-        cls.client = TestClient(app)
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        await get_redis().flushall()
+        self.client = AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        )
+
+    async def asyncTearDown(self):
+        await self.client.aclose()
 
     @db_session_context
     async def test_view_contracts(self):
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
         self.assertEqual(response.status_code, 200)
@@ -37,7 +43,7 @@ class TestRouterContract(AsyncDbTestCase):
         await contract.create()
 
         # Should return cached response with count 0
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
         self.assertEqual(response.status_code, 200)
@@ -48,7 +54,7 @@ class TestRouterContract(AsyncDbTestCase):
         await del_contract_cache(address_expected)
 
         # Should return cached response with count 0
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
         self.assertEqual(response.status_code, 200)
@@ -62,11 +68,12 @@ class TestRouterContract(AsyncDbTestCase):
         await abi.create()
         contract.abi_id = abi.id
         await contract.update()
+        await db_session.refresh(contract, attribute_names=["abi"])
 
         # Invalidate cache
         await del_contract_cache(address_expected)
 
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}",
         )
         self.assertEqual(response.status_code, 200)
@@ -100,7 +107,7 @@ class TestRouterContract(AsyncDbTestCase):
         # Invalidate cache
         await del_contract_cache(address_expected)
 
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
         )
         self.assertEqual(response.status_code, 200)
@@ -119,7 +126,7 @@ class TestRouterContract(AsyncDbTestCase):
         # Invalidate cache
         await del_contract_cache(address_expected)
 
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{contract_without_name}",
         )
         self.assertEqual(response.status_code, 200)
@@ -144,7 +151,7 @@ class TestRouterContract(AsyncDbTestCase):
             )
             await contract.create()
 
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}?limit=5",
         )
         self.assertEqual(response.status_code, 200)
@@ -158,7 +165,7 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["previous"], None)
         self.assertEqual(len(results), 5)
 
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}?limit=5&offset=5",
         )
         self.assertEqual(response.status_code, 200)
@@ -174,8 +181,8 @@ class TestRouterContract(AsyncDbTestCase):
 
     @db_session_context
     async def test_view_list_all_contracts(self):
-        response = self.client.get(
-            "/api/v1/contracts/",
+        response = await self.client.get(
+            "/api/v1/contracts",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
@@ -184,8 +191,8 @@ class TestRouterContract(AsyncDbTestCase):
         untrusted_contract = await contract_factory(
             address="0x0000000000000000000000000000000000000001", chain_id=6
         )
-        response = self.client.get(
-            "/api/v1/contracts/",
+        response = await self.client.get(
+            "/api/v1/contracts",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
@@ -210,15 +217,15 @@ class TestRouterContract(AsyncDbTestCase):
             trusted_for_delegate_call=True,
             chain_id=5,
         )
-        response = self.client.get(
-            "/api/v1/contracts/",
+        response = await self.client.get(
+            "/api/v1/contracts",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
         self.assertEqual(response_json["count"], 2)
 
-        response = self.client.get(
-            "/api/v1/contracts/?trusted_for_delegate_call=true",
+        response = await self.client.get(
+            "/api/v1/contracts?trusted_for_delegate_call=true",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
@@ -239,8 +246,8 @@ class TestRouterContract(AsyncDbTestCase):
             address="0x0000000000000000000000000000000000000001", chain_id=7
         )
 
-        response = self.client.get(
-            "/api/v1/contracts/",
+        response = await self.client.get(
+            "/api/v1/contracts",
         )
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
@@ -261,8 +268,8 @@ class TestRouterContract(AsyncDbTestCase):
         )
         self.assertEqual(response_json["results"][2]["chainId"], 7)
 
-        response = self.client.get(
-            f"/api/v1/contracts/?chain_ids={untrusted_contract_next_chain.chain_id}",
+        response = await self.client.get(
+            f"/api/v1/contracts?chain_ids={untrusted_contract_next_chain.chain_id}",
         )
         response_json = response.json()
         self.assertEqual(response_json["count"], 1)
@@ -281,8 +288,8 @@ class TestRouterContract(AsyncDbTestCase):
             address="0x0000000000000000000000000000000000000002",
             chain_id=large_chain_id,
         )
-        response = self.client.get(
-            f"/api/v1/contracts/?chain_ids={large_chain_id}",
+        response = await self.client.get(
+            f"/api/v1/contracts?chain_ids={large_chain_id}",
         )
         response_json = response.json()
         self.assertEqual(response_json["count"], 1)
@@ -312,7 +319,7 @@ class TestRouterContract(AsyncDbTestCase):
             await contract.create()
 
         # Test first page with proxy headers
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}?limit=5",
             headers={
                 "x-forwarded-prefix": "/safe-decoder",
@@ -339,7 +346,7 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response_json["previous"], None)
 
         # Test second page with proxy headers
-        response = self.client.get(
+        response = await self.client.get(
             f"/api/v1/contracts/{address_expected}?limit=5&offset=5",
             headers={
                 "x-forwarded-prefix": "/safe-decoder",
