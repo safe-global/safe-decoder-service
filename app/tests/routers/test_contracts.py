@@ -3,7 +3,11 @@ from fastapi.testclient import TestClient
 from hexbytes import HexBytes
 
 from ...config import settings
-from ...datasources.cache.redis import del_contract_cache
+from ...datasources.cache.redis import (
+    del_contract_cache,
+    get_key_for_contract,
+    get_redis,
+)
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
@@ -29,6 +33,21 @@ class TestRouterContract(AsyncDbTestCase):
         self.assertEqual(response.status_code, 200)
         response_json = response.json()
         self.assertEqual(response_json["count"], 0)
+
+        # The cached write must set a TTL on the contract hash
+        redis = get_redis()
+        hash_key = get_key_for_contract(address_expected)
+        self.assertGreater(await redis.ttl(hash_key), 0)
+
+        # Lower the TTL, then trigger a write to a different field (different
+        # query params). The TTL must not be extended, as the expiration is set
+        # with `nx` and anchored to the first write.
+        await redis.expire(hash_key, 5)
+        response = self.client.get(
+            f"/api/v1/contracts/{address_expected}?chain_ids=5",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(await redis.ttl(hash_key), 5)
 
         address = HexBytes(address_expected)
         contract = Contract(
