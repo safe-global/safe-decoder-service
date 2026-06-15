@@ -49,6 +49,9 @@ class TestRouterContract(AsyncDbTestCase):
             f"/api/v1/contracts/{address_expected}?chain_ids=5",
         )
         self.assertEqual(response.status_code, 200)
+        ttl = await redis.ttl(hash_key)
+        self.assertGreater(ttl, 0)
+        self.assertLessEqual(ttl, 5)
         self.assertLessEqual(await redis.ttl(hash_key), 5)
 
         address = HexBytes(address_expected)
