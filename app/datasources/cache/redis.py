@@ -108,12 +108,14 @@ def cache_response(
             # Store the response in cache for later
             # Force validation to trigger field validators that convert bytes
             validated_response = model.model_validate(response)
-            await redis.hset(  # type: ignore[misc]
-                hash_key, field_key, validated_response.model_dump_json(by_alias=True)
-            )
-            # Set expiration just if is not configured
-            if await redis.ttl(hash_key) == -1:
-                await redis.expire(hash_key, expire)
+            async with redis.pipeline(transaction=False) as pipe:
+                pipe.hset(
+                    hash_key,
+                    field_key,
+                    validated_response.model_dump_json(by_alias=True),
+                )
+                pipe.expire(hash_key, expire, nx=True)
+                await pipe.execute()
 
             return response
 
