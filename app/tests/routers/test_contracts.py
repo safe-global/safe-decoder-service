@@ -23,7 +23,9 @@ class TestRouterContract(AsyncDbTestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
-
+      async def asyncSetUp(self):
+          await super().asyncSetUp()
+          await get_redis().flushdb()
     @db_session_context
     async def test_view_contracts(self):
         address_expected = "0x6eEF70Da339a98102a642969B3956DEa71A1096e"
