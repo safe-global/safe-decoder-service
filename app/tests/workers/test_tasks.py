@@ -2,7 +2,7 @@
 import json
 import unittest
 from collections.abc import Awaitable
-from typing import Any
+from typing import Any, cast
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -84,9 +84,11 @@ class TestAsyncTasks(AsyncDbTestCase):
 
     def _wait_tasks_execution(self):
         # Ensure that all the messages on redis were consumed
-        redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
+        redis_tasks = cast(list, redis_broker.client.lrange("dramatiq:default", 0, -1))
         while len(redis_tasks) > 0:
-            redis_tasks = self.worker.broker.client.lrange("dramatiq:default", 0, -1)
+            redis_tasks = cast(
+                list, redis_broker.client.lrange("dramatiq:default", 0, -1)
+            )
 
         # Wait for all the messages on the given queue to be processed.
         # This method is only meant to be used in tests
