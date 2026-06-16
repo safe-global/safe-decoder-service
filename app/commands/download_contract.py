@@ -1,6 +1,8 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from hexbytes import HexBytes
 
 from app.commands.styles import error, print_command_title, success
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Contract
 from app.services.contract_metadata_service import get_contract_metadata_service
 from app.workers.tasks import get_contract_metadata_task
@@ -8,7 +10,8 @@ from app.workers.tasks import get_contract_metadata_task
 
 async def download_contract_command(address: str, chain_id: int):
     print_command_title(f"Downloading contract {address}")
-    contract = await Contract.get_contract(HexBytes(address), chain_id)
+    async with transactional_session_context():
+        contract = await Contract.get_contract(HexBytes(address), chain_id)
     if contract:
         print(
             f"Contract: {address}, retries: {contract.fetch_retries}, contains ABI: {True if contract.abi_id else False}"

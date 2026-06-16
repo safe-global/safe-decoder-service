@@ -227,10 +227,12 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
             insert(cls)
             .values(abi_json=abi_json, relevance=relevance, source_id=source_id)
             .on_conflict_do_nothing()
+            .returning(cls)
         )
-        result = cast(CursorResult, await db_session.execute(insert_stmt))
-        abi = await cls.get_abi(abi_json)
-        return cast("Abi", abi), bool(result.rowcount)
+        result = await db_session.execute(insert_stmt)
+        if abi := result.scalars().first():
+            return abi, True
+        return cast("Abi", await cls.get_abi(abi_json)), False
 
 
 class Project(SqlQueryBase, SQLModel, table=True):
@@ -332,10 +334,12 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
             insert(cls)
             .values(address=address, chain_id=chain_id, **kwargs)
             .on_conflict_do_nothing()
+            .returning(cls)
         )
-        result = cast(CursorResult, await db_session.execute(insert_stmt))
-        contract = await cls.get_contract(address, chain_id)
-        return cast("Contract", contract), bool(result.rowcount)
+        result = await db_session.execute(insert_stmt)
+        if contract := result.scalars().first():
+            return contract, True
+        return cast("Contract", await cls.get_contract(address, chain_id)), False
 
     @classmethod
     async def get_abi_by_contract_address(

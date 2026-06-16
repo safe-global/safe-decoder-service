@@ -12,7 +12,6 @@ from starlette.responses import Response
 from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
 
 from . import VERSION
-from .datasources.db.database import transactional_session_context
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -52,13 +51,10 @@ async def lifespan(app: FastAPI):
             )
             logger.debug("Created task to consume elements from Queue Provider")
 
-        async with transactional_session_context(
-            "InitializeDataDecoderServiceOnStartup"
-        ):
-            # Load hardcoded ABIs in database
-            await abi_service.load_local_abis_in_database()
-            # Initializes DataDecoderService
-            await get_data_decoder_service()
+        # Load hardcoded ABIs in database
+        await abi_service.load_local_abis_in_database()
+        # Initializes DataDecoderService
+        await get_data_decoder_service()
         yield
     finally:
         if consume_task:

@@ -11,14 +11,12 @@ from app.commands.download_contract import download_contract_command
 from app.commands.safe_contracts import (
     setup_safe_contracts,
 )
-from app.datasources.db.database import transactional_session_context
 
 
 def async_command(func: Callable) -> Callable:
     """
-    Wrap a function so:
-        - Async functions are supported
-        - A database session is open and closed
+    Wrap an async function so it can be used as a synchronous Typer command.
+    Each command scopes its own database work with `transactional_session_context`.
 
     :param func:
     :return:
@@ -27,11 +25,7 @@ def async_command(func: Callable) -> Callable:
 
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any):
-            async def run_with_context():
-                async with transactional_session_context():
-                    return await func(*args, **kwargs)
-
-            return asyncio.run(run_with_context())
+            return asyncio.run(func(*args, **kwargs))
 
         return wrapper
     return func

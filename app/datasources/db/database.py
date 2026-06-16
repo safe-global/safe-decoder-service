@@ -75,11 +75,11 @@ async def transactional_session_context(
     Define the lifecycle of a database session scope.
 
     Explicit transactional context:
-    - Commits on success
-    - Rolls back on exception
-    - Re-raises exceptions
     - Reuses an existing session context if already set
     - Creates a new context (and removes it on exit) if it created it
+    - Only the context that created the session commits on success or rolls
+      back on exception, so nested calls never commit an intermediate state
+    - Re-raises exceptions
 
     Bounds a unit of database work so the connection is returned to the pool as
     soon as the transaction completes, before any post-query work (response
@@ -99,9 +99,11 @@ async def transactional_session_context(
 
     try:
         yield
-        await db_session.commit()
+        if created_context:
+            await db_session.commit()
     except Exception:
-        await db_session.rollback()
+        if created_context:
+            await db_session.rollback()
         raise
     finally:
         if created_context and token:
