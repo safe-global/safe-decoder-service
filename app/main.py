@@ -130,10 +130,6 @@ async def http_request_middleware(request: Request, call_next):
     Intercepts request and do some actions:
      - Log requests calls
 
-    The database session lifecycle is not bound to the request: each endpoint
-    scopes its own database work with `transactional_session_context()` so the
-    connection is released before post-query work (serialization, cache writes).
-
     :param request:
     :param call_next:
     :return:

@@ -68,9 +68,7 @@ def _get_database_session_context() -> str:
 
 
 @asynccontextmanager
-async def transactional_session_context(
-    session_id: str | None = None,
-) -> AsyncGenerator[None]:
+async def transactional_session_context() -> AsyncGenerator[None]:
     """
     Define the lifecycle of a database session scope.
 
@@ -85,7 +83,6 @@ async def transactional_session_context(
     soon as the transaction completes, before any post-query work (response
     serialization, cache writes).
 
-    :param session_id: Optional session ID. If not provided, a UUID is generated.
     :return:
     """
     token = None
@@ -94,7 +91,7 @@ async def transactional_session_context(
     try:
         _get_database_session_context()
     except LookupError:
-        token = _db_session_context.set(session_id or str(uuid.uuid4()))
+        token = _db_session_context.set(str(uuid.uuid4()))
         created_context = True
 
     try:
