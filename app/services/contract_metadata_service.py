@@ -23,6 +23,7 @@ from safe_eth.eth.utils import fast_to_checksum_address
 
 from app.config import settings
 from app.datasources.cache.redis import get_redis
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract
 
 logger = logging.getLogger(__name__)
@@ -166,57 +167,60 @@ class ContractMetadataService:
         :param contract_metadata:
         :return:
         """
-        contract, _ = await Contract.get_or_create(
-            address=HexBytes(contract_metadata.address),
-            chain_id=contract_metadata.chain_id,
-        )
-
-        if contract_metadata.metadata:
-            if not contract_metadata.source:
-                logger.error(
-                    "Cannot store ABI for %s: metadata present but source is missing",
-                    contract_metadata.address,
-                )
-                contract.fetch_retries += 1
-                await contract.update()
-                return False
-
-            source = await AbiSource.get_abi_source(name=contract_metadata.source.value)
-            if source is None:
-                logger.error(
-                    "Abi source %s does not exist", contract_metadata.source.value
-                )
-                contract.fetch_retries += 1
-                await contract.update()
-                return False
-
-            if not contract_metadata.metadata.abi:
-                logger.error(
-                    "Cannot store ABI for %s: ABI is empty or null",
-                    contract_metadata.address,
-                )
-                contract.fetch_retries += 1
-                await contract.update()
-                return False
-
-            abi, _ = await Abi.get_or_create_abi(
-                abi_json=contract_metadata.metadata.abi,
-                source_id=source.id,
+        async with transactional_session_context():
+            contract, _ = await Contract.get_or_create(
+                address=HexBytes(contract_metadata.address),
+                chain_id=contract_metadata.chain_id,
             )
-            contract.abi_id = abi.id
-            contract.name = contract_metadata.metadata.name
-            if (
-                contract_metadata.metadata.implementation
-                and contract_metadata.metadata.implementation != NULL_ADDRESS
-            ):
-                contract.implementation = HexBytes(
-                    contract_metadata.metadata.implementation
-                )
 
-        if not contract_metadata.metadata:
-            contract.fetch_retries += 1
-        await contract.update()
-        return bool(contract_metadata.metadata)
+            if contract_metadata.metadata:
+                if not contract_metadata.source:
+                    logger.error(
+                        "Cannot store ABI for %s: metadata present but source is missing",
+                        contract_metadata.address,
+                    )
+                    contract.fetch_retries += 1
+                    await contract.update()
+                    return False
+
+                source = await AbiSource.get_abi_source(
+                    name=contract_metadata.source.value
+                )
+                if source is None:
+                    logger.error(
+                        "Abi source %s does not exist", contract_metadata.source.value
+                    )
+                    contract.fetch_retries += 1
+                    await contract.update()
+                    return False
+
+                if not contract_metadata.metadata.abi:
+                    logger.error(
+                        "Cannot store ABI for %s: ABI is empty or null",
+                        contract_metadata.address,
+                    )
+                    contract.fetch_retries += 1
+                    await contract.update()
+                    return False
+
+                abi, _ = await Abi.get_or_create_abi(
+                    abi_json=contract_metadata.metadata.abi,
+                    source_id=source.id,
+                )
+                contract.abi_id = abi.id
+                contract.name = contract_metadata.metadata.name
+                if (
+                    contract_metadata.metadata.implementation
+                    and contract_metadata.metadata.implementation != NULL_ADDRESS
+                ):
+                    contract.implementation = HexBytes(
+                        contract_metadata.metadata.implementation
+                    )
+
+            if not contract_metadata.metadata:
+                contract.fetch_retries += 1
+            await contract.update()
+            return bool(contract_metadata.metadata)
 
     @staticmethod
     def get_proxy_implementation_address(
@@ -254,18 +258,19 @@ class ContractMetadataService:
         cached_retries: bytes = cast(bytes, await redis.get(cache_key))
         if cached_retries is not None:
             return bool(int(cached_retries.decode()))
-        else:
+
+        async with transactional_session_context():
             contract = await Contract.get_contract(
                 address=HexBytes(contract_address), chain_id=chain_id
             )
 
-            if contract and (contract.fetch_retries > max_retries or contract.abi_id):
-                # Cache with TTL so contracts can be retried after cache expires
-                await redis.set(
-                    cache_key,
-                    0,
-                    ex=ContractMetadataService.SHOULD_ATTEMPT_DOWNLOAD_CACHE_TTL,
-                )
-                return False
+        if contract and (contract.fetch_retries > max_retries or contract.abi_id):
+            # Cache with TTL so contracts can be retried after cache expires
+            await redis.set(
+                cache_key,
+                0,
+                ex=ContractMetadataService.SHOULD_ATTEMPT_DOWNLOAD_CACHE_TTL,
+            )
+            return False
 
-            return True
+        return True

@@ -12,7 +12,6 @@ from starlette.responses import Response
 from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
 
 from . import VERSION
-from .datasources.db.database import with_db_session_context
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
@@ -52,11 +51,10 @@ async def lifespan(app: FastAPI):
             )
             logger.debug("Created task to consume elements from Queue Provider")
 
-        async with with_db_session_context("InitializeDataDecoderServiceOnStartup"):
-            # Load hardcoded ABIs in database
-            await abi_service.load_local_abis_in_database()
-            # Initializes DataDecoderService
-            await get_data_decoder_service()
+        # Load hardcoded ABIs in database
+        await abi_service.load_local_abis_in_database()
+        # Initializes DataDecoderService
+        await get_data_decoder_service()
         yield
     finally:
         if consume_task:
@@ -130,7 +128,6 @@ async def http_redirect_middleware(request: Request, call_next):
 async def http_request_middleware(request: Request, call_next):
     """
     Intercepts request and do some actions:
-     - Set the database session context for the current request, so the same database session is used across the whole request.
      - Log requests calls
 
     :param request:
@@ -140,8 +137,7 @@ async def http_request_middleware(request: Request, call_next):
     start_time = datetime.datetime.now(datetime.UTC)
     response: Response | None = None
     try:
-        async with with_db_session_context():
-            response = await call_next(request)
+        response = await call_next(request)
     finally:
         # Log request
         try:

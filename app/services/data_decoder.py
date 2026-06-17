@@ -19,6 +19,7 @@ from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import implicitly_identity
 
+from ..datasources.db.database import transactional_session_context
 from ..datasources.db.models import Abi, Contract
 
 logger = logging.getLogger(__name__)
@@ -106,26 +107,29 @@ class DataDecoderService:
 
         # last_abi_id is used as a monotonic cursor to reload only new ABIs on
         # subsequent calls, avoiding the timestamp-collision edge case.
-        self.last_abi_id = await Abi.get_last_inserted_id()
-        logger.info(
-            "%s: Loading contract ABIs for decoding. Last inserted ABI id on the database: %s",
-            self.__class__.__name__,
-            self.last_abi_id,
-        )
-        self.fn_selectors_with_abis: dict[
-            bytes, ABIFunction
-        ] = await self._generate_selectors_with_abis_from_abis(
-            await self.get_supported_abis()
-        )
-        logger.info(
-            "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
-        )
-        self.multisend_abis: list[ABI] = [m async for m in self.get_multisend_abis()]
-        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = {}
-        for abi in self.multisend_abis:
-            self.multisend_fn_selectors_with_abis.update(
-                await self._generate_selectors_with_abis_from_abi(abi)
+        async with transactional_session_context():
+            self.last_abi_id = await Abi.get_last_inserted_id()
+            logger.info(
+                "%s: Loading contract ABIs for decoding. Last inserted ABI id on the database: %s",
+                self.__class__.__name__,
+                self.last_abi_id,
             )
+            self.fn_selectors_with_abis: dict[
+                bytes, ABIFunction
+            ] = await self._generate_selectors_with_abis_from_abis(
+                await self.get_supported_abis()
+            )
+            logger.info(
+                "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
+            )
+            self.multisend_abis: list[ABI] = [
+                m async for m in self.get_multisend_abis()
+            ]
+            self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = {}
+            for abi in self.multisend_abis:
+                self.multisend_fn_selectors_with_abis.update(
+                    await self._generate_selectors_with_abis_from_abi(abi)
+                )
         # lock_load_new_abis will avoid concurrent calls to load_new_abis
         self.lock_load_new_abis = asyncio.Lock()
 
@@ -528,28 +532,29 @@ class DataDecoderService:
                 self.__class__.__name__,
             )
             previous_last_abi_id = self.last_abi_id
-            self.last_abi_id = await Abi.get_last_inserted_id()
-            if previous_last_abi_id is None:
-                # No reference to compare, so we get all the ABIs
-                abis = Abi.get_abis_sorted_by_relevance()
-            else:
-                if (
-                    self.last_abi_id is not None
-                    and self.last_abi_id > previous_last_abi_id
-                ):
-                    # Only reload if new ABIs were inserted
-                    abis = Abi.get_abis_with_id_greater_than(previous_last_abi_id)
+            async with transactional_session_context():
+                self.last_abi_id = await Abi.get_last_inserted_id()
+                if previous_last_abi_id is None:
+                    # No reference to compare, so we get all the ABIs
+                    abis = Abi.get_abis_sorted_by_relevance()
                 else:
-                    logger.debug(
-                        "%s: No new contract ABIs to load",
-                        self.__class__.__name__,
-                    )
-                    return 0
+                    if (
+                        self.last_abi_id is not None
+                        and self.last_abi_id > previous_last_abi_id
+                    ):
+                        # Only reload if new ABIs were inserted
+                        abis = Abi.get_abis_with_id_greater_than(previous_last_abi_id)
+                    else:
+                        logger.debug(
+                            "%s: No new contract ABIs to load",
+                            self.__class__.__name__,
+                        )
+                        return 0
 
-            loaded_abis = 0
-            async for abi in abis:
-                if await self.add_abi(abi):
-                    loaded_abis += 1
+                loaded_abis = 0
+                async for abi in abis:
+                    if await self.add_abi(abi):
+                        loaded_abis += 1
             logger.debug(
                 "%s: Loaded new %d contract ABIs",
                 self.__class__.__name__,

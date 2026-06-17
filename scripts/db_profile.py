@@ -1,13 +1,15 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 """
 Ipython profile to enable on startup database interactions
 """
 
-from app.datasources.db.database import db_session, set_database_session_context
+import uuid
+
+from app.datasources.db.database import _db_session_context, db_session
 from app.datasources.db.models import *  # noqa: F401, F403
 
-session_context = set_database_session_context()
-
-session_context.__enter__()  # Uses session context
+# Set a session scope so `db_session` is usable interactively
+_db_session_context.set(str(uuid.uuid4()))
 
 
 async def restore_session():
