@@ -363,9 +363,10 @@ class DataDecoderService:
         data_str = data if isinstance(data, str) else to_0x_hex_str(data)
         try:
             logger.debug("Decoding data %s", data_str)
-            fn_name, parameters = await self.decode_transaction_with_types(
-                data, address=address, chain_id=chain_id
-            )
+            async with transactional_session_context():
+                fn_name, parameters = await self.decode_transaction_with_types(
+                    data, address=address, chain_id=chain_id
+                )
             decoded: DataDecoded = {"method": fn_name, "parameters": parameters}
             logger.debug("Decoded data %s into %s", data_str, decoded)
             return decoded
@@ -492,12 +493,13 @@ class DataDecoderService:
         if selector not in self.fn_selectors_with_abis:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
-            if chain_id is not None and await self.get_contract_abi(
-                address, chain_id=chain_id
-            ):
-                return DecodingAccuracyEnum.FULL_MATCH
-            if await self.get_contract_abi(address, None):
-                return DecodingAccuracyEnum.PARTIAL_MATCH
+            async with transactional_session_context():
+                if chain_id is not None and await self.get_contract_abi(
+                    address, chain_id=chain_id
+                ):
+                    return DecodingAccuracyEnum.FULL_MATCH
+                if await self.get_contract_abi(address, None):
+                    return DecodingAccuracyEnum.PARTIAL_MATCH
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
     async def add_abi(self, abi: ABI) -> bool:
