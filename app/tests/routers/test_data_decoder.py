@@ -10,7 +10,7 @@ from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
 from ...datasources.abis.gnosis_protocol import cowswap_settlement_v2_abi
-from ...datasources.db.database import db_session_context
+from ...datasources.db.database import db_session_context, transactional_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
@@ -120,33 +120,34 @@ class TestRouterAbout(AsyncDbTestCase):
             },
         )
 
-    @db_session_context
     async def test_view_data_decoder_with_chain_id(self):
-        source = AbiSource(name="local", url="")
-        await source.create()
-
+        # No outer context: the endpoint must scope its own session
         contract_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-        abi = Abi(abi_json=example_abi, relevance=101, source_id=source.id)
-        await abi.create()
-        contract = Contract(
-            address=HexBytes(contract_address),
-            abi=abi,
-            name="SwappedContract",
-            chain_id=1,
-        )
-        await contract.create()
+        async with transactional_session_context():
+            source = AbiSource(name="local", url="")
+            await source.create()
 
-        swapped_abi = Abi(
-            abi_json=example_swapped_abi, relevance=100, source_id=source.id
-        )
-        await swapped_abi.create()
-        contract = Contract(
-            address=HexBytes(contract_address),
-            abi=swapped_abi,
-            name="SwappedContract",
-            chain_id=2,
-        )
-        await contract.create()
+            abi = Abi(abi_json=example_abi, relevance=101, source_id=source.id)
+            await abi.create()
+            contract = Contract(
+                address=HexBytes(contract_address),
+                abi=abi,
+                name="SwappedContract",
+                chain_id=1,
+            )
+            await contract.create()
+
+            swapped_abi = Abi(
+                abi_json=example_swapped_abi, relevance=100, source_id=source.id
+            )
+            await swapped_abi.create()
+            contract = Contract(
+                address=HexBytes(contract_address),
+                abi=swapped_abi,
+                name="SwappedContract",
+                chain_id=2,
+            )
+            await contract.create()
 
         example_data = (
             Web3()
