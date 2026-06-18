@@ -1,25 +1,23 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-import json
-import unittest
-from collections.abc import Awaitable
-from typing import Any, cast
+import asyncio
 from unittest import mock
 from unittest.mock import MagicMock
 
-from dramatiq.worker import Worker
 from eth_account import Account
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import AsyncEtherscanClientV2
 from safe_eth.eth.utils import fast_to_checksum_address
+from taskiq.receiver import Receiver
 
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import AbiSource, Contract
 from app.services.safe_contracts_service import SafeContractsService
 from app.workers.tasks import (
+    broker,
+    build_broker,
     create_safe_contracts_task_for_new_chains,
     get_contract_metadata_task,
-    redis_broker,
     task_to_test,
 )
 
@@ -32,67 +30,85 @@ from ..mocks.contract_metadata_mocks import (
 )
 
 
-class TestTasks(unittest.TestCase):
-    worker: Worker
+async def wait_tasks_execution(timeout: float = 10.0) -> None:
+    redis = get_redis()
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        groups = await redis.xinfo_groups("taskiq")
+        if not groups or (groups[0]["lag"] == 0 and groups[0]["pending"] == 0):
+            return
+        await asyncio.sleep(0.05)
+    raise TimeoutError("Tasks did not drain within the timeout")
 
-    def setUp(self) -> None:
-        redis_broker.client.flushall()
-        self.worker = Worker(redis_broker)
 
-    def tearDown(self) -> None:
-        redis_broker.client.flushall()
-        self.worker.stop()
+class TestTasks(AsyncDbTestCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        # Flush Redis before startup so the consumer group it declares is not wiped
+        await get_redis().flushall()
+        # Rebind the broker connection pool to this test's event loop
+        broker.connection_pool = build_broker().connection_pool
+        await broker.startup()
 
-    def test_task_in_redis_queue(self):
-        redis_tasks: Awaitable[list] | list = redis_broker.client.lrange(
-            "dramatiq:default", 0, -1
+    async def asyncTearDown(self):
+        await super().asyncTearDown()
+        await broker.shutdown()
+        await get_redis().flushall()
+
+    async def test_task_in_redis_queue(self):
+        redis = get_redis()
+        self.assertEqual(await redis.xlen("taskiq"), 0)
+
+        await task_to_test.kiq("Task in Redis Queue")
+
+        self.assertEqual(await redis.xlen("taskiq"), 1)
+        groups = await redis.xinfo_groups("taskiq")
+        self.assertEqual(groups[0]["lag"], 1)
+
+        finish_event = asyncio.Event()
+        worker = asyncio.create_task(
+            Receiver(broker, run_startup=False, max_async_tasks=10).listen(finish_event)
         )
-        assert isinstance(redis_tasks, list)
-        self.assertEqual(len(redis_tasks), 0)
+        await wait_tasks_execution()
+        finish_event.set()
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
 
-        test_message = "Task in Redis Queue"
-        task_to_test.send(test_message)
-
-        redis_tasks = redis_broker.client.lrange("dramatiq:default", 0, -1)
-        assert isinstance(redis_tasks, list)
-        self.assertEqual(len(redis_tasks), 1)
-        task_id = redis_tasks[0]
-        task_info_raw: Any = redis_broker.client.hget("dramatiq:default.msgs", task_id)
-        assert isinstance(task_info_raw, bytes)
-        task_info = json.loads(task_info_raw)
-        self.assertEqual(task_info.get("args"), [test_message])
-        self.assertEqual(task_info.get("actor_name"), "task_to_test")
-
-        self.worker.start()
-
-        redis_tasks = redis_broker.client.lrange("dramatiq:default", 0, -1)
-        assert isinstance(redis_tasks, list)
-        self.assertEqual(len(redis_tasks), 0)
+        groups = await redis.xinfo_groups("taskiq")
+        self.assertEqual(groups[0]["lag"], 0)
+        self.assertEqual(groups[0]["pending"], 0)
 
 
 class TestAsyncTasks(AsyncDbTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
-        self.worker = Worker(redis_broker, worker_threads=1)
-        self.worker.start()
+        await get_redis().flushall()
+        # Rebind the broker connection pool to this test's event loop
+        broker.connection_pool = build_broker().connection_pool
+        await broker.startup()
+        # Consume and run tasks in-process so the patched mocks apply while they execute
+        self._finish_event = asyncio.Event()
+        self._worker = asyncio.create_task(
+            Receiver(broker, run_startup=False, max_async_tasks=10).listen(
+                self._finish_event
+            )
+        )
 
     async def asyncTearDown(self):
         await super().asyncTearDown()
-        self.worker.stop()
-        redis = get_redis()
-        await redis.flushall()
-
-    def _wait_tasks_execution(self):
-        # Ensure that all the messages on redis were consumed
-        redis_tasks = cast(list, redis_broker.client.lrange("dramatiq:default", 0, -1))
-        while len(redis_tasks) > 0:
-            redis_tasks = cast(
-                list, redis_broker.client.lrange("dramatiq:default", 0, -1)
-            )
-
-        # Wait for all the messages on the given queue to be processed.
-        # This method is only meant to be used in tests
-        self.worker.broker.join("default")
+        # Stop the in-process task consumer
+        self._finish_event.set()
+        self._worker.cancel()
+        try:
+            await self._worker
+        except asyncio.CancelledError:
+            pass
+        await broker.shutdown()
+        await get_redis().flushall()
 
     @mock.patch.object(ContractMetadataService, "enabled_clients")
     @mock.patch.object(
@@ -116,8 +132,10 @@ class TestAsyncTasks(AsyncDbTestCase):
             AsyncEtherscanClientV2(EthereumNetwork(chain_id))
         ]
         # Should try one time
-        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
-        self._wait_tasks_execution()
+        await get_contract_metadata_task.kiq(
+            address=contract_address, chain_id=chain_id
+        )
+        await wait_tasks_execution()
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
         self.assertIsNone(contract.abi_id)
@@ -126,8 +144,10 @@ class TestAsyncTasks(AsyncDbTestCase):
         # Shouldn't try second time
         etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         chain_id = 100
-        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
-        self._wait_tasks_execution()
+        await get_contract_metadata_task.kiq(
+            address=contract_address, chain_id=chain_id
+        )
+        await wait_tasks_execution()
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
         self.assertIsNone(contract.abi_id)
@@ -138,8 +158,10 @@ class TestAsyncTasks(AsyncDbTestCase):
         await redis.delete(cache_key)
         await contract.update()
         await db_session.commit()
-        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
-        self._wait_tasks_execution()
+        await get_contract_metadata_task.kiq(
+            address=contract_address, chain_id=chain_id
+        )
+        await wait_tasks_execution()
         await db_session.refresh(contract)
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
@@ -163,9 +185,11 @@ class TestAsyncTasks(AsyncDbTestCase):
         proxy_implementation_address = "0x43506849D7C04F9138D1A2050bbF3A0c054402dd"
         chain_id = 1
 
-        get_contract_metadata_task.send(address=contract_address, chain_id=chain_id)
+        await get_contract_metadata_task.kiq(
+            address=contract_address, chain_id=chain_id
+        )
 
-        self._wait_tasks_execution()
+        await wait_tasks_execution()
 
         contract = await Contract.get_contract(HexBytes(contract_address), chain_id)
         self.assertIsNotNone(contract)
@@ -202,8 +226,8 @@ class TestAsyncTasks(AsyncDbTestCase):
         redis = get_redis()
         await redis.delete(lock_key)
 
-        create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
-        self._wait_tasks_execution()
+        await create_safe_contracts_task_for_new_chains.kiq(chain_id=new_chain_id)
+        await wait_tasks_execution()
 
         contracts = await Contract.get_all()
         chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]
@@ -236,8 +260,8 @@ class TestAsyncTasks(AsyncDbTestCase):
 
         await redis.set(lock_key, "1", ex=300)
 
-        create_safe_contracts_task_for_new_chains.send(chain_id=new_chain_id)
-        self._wait_tasks_execution()
+        await create_safe_contracts_task_for_new_chains.kiq(chain_id=new_chain_id)
+        await wait_tasks_execution()
 
         contracts = await Contract.get_all()
         chain_contracts = [c for c in contracts if c.chain_id == new_chain_id]

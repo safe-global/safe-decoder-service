@@ -54,13 +54,13 @@ class EventsService:
                     # Create missing Safe contract if is a new chain
                     safe_contract_service = get_safe_contract_service()
                     if not await safe_contract_service.safe_contracts_exist(chain_id):
-                        create_safe_contracts_task_for_new_chains.send(
+                        await create_safe_contracts_task_for_new_chains.kiq(
                             chain_id=chain_id
                         )
                     for contract_address in {to, *contracts_from_data}:
                         if contract_address == NULL_ADDRESS:
                             continue
-                        get_contract_metadata_task.send(
+                        await get_contract_metadata_task.kiq(
                             address=contract_address, chain_id=chain_id
                         )
         except json.JSONDecodeError:
