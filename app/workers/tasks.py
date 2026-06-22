@@ -4,6 +4,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import Token
 
+from redis.asyncio.retry import Retry
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 from taskiq import (
@@ -56,7 +60,13 @@ class TaskLoggingMiddleware(TaskiqMiddleware):
 
 
 def build_broker() -> RedisStreamBroker:
-    return RedisStreamBroker(url=settings.REDIS_URL).with_middlewares(
+    return RedisStreamBroker(
+        url=settings.REDIS_URL,
+        socket_keepalive=True,
+        health_check_interval=30,
+        retry=Retry(ExponentialBackoff(), retries=5),
+        retry_on_error=[RedisConnectionError, RedisTimeoutError],
+    ).with_middlewares(
         TaskLoggingMiddleware(),
         SmartRetryMiddleware(
             default_retry_count=5,
