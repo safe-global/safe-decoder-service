@@ -2,9 +2,7 @@
 import datetime
 import logging
 import traceback
-from collections.abc import Generator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 
 from pydantic.main import BaseModel
 
@@ -130,28 +128,22 @@ def log_record_factory(*args, **kwargs) -> logging.LogRecord:
 logging.setLogRecordFactory(log_record_factory)
 
 
-@contextmanager
-def logging_task_context(task_message) -> Generator[None]:
+def set_task_context(task_message) -> Token[TaskInfo]:
     """
-    Set taskInfo ContextVar, at the end it will be removed.
-    This context is designed to be retrieved during logs to get information about the task.
-
-    :param task_message:
-    :return:
+    Set the taskInfo ContextVar so logs emitted while the task runs include its detail.
+    Returns the token to later reset it with `reset_task_context`.
     """
     task_detail = TaskInfo(
-        name=task_message.actor_name,
-        id=task_message.message_id,
+        name=task_message.task_name,
+        id=task_message.task_id,
         kwargs=task_message.kwargs,
         args=task_message.args,
     )
-    token = _task_info.set(task_detail)
-    try:
-        logger.debug("Starting task...")
-        yield
-    finally:
-        logger.debug("Finishing task...")
-        _task_info.reset(token)
+    return _task_info.set(task_detail)
+
+
+def reset_task_context(token: Token[TaskInfo]) -> None:
+    _task_info.reset(token)
 
 
 def get_task_info() -> TaskInfo:
