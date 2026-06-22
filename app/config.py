@@ -82,6 +82,11 @@ LOGGING_CONFIG = {
             "handlers": ["console"],
             "propagate": False,
         },
+        "taskiq": {
+            "level": "WARNING",
+            "handlers": ["console"],
+            "propagate": False,
+        },
     },
 }
 
