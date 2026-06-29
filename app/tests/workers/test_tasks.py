@@ -353,10 +353,8 @@ class TestAsyncTasks(AsyncDbTestCase):
         # Proxy selector cache must have been cleared.
         self.assertFalse(await redis.hexists(hash_key, field_key))  # type: ignore[misc]
 
-        # Second decode (fresh decoder to bypass alru_cache): must use implementation ABI.
-        decoder2 = DataDecoderService()
-        await decoder2.init()
-        fn_name, arguments = await decoder2.decode_transaction(
+        # Second decode: must use implementation ABI.
+        fn_name, arguments = await decoder.decode_transaction(
             example_data, address=Address(HexBytes(proxy_address)), chain_id=chain_id
         )
         self.assertEqual(fn_name, "buyDroid")
