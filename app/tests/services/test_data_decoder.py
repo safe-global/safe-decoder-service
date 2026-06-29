@@ -507,17 +507,6 @@ class TestDataDecoderService(AsyncDbTestCase):
         contract_reversed.address = b"b"
         await contract_reversed.update()
 
-        # Check caches are working even if contract was updated on DB
-        fn_name, arguments = await decoder_service.decode_transaction(
-            example_data, address=contract_address, chain_id=1
-        )
-        accuracy = await decoder_service.get_decoding_accuracy(
-            example_data, address=contract_address, chain_id=1
-        )
-        self.assertEqual(fn_name, "buyDroid")
-        self.assertEqual(arguments, expected_arguments)
-        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
-
         await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         decoder_service = DataDecoderService()
         await decoder_service.init()

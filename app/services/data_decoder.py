@@ -184,7 +184,6 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    @alru_cache(maxsize=2048)
     async def get_contract_abi(
         self,
         address: Address,
