@@ -381,6 +381,30 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return None
 
     @classmethod
+    async def has_abi_by_contract_address(
+        cls, address: bytes, chain_id: int | None
+    ) -> bool:
+        """
+        Check whether a contract with an ABI exists for the given `address` (and
+        `chain_id` when provided), without fetching the ABI JSON.
+
+        Lightweight counterpart to `get_abi_by_contract_address` for callers that only
+        need to know if a match exists (e.g. computing decoding accuracy), avoiding the
+        cost of transferring the full ABI on every call.
+
+        :return: `True` if a matching contract with an ABI exists, `False` otherwise.
+        """
+        query = (
+            select(cls.id)
+            .join(Abi, cls.abi_id == Abi.id)
+            .where(cls.address == address)
+        )
+        if chain_id is not None:
+            query = query.where(cls.chain_id == chain_id)
+        results = await db_session.execute(select(query.exists()))
+        return bool(results.scalar())
+
+    @classmethod
     async def get_contracts_without_abi(
         cls, max_retries: int = 0
     ) -> AsyncIterator[Self]:

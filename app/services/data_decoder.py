@@ -198,6 +198,18 @@ class DataDecoderService:
         """
         return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
 
+    async def _has_contract_abi(self, address: Address, chain_id: int | None) -> bool:
+        """
+        Checks whether an ABI exists for the contract at the given address without
+        fetching it. Use this instead of `get_contract_abi` when only the presence of a
+        match matters (e.g. computing decoding accuracy), to avoid transferring the ABI.
+
+        :param address: Contract address
+        :param chain_id: Chain id for the contract
+        :return: `True` if an ABI is found, `False` otherwise.
+        """
+        return await Contract.has_abi_by_contract_address(HexBytes(address), chain_id)
+
     async def _get_abi_for_decoding(
         self, address: Address, chain_id: int | None
     ) -> ABI | None:
@@ -569,11 +581,11 @@ class DataDecoderService:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
             async with transactional_session_context():
-                if chain_id is not None and await self.get_contract_abi(
+                if chain_id is not None and await self._has_contract_abi(
                     address, chain_id=chain_id
                 ):
                     return DecodingAccuracyEnum.FULL_MATCH
-                if await self.get_contract_abi(address, None):
+                if await self._has_contract_abi(address, None):
                     return DecodingAccuracyEnum.PARTIAL_MATCH
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
