@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import logging
 import secrets
 from typing import cast
 
@@ -13,6 +14,8 @@ from ..config import settings
 from ..datasources.cache.redis import get_redis
 from ..datasources.db.database import get_engine
 from ..datasources.db.models import Contract
+
+logger = logging.getLogger(__name__)
 
 
 class AdminAuth(AuthenticationBackend):
@@ -48,6 +51,12 @@ class AdminAuth(AuthenticationBackend):
         return False
 
     async def logout(self, request: Request) -> bool:
+        secret = request.session.get("token")
+        if secret:
+            try:
+                await get_redis().delete(f"admin:token:{secret}")
+            except Exception:
+                logger.exception("Could not remove admin token from Redis")
         request.session.clear()
         return True
 

@@ -97,7 +97,7 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
             "Unsupported message. Cannot parse as JSON: %s", invalid_message
         )
 
-    @patch("app.workers.tasks.get_contract_metadata_task.send")
+    @patch("app.workers.tasks.get_contract_metadata_task.kiq", new_callable=AsyncMock)
     @patch("app.services.events.get_safe_contract_service")
     async def test_process_event_calls_send(
         self,
@@ -136,7 +136,7 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
             address="0x6ED857dc1da2c41470A95589bB482152000773e9", chain_id=1
         )
 
-    @patch("app.workers.tasks.get_contract_metadata_task.send")
+    @patch("app.workers.tasks.get_contract_metadata_task.kiq", new_callable=AsyncMock)
     @patch("app.services.events.get_safe_contract_service")
     async def test_process_event_with_multisend_calls_send(
         self,
@@ -168,7 +168,7 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
             any_order=True,
         )
 
-    @patch("app.workers.tasks.get_contract_metadata_task.send")
+    @patch("app.workers.tasks.get_contract_metadata_task.kiq", new_callable=AsyncMock)
     @patch("app.services.events.get_safe_contract_service")
     async def test_process_event_skips_null_address(
         self,
@@ -202,12 +202,17 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
             address=real_address, chain_id=1
         )
 
-    @patch("app.workers.tasks.create_safe_contracts_task_for_new_chains.send")
+    @patch("app.workers.tasks.get_contract_metadata_task.kiq", new_callable=AsyncMock)
+    @patch(
+        "app.workers.tasks.create_safe_contracts_task_for_new_chains.kiq",
+        new_callable=AsyncMock,
+    )
     @patch("app.services.events.get_safe_contract_service")
     async def test_process_event_calls_create_safe_contracts_task(
         self,
         mock_get_safe_contract_service: MagicMock,
         mock_create_safe_contracts_task: MagicMock,
+        mock_get_contract_metadata_task: MagicMock,
     ):
         mock_safe_contract_service = AsyncMock()
         mock_safe_contract_service.safe_contracts_exist.return_value = False
@@ -226,12 +231,17 @@ class TestEventsService(unittest.IsolatedAsyncioTestCase):
         await EventsService().process_event(valid_message)
         mock_create_safe_contracts_task.assert_called_once_with(chain_id=42161)
 
-    @patch("app.workers.tasks.create_safe_contracts_task_for_new_chains.send")
+    @patch("app.workers.tasks.get_contract_metadata_task.kiq", new_callable=AsyncMock)
+    @patch(
+        "app.workers.tasks.create_safe_contracts_task_for_new_chains.kiq",
+        new_callable=AsyncMock,
+    )
     @patch("app.services.events.get_safe_contract_service")
     async def test_process_event_does_not_call_create_safe_contracts_task_when_contracts_exist(
         self,
         mock_get_safe_contract_service: MagicMock,
         mock_create_safe_contracts_task: MagicMock,
+        mock_get_contract_metadata_task: MagicMock,
     ):
         mock_safe_contract_service = AsyncMock()
         mock_safe_contract_service.safe_contracts_exist.return_value = True

@@ -105,7 +105,7 @@ def get_field_key(kwargs: dict) -> str:
     request = kwargs.get("request")
     url_path = ""
     if request:
-        url_path = str(get_proxy_aware_url(request)) if request else ""
+        url_path = str(get_proxy_aware_url(request))
 
     # Add query parameters as part of key field except the request.
     cacheable_kwargs = {
@@ -153,10 +153,14 @@ def cache_response(
             # Store the response in cache for later
             # Force validation to trigger field validators that convert bytes
             validated_response = model.model_validate(response)
-            await redis.hset(  # type: ignore[misc]
-                hash_key, field_key, validated_response.model_dump_json(by_alias=True)
-            )
-            await redis.expire(hash_key, expire, nx=True)
+            async with redis.pipeline(transaction=False) as pipe:
+                pipe.hset(
+                    hash_key,
+                    field_key,
+                    validated_response.model_dump_json(by_alias=True),
+                )
+                pipe.expire(hash_key, expire, nx=True)
+                await pipe.execute()
 
             return response
 

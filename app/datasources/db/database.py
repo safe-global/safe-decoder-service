@@ -1,7 +1,8 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import uuid
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from functools import cache, wraps
 
@@ -43,28 +44,16 @@ def get_engine() -> AsyncEngine:
             future=True,
             poolclass=pool_classes.get(settings.DATABASE_POOL_CLASS),
             pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,
+            pool_pre_ping=True,
+            connect_args={
+                "server_settings": {
+                    "idle_in_transaction_session_timeout": str(
+                        settings.DATABASE_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS
+                    )
+                }
+            },
         )
-
-
-@contextmanager
-def set_database_session_context(
-    session_id: str | None = None,
-) -> Generator[None]:
-    """
-    Set session ContextVar, at the end it will be removed.
-    This context is designed to be used with `async_scoped_session` to define a context scope.
-
-    :param session_id:
-    :return:
-    """
-    _session_id: str = session_id or str(uuid.uuid4())
-    logger.debug("Storing db_session context")
-    token = _db_session_context.set(_session_id)
-    try:
-        yield
-    finally:
-        logger.debug("Removing db_session context")
-        _db_session_context.reset(token)
 
 
 def _get_database_session_context() -> str:
@@ -73,27 +62,62 @@ def _get_database_session_context() -> str:
     Used as a scope function on `async_scoped_session`.
 
     :return: session_id for the current context
+    :raises LookupError: when the session id was not created
     """
     return _db_session_context.get()
 
 
+@asynccontextmanager
+async def transactional_session_context() -> AsyncGenerator[None]:
+    """
+    Define the lifecycle of a database session scope.
+
+    Explicit transactional context:
+    - Reuses an existing session context if already set
+    - Creates a new context (and removes it on exit) if it created it
+    - Only the context that created the session commits on success or rolls
+      back on exception, so nested calls never commit an intermediate state
+    - Re-raises exceptions
+
+    Bounds a unit of database work so the connection is returned to the pool as
+    soon as the transaction completes, before any post-query work (response
+    serialization, cache writes).
+
+    :return:
+    """
+    token = None
+    created_context = False
+
+    try:
+        _get_database_session_context()
+    except LookupError:
+        token = _db_session_context.set(str(uuid.uuid4()))
+        created_context = True
+
+    try:
+        yield
+        if created_context:
+            await db_session.commit()
+    except Exception:
+        if created_context:
+            await db_session.rollback()
+        raise
+    finally:
+        if created_context and token:
+            await db_session.remove()
+            _db_session_context.reset(token)
+
+
 def db_session_context(func):
     """
-    Wrap the decorated function in the `set_database_session_context` context.
+    Wrap the decorated function in the `transactional_session_context` context.
     Decorated function will share the same database session.
-    Remove the session at the end of the context.
     """
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        with set_database_session_context():
-            try:
-                return await func(*args, **kwargs)
-            finally:
-                logger.debug(
-                    "Removing session context: %s", _get_database_session_context()
-                )
-                await db_session.remove()
+        async with transactional_session_context():
+            return await func(*args, **kwargs)
 
     return wrapper
 

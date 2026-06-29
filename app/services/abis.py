@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_typing import ABI
@@ -58,6 +59,7 @@ from app.datasources.abis.sight import (
 )
 from app.datasources.abis.snapshot import snapshot_delegate_registry_abi
 from app.datasources.abis.timelock import timelock_abi
+from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Abi, AbiSource
 
 
@@ -79,16 +81,19 @@ class AbiService:
                 ).create()
 
     async def load_local_abis_in_database(self) -> None:
-        abi_source, _ = await AbiSource.get_or_create("localstorage", "decoder-service")
-        await self._store_abis_in_database(
-            self.get_safe_contracts_abis(), 100, abi_source
-        )
-        await self._store_abis_in_database(
-            self.get_erc_abis() + self.get_safe_abis(), 90, abi_source
-        )
-        await self._store_abis_in_database(
-            self.get_third_parties_abis(), 50, abi_source
-        )
+        async with transactional_session_context():
+            abi_source, _ = await AbiSource.get_or_create(
+                "localstorage", "decoder-service"
+            )
+            await self._store_abis_in_database(
+                self.get_safe_contracts_abis(), 100, abi_source
+            )
+            await self._store_abis_in_database(
+                self.get_erc_abis() + self.get_safe_abis(), 90, abi_source
+            )
+            await self._store_abis_in_database(
+                self.get_third_parties_abis(), 50, abi_source
+            )
 
     def get_safe_contracts_abis(
         self,

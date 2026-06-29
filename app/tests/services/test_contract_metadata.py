@@ -13,6 +13,7 @@ from safe_eth.eth.clients import (
     AsyncEtherscanClientV2,
     AsyncSourcifyClient,
     BlockScoutConfigurationProblem,
+    ContractMetadata,
     EtherscanClientConfigurationProblem,
     SourcifyClientConfigurationProblem,
 )
@@ -43,6 +44,32 @@ from ..mocks.contract_metadata_mocks import (
 
 
 class TestContractMetadataService(AsyncDbTestCase):
+    @db_session_context
+    async def test_process_contract_metadata_partial_match_with_valid_abi(self):
+        random_address = Account.create().address
+        await AbiSource.get_or_create("Etherscan", "")
+
+        # A partial match still carries a valid ABI — it must be stored.
+        partial_metadata = ContractMetadata(
+            name="Partial Contract",
+            abi=[{"type": "function", "name": "transfer"}],
+            partial_match=True,
+        )
+        contract_data = EnhancedContractMetadata(
+            address=random_address,
+            metadata=partial_metadata,
+            source=ContractSource.ETHERSCAN,
+            chain_id=1,
+        )
+        result = await ContractMetadataService.process_contract_metadata(contract_data)
+        self.assertTrue(result)
+        contract = await Contract.get_contract(
+            address=HexBytes(random_address), chain_id=1
+        )
+        self.assertIsNotNone(contract.abi_id)
+        self.assertEqual(contract.abi.abi_json, partial_metadata.abi)
+        self.assertEqual(contract.fetch_retries, 0)
+
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )
@@ -268,7 +295,6 @@ class TestContractMetadataService(AsyncDbTestCase):
         # Should be false if contract has abi_id
         source, _ = await AbiSource.get_or_create("Etherscan", "")
         abi = Abi(
-            abi_hash=b"A Test Abi",
             abi_json=etherscan_metadata_mock.abi,
             relevance=10,
             source_id=source.id,

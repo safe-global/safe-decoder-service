@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "psql://postgres:"
     DATABASE_POOL_CLASS: str = "AsyncAdaptedQueuePool"
     DATABASE_POOL_SIZE: int = 10
+    # Extra connections allowed above pool_size
+    DATABASE_POOL_MAX_OVERFLOW: int = 10
+    # Force-closes transactions left idle so leaked connections are reclaimed
+    DATABASE_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS: int = 30_000
     RABBITMQ_AMQP_URL: str = "amqp://guest:guest@"
     RABBITMQ_AMQP_EXCHANGE: str = "safe-transaction-service-events"
     RABBITMQ_DECODER_EVENTS_QUEUE_NAME: str = "safe-decoder-service"
@@ -76,6 +80,11 @@ LOGGING_CONFIG = {
         },
         "app.services.events": {
             "level": settings.LOG_LEVEL_EVENTS_SERVICE,
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "taskiq": {
+            "level": "WARNING",
             "handlers": ["console"],
             "propagate": False,
         },

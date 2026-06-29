@@ -1,15 +1,16 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_typing import ABIEvent, ABIFunction
-from fastapi.testclient import TestClient
 from hexbytes import HexBytes
+from httpx import ASGITransport, AsyncClient
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import get_empty_tx_params
 from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
 from ...datasources.abis.gnosis_protocol import cowswap_settlement_v2_abi
-from ...datasources.db.database import db_session_context
+from ...datasources.db.database import db_session_context, transactional_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
@@ -19,11 +20,16 @@ from ..services.mocks_data_decoder import example_abi, example_swapped_abi
 
 
 class TestRouterAbout(AsyncDbTestCase):
-    client: TestClient
+    client: AsyncClient
 
-    @classmethod
-    def setUpClass(cls):
-        cls.client = TestClient(app)
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.client = AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        )
+
+    async def asyncTearDown(self):
+        await self.client.aclose()
 
     def setUp(self):
         get_data_decoder_service.cache_clear()
@@ -46,8 +52,8 @@ class TestRouterAbout(AsyncDbTestCase):
             "0000000001"
         )
 
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={"data": to_0x_hex_str(add_owner_with_threshold_data)},
         )
         self.assertEqual(response.status_code, 200)
@@ -73,12 +79,14 @@ class TestRouterAbout(AsyncDbTestCase):
             },
         )
 
-        response = self.client.post("/api/v1/data-decoder/", json={"data": "0x123"})
+        response = await self.client.post(
+            "/api/v1/data-decoder", json={"data": "0x123"}
+        )
         self.assertEqual(response.status_code, 404)
 
         # Test no checksummed address
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={
                 "data": to_0x_hex_str(add_owner_with_threshold_data),
                 "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -89,8 +97,8 @@ class TestRouterAbout(AsyncDbTestCase):
     @db_session_context
     async def test_view_data_decoder_with_chain_id_without_to(self):
         # Test no checksummed address
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={
                 "data": "0x1234",
                 "chainId": 1,
@@ -112,41 +120,34 @@ class TestRouterAbout(AsyncDbTestCase):
             },
         )
 
-    @db_session_context
     async def test_view_data_decoder_with_chain_id(self):
-        source = AbiSource(name="local", url="")
-        await source.create()
-
+        # No outer context: the endpoint must scope its own session
         contract_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-        abi = Abi(
-            abi_hash=b"ExampleABI",
-            abi_json=example_abi,
-            relevance=101,
-            source_id=source.id,
-        )
-        await abi.create()
-        contract = Contract(
-            address=HexBytes(contract_address),
-            abi=abi,
-            name="SwappedContract",
-            chain_id=1,
-        )
-        await contract.create()
+        async with transactional_session_context():
+            source = AbiSource(name="local", url="")
+            await source.create()
 
-        swapped_abi = Abi(
-            abi_hash=b"SwappedABI",
-            abi_json=example_swapped_abi,
-            relevance=100,
-            source_id=source.id,
-        )
-        await swapped_abi.create()
-        contract = Contract(
-            address=HexBytes(contract_address),
-            abi=swapped_abi,
-            name="SwappedContract",
-            chain_id=2,
-        )
-        await contract.create()
+            abi = Abi(abi_json=example_abi, relevance=101, source_id=source.id)
+            await abi.create()
+            contract = Contract(
+                address=HexBytes(contract_address),
+                abi=abi,
+                name="SwappedContract",
+                chain_id=1,
+            )
+            await contract.create()
+
+            swapped_abi = Abi(
+                abi_json=example_swapped_abi, relevance=100, source_id=source.id
+            )
+            await swapped_abi.create()
+            contract = Contract(
+                address=HexBytes(contract_address),
+                abi=swapped_abi,
+                name="SwappedContract",
+                chain_id=2,
+            )
+            await contract.create()
 
         example_data = (
             Web3()
@@ -157,8 +158,8 @@ class TestRouterAbout(AsyncDbTestCase):
             )["data"]
         )
 
-        response = self.client.post(
-            "/api/v1/data-decoder/", json={"data": example_data}
+        response = await self.client.post(
+            "/api/v1/data-decoder", json={"data": example_data}
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -183,11 +184,13 @@ class TestRouterAbout(AsyncDbTestCase):
             },
         )
 
-        response = self.client.post("/api/v1/data-decoder/", json={"data": "0x123"})
+        response = await self.client.post(
+            "/api/v1/data-decoder", json={"data": "0x123"}
+        )
         self.assertEqual(response.status_code, 404)
 
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={
                 "data": example_data,
                 "to": contract_address,
@@ -217,8 +220,8 @@ class TestRouterAbout(AsyncDbTestCase):
             },
         )
 
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={
                 "data": example_data,
                 "to": contract_address,
@@ -265,8 +268,8 @@ class TestRouterAbout(AsyncDbTestCase):
         # Nested call to CowSwap settlement v2 contract
         # https://sepolia.etherscan.io/tx/0x2f2293ec868e1edf9763a51d19e890f56f6afee155d0a3371ae6518b4c394f30
         data = "0x6a7612020000000000000000000000009008d19f58aabd9ed0d60971565aa8510560ab4100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000a4ec6cb13f000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000038a1f6fb0cc6526262f88a720c8716adf2d0020645d2cce0e3997413375643e9562a73e61bd15b25b6958b4da3bfc759ca4db249b9678f9521000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008210d8d32da8b9a9da815fa3be1edb76c96d2648a3de1a58d410a961d75ca501e96955ecfefd97cdc953b6e6737377d6fddf644daf050d87bc1846724c6827b7fd1c936e977045ac01dd18a0cc6686354ed28910cba95b4ad5e688c35a3295c9e309124c950598ff534299144a53c4fc00016c30f667a11e90a29536b394d415f5061b000000000000000000000000000000000000000000000000000000000000"
-        response = self.client.post(
-            "/api/v1/data-decoder/",
+        response = await self.client.post(
+            "/api/v1/data-decoder",
             json={
                 "data": data,
             },

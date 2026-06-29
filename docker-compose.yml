@@ -67,7 +67,7 @@ services:
         condition: service_healthy
     command: docker/web/run_web.sh
 
-  dramatiq-worker:
+  taskiq-worker:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
@@ -76,4 +76,4 @@ services:
     depends_on:
       - redis
     command:
-      docker/web/dramatiq/worker/run.sh
+      docker/web/taskiq/worker/run.sh

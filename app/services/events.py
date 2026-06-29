@@ -8,7 +8,6 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_is_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 
-from ..datasources.db.database import db_session_context
 from ..workers.tasks import (
     create_safe_contracts_task_for_new_chains,
     get_contract_metadata_task,
@@ -34,7 +33,6 @@ class EventsService:
             for multisend_tx in MultiSend.from_transaction_data(HexBytes(data))
         }
 
-    @db_session_context
     async def process_event(self, message: str) -> None:
         """
         Processes the incoming event message.
@@ -56,13 +54,13 @@ class EventsService:
                     # Create missing Safe contract if is a new chain
                     safe_contract_service = get_safe_contract_service()
                     if not await safe_contract_service.safe_contracts_exist(chain_id):
-                        create_safe_contracts_task_for_new_chains.send(
+                        await create_safe_contracts_task_for_new_chains.kiq(
                             chain_id=chain_id
                         )
                     for contract_address in {to, *contracts_from_data}:
                         if contract_address == NULL_ADDRESS:
                             continue
-                        get_contract_metadata_task.send(
+                        await get_contract_metadata_task.kiq(
                             address=contract_address, chain_id=chain_id
                         )
         except json.JSONDecodeError:
