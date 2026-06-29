@@ -14,7 +14,7 @@ dependencies = [
     "redis[hiredis]==7.4.0",
     "safe-eth-py==7.21.0",
     "setuptools>=82.0.1,<83",
-    "sqladmin[full]==0.26.0",
+    "sqladmin[full]==0.27.2",
     "sqlmodel==0.0.38",
     "taskiq==0.12.4",
     "taskiq-redis==1.2.2",
