@@ -249,7 +249,7 @@ class DataDecoderService:
         return selectors
 
     async def _get_implementation(
-        self, address: Address, chain_id: int | None
+        self, address: Address, chain_id: int
     ) -> bytes | None:
         """
         Return the implementation address of a proxy contract, cached per address and

@@ -342,24 +342,18 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return cast("Contract", await cls.get_contract(address, chain_id)), False
 
     @classmethod
-    async def get_implementation(
-        cls, address: bytes, chain_id: int | None
-    ) -> bytes | None:
+    async def get_implementation(cls, address: bytes, chain_id: int) -> bytes | None:
         """
         Fetch the implementation address of a proxy contract without transferring its
         ABI. Returns `None` for regular (non-proxy) contracts and for unknown addresses.
 
         :param address: Contract address to look up.
-        :param chain_id: Chain to filter by, or `None` to match any chain (returns the
-            lowest `chain_id` match).
+        :param chain_id: Chain to filter by.
         :return: Implementation address or `None`.
         """
-        query = select(cls.implementation).where(cls.address == address)
-        if chain_id is not None:
-            query = query.where(cls.chain_id == chain_id)
-        else:
-            query = query.order_by(col(cls.chain_id))
-
+        query = select(cls.implementation).where(
+            cls.address == address, cls.chain_id == chain_id
+        )
         results = await db_session.execute(query)
         row = results.first()
         return row[0] if row is not None else None
