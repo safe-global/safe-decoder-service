@@ -342,19 +342,39 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return cast("Contract", await cls.get_contract(address, chain_id)), False
 
     @classmethod
-    async def get_implementation_address(
+    async def get_abi_and_implementation(
         cls, address: bytes, chain_id: int | None
-    ) -> bytes | None:
+    ) -> tuple[ABI | None, bytes | None]:
         """
+        Fetch the contract's own ABI and its implementation address in a single query,
+        avoiding a second round trip on the decoding cache-miss path.
+
+        A contract row only ever has an `implementation` set together with its own ABI
+        (see `ContractMetadataService.process_contract_metadata`), so the inner join on
+        `Abi` never drops a proxy that has an implementation.
+
         :param address: Contract address to look up.
-        :param chain_id: Chain to filter by, or `None` to match any chain.
-        :return: The implementation address if the contract is a proxy, `None` otherwise.
+        :param chain_id: Chain to filter by, or `None` to match any chain (returns the
+            lowest `chain_id` match).
+        :return: Tuple of (ABI json or `None`, implementation address or `None`).
         """
-        query = select(cls.implementation).where(cls.address == address)
+        query = (
+            select(Abi.abi_json, cls.implementation)
+            .join(cls)
+            .where(cls.address == address)
+            .where(cls.abi_id == Abi.id)
+        )
         if chain_id is not None:
             query = query.where(cls.chain_id == chain_id)
+        else:
+            query = query.order_by(col(cls.chain_id))
+
         results = await db_session.execute(query)
-        return results.scalars().first()
+        row = results.first()
+        if row is None:
+            return None, None
+        abi_json, implementation = row
+        return cast(ABI, abi_json), implementation
 
     @classmethod
     async def get_abi_by_contract_address(

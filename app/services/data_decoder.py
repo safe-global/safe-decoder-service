@@ -228,17 +228,15 @@ class DataDecoderService:
         :param chain_id: Chain for the contract
         :return: ABI if found, `None` otherwise
         """
-        own_abi = await self.get_contract_abi(address, chain_id)
+        own_abi, implementation = await Contract.get_abi_and_implementation(
+            HexBytes(address), chain_id
+        )
 
-        if chain_id is not None:
-            implementation = await Contract.get_implementation_address(
-                HexBytes(address), chain_id
-            )
-            if implementation:
-                impl_address = cast(Address, implementation)
-                impl_abi = await self.get_contract_abi(impl_address, chain_id)
-                if impl_abi:
-                    return list(own_abi or []) + list(impl_abi)
+        if chain_id is not None and implementation:
+            impl_address = cast(Address, implementation)
+            impl_abi = await self.get_contract_abi(impl_address, chain_id)
+            if impl_abi:
+                return list(own_abi or []) + list(impl_abi)
 
         if own_abi:
             return own_abi
