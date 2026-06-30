@@ -277,22 +277,17 @@ class DataDecoderService:
         selectors = (
             await self._generate_selectors_with_abis_from_abi(abi) if abi else None
         )
-        await cast(
-            Awaitable[int],
-            redis.hset(
-                redis_key,
-                field_key,
-                json.dumps(
-                    {
-                        to_0x_hex_str(selector): fn_abi
-                        for selector, fn_abi in selectors.items()
-                    }
-                    if selectors is not None
-                    else None
-                ),
-            ),
+        payload = json.dumps(
+            {to_0x_hex_str(selector): fn_abi for selector, fn_abi in selectors.items()}
+            if selectors is not None
+            else None
         )
-        await redis.expire(redis_key, settings.CONTRACT_SELECTORS_CACHE_TTL, nx=True)
+        # Set the value and its TTL atomically so the hash can never be left without an
+        # expiry.
+        async with redis.pipeline(transaction=True) as pipe:
+            pipe.hset(redis_key, field_key, payload)
+            pipe.expire(redis_key, settings.CONTRACT_SELECTORS_CACHE_TTL, nx=True)
+            await pipe.execute()
         return selectors
 
     async def get_abi_function(
