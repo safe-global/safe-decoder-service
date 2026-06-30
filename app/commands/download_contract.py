@@ -46,7 +46,6 @@ async def download_contract_command(address: str, chain_id: int):
             )
             async with broker_connection():
                 await get_proxy_implementation_metadata_task.kiq(
-                    proxy_address=address,
                     implementation_address=proxy_implementation_address,
                     chain_id=chain_id,
                 )

@@ -273,8 +273,8 @@ class TestAsyncTasks(AsyncDbTestCase):
         mock_enabled_clients: MagicMock,
     ):
         """
-        Regression: proxy selector cache must be invalidated when the implementation ABI
-        is downloaded for the first time, so the next decode uses the implementation ABI.
+        After the implementation ABI is downloaded, the next decode against the proxy
+        must use the implementation ABI.
         """
         chain_id = 1
         proxy_address = Account.create().address
@@ -326,9 +326,12 @@ class TestAsyncTasks(AsyncDbTestCase):
         self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
 
         redis = get_redis()
-        hash_key = get_key_for_contract_selectors(proxy_address)
+        proxy_hash_key = get_key_for_contract_selectors(proxy_address)
+        impl_hash_key = get_key_for_contract_selectors(impl_address)
         field_key = get_field_key_for_selectors(chain_id)
-        self.assertTrue(await redis.hexists(hash_key, field_key))  # type: ignore[misc]
+        self.assertTrue(await redis.hexists(proxy_hash_key, field_key))  # type: ignore[misc]
+        # First decode also cached the implementation's (empty) own selectors.
+        self.assertTrue(await redis.hexists(impl_hash_key, field_key))  # type: ignore[misc]
 
         # Task downloads the implementation ABI (swapped param names).
         impl_metadata = ContractMetadata("Implementation", example_swapped_abi, False)  # type: ignore[arg-type]
@@ -337,7 +340,6 @@ class TestAsyncTasks(AsyncDbTestCase):
             AsyncEtherscanClientV2(EthereumNetwork(chain_id))
         ]
         await get_proxy_implementation_metadata_task.kiq(
-            proxy_address=proxy_address,
             implementation_address=impl_address,
             chain_id=chain_id,
         )
@@ -350,8 +352,9 @@ class TestAsyncTasks(AsyncDbTestCase):
         )
         self.assertIsNotNone(impl_contract_updated.abi_id)
 
-        # Proxy selector cache must have been cleared.
-        self.assertFalse(await redis.hexists(hash_key, field_key))  # type: ignore[misc]
+        # Implementation cache cleared; proxy entry untouched.
+        self.assertFalse(await redis.hexists(impl_hash_key, field_key))  # type: ignore[misc]
+        self.assertTrue(await redis.hexists(proxy_hash_key, field_key))  # type: ignore[misc]
 
         # Second decode: must use implementation ABI.
         fn_name, arguments = await decoder.decode_transaction(

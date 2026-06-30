@@ -22,11 +22,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import RedisStreamBroker
 
 from app.config import settings
-from app.datasources.cache.redis import (
-    del_contract_cache,
-    del_contract_selectors_cache,
-    get_redis,
-)
+from app.datasources.cache.redis import del_contract_cache, get_redis
 from app.datasources.db.database import transactional_session_context
 from app.datasources.db.models import Contract
 from app.loggers.safe_logger import (
@@ -136,7 +132,6 @@ async def get_contract_metadata_task(
                 proxy_implementation_address,
             )
             await get_proxy_implementation_metadata_task.kiq(
-                proxy_address=address,
                 implementation_address=proxy_implementation_address,
                 chain_id=chain_id,
             )
@@ -146,7 +141,7 @@ async def get_contract_metadata_task(
 
 @broker.task
 async def get_proxy_implementation_metadata_task(
-    proxy_address: str, implementation_address: str, chain_id: int
+    implementation_address: str, chain_id: int
 ):
     contract_metadata_service = get_contract_metadata_service()
     if await contract_metadata_service.should_attempt_download(
@@ -162,7 +157,6 @@ async def get_proxy_implementation_metadata_task(
         if result:
             logger.info("Success downloading proxy implementation contract metadata")
             await del_contract_cache(implementation_address)
-            await del_contract_selectors_cache(proxy_address, chain_id)
         else:
             logger.info("Failed to download proxy implementation contract metadata")
     else:

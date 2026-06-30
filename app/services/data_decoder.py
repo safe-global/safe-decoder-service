@@ -22,9 +22,11 @@ from web3._utils.normalizers import implicitly_identity
 
 from ..config import settings
 from ..datasources.cache.redis import (
+    get_field_key_for_implementation,
     get_field_key_for_selectors,
     get_key_for_contract_selectors,
     get_redis,
+    hset_with_ttl,
 )
 from ..datasources.db.database import transactional_session_context
 from ..datasources.db.models import Abi, Contract
@@ -184,25 +186,11 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    async def get_contract_abi(
-        self,
-        address: Address,
-        chain_id: int | None,
-    ) -> ABI | None:
-        """
-        Retrieves the ABI for the contract at the given address.
-
-        :param address: Contract address
-        :param chain_id: Chain id for the contract
-        :return: List of ABI data if found, `None` otherwise.
-        """
-        return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
-
     async def _has_contract_abi(self, address: Address, chain_id: int | None) -> bool:
         """
         Checks whether an ABI exists for the contract at the given address without
-        fetching it. Use this instead of `get_contract_abi` when only the presence of a
-        match matters (e.g. computing decoding accuracy), to avoid transferring the ABI.
+        fetching it. Use this when only the presence of a match matters (e.g. computing
+        decoding accuracy), to avoid transferring the ABI.
 
         :param address: Contract address
         :param chain_id: Chain id for the contract
@@ -210,85 +198,124 @@ class DataDecoderService:
         """
         return await Contract.has_abi_by_contract_address(HexBytes(address), chain_id)
 
-    async def _get_abi_for_decoding(
-        self, address: Address, chain_id: int | None
-    ) -> ABI | None:
-        """
-        Resolves the ABI to use for decoding using the following priority:
-            1. Proxy own ABI merged with implementation ABI (if chain is known and contract
-               is a proxy with a known implementation ABI). Implementation selectors take
-               priority over proxy selectors on collision so parameter names are correct.
-            2. Contract own ABI on the given chain
-            3. Contract own ABI on any chain
+    @staticmethod
+    def _encode_selectors(selectors: dict[bytes, ABIFunction] | None) -> str:
+        return json.dumps(
+            {to_0x_hex_str(selector): fn_abi for selector, fn_abi in selectors.items()}
+            if selectors is not None
+            else None
+        )
 
-        Proxy implementation resolution is skipped when chain_id is None because the
-        implementation address can differ across chains.
+    @staticmethod
+    def _decode_selectors(raw: str) -> dict[bytes, ABIFunction] | None:
+        data = json.loads(raw)
+        if data is None:
+            return None
+        return {
+            HexBytes(selector): cast(ABIFunction, fn_abi)
+            for selector, fn_abi in data.items()
+        }
+
+    async def _get_selectors(
+        self, address: Address, chain_id: int | None
+    ) -> dict[bytes, ABIFunction] | None:
+        """
+        Return the function selectors generated from the contract's ABI, cached per
+        address and chain.
 
         :param address: Contract address
         :param chain_id: Chain for the contract
-        :return: ABI if found, `None` otherwise
+        :return: Selectors keyed by 4-byte selector, or `None` when there is no ABI.
         """
-        own_abi, implementation = await Contract.get_abi_and_implementation(
-            HexBytes(address), chain_id
+        redis_key = get_key_for_contract_selectors(to_0x_hex_str(HexBytes(address)))
+        field_key = get_field_key_for_selectors(chain_id)
+
+        cached = await cast(
+            Awaitable[str | None], get_redis().hget(redis_key, field_key)
         )
+        if cached is not None:
+            return self._decode_selectors(cached)
 
-        if chain_id is not None and implementation:
-            impl_address = cast(Address, implementation)
-            impl_abi = await self.get_contract_abi(impl_address, chain_id)
-            if impl_abi:
-                return list(own_abi or []) + list(impl_abi)
+        abi = await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
+        selectors = (
+            await self._generate_selectors_with_abis_from_abi(abi) if abi else None
+        )
+        await hset_with_ttl(
+            redis_key,
+            field_key,
+            self._encode_selectors(selectors),
+            settings.CONTRACT_SELECTORS_CACHE_TTL,
+        )
+        return selectors
 
-        if own_abi:
-            return own_abi
+    async def _get_implementation(
+        self, address: Address, chain_id: int | None
+    ) -> bytes | None:
+        """
+        Return the implementation address of a proxy contract, cached per address and
+        chain. `None` for regular (non-proxy) contracts.
 
-        # Last chance: any ABI on any chain with the same address
-        if chain_id is not None:
-            return await self.get_contract_abi(address, None)
+        :param address: Contract address
+        :param chain_id: Chain for the contract
+        :return: Implementation address or `None`.
+        """
+        redis_key = get_key_for_contract_selectors(to_0x_hex_str(HexBytes(address)))
+        field_key = get_field_key_for_implementation(chain_id)
 
-        return None
+        cached = await cast(
+            Awaitable[str | None], get_redis().hget(redis_key, field_key)
+        )
+        if cached is not None:
+            raw = json.loads(cached)
+            return HexBytes(raw) if raw is not None else None
+
+        implementation = await Contract.get_implementation(HexBytes(address), chain_id)
+        payload = json.dumps(
+            to_0x_hex_str(HexBytes(implementation)) if implementation else None
+        )
+        await hset_with_ttl(
+            redis_key, field_key, payload, settings.CONTRACT_SELECTORS_CACHE_TTL
+        )
+        return implementation
 
     async def get_contract_abi_selectors_with_functions(
         self, address: Address, chain_id: int | None
     ) -> dict[bytes, ABIFunction] | None:
         """
+        Resolve the function selectors to use when decoding calldata sent to `address`,
+        following this priority:
+            1. Proxy selectors merged with the implementation selectors (when the chain
+               is known and the contract is a proxy with a known implementation ABI).
+               Implementation selectors win on collision so parameter names are correct.
+            2. Contract selectors on the given chain.
+            3. Contract selectors on any chain.
+
+        Proxy resolution is skipped when `chain_id` is `None` because the implementation
+        address can differ across chains.
+
         :param address: Contract address
         :param chain_id: Chain for the contract
-        :return: Dictionary of function selectors with `ABIFunction` if found, `None` otherwise.
-            If contract is not found for the chain, return the first one that matches in other chain.
-            For proxy contracts, the implementation ABI is used so parameter names are correct.
+        :return: Dictionary of function selectors with `ABIFunction` if found, `None`
+            otherwise.
         """
-        redis_key = get_key_for_contract_selectors(to_0x_hex_str(HexBytes(address)))
-        field_key = get_field_key_for_selectors(chain_id)
+        selectors = await self._get_selectors(address, chain_id)
 
-        redis = get_redis()
-        cached = await cast(Awaitable[str | None], redis.hget(redis_key, field_key))
-        if cached is not None:
-            result = json.loads(cached)
-            return (
-                {
-                    HexBytes(selector): cast(ABIFunction, fn_abi)
-                    for selector, fn_abi in result.items()
-                }
-                if result is not None
-                else None
-            )
+        if chain_id is not None:
+            implementation_address = await self._get_implementation(address, chain_id)
+            if implementation_address:
+                implementation_selectors = await self._get_selectors(
+                    cast(Address, implementation_address), chain_id
+                )
+                if implementation_selectors:
+                    return {**(selectors or {}), **implementation_selectors}
 
-        abi = await self._get_abi_for_decoding(address, chain_id)
-        selectors = (
-            await self._generate_selectors_with_abis_from_abi(abi) if abi else None
-        )
-        payload = json.dumps(
-            {to_0x_hex_str(selector): fn_abi for selector, fn_abi in selectors.items()}
-            if selectors is not None
-            else None
-        )
-        # Set the value and its TTL atomically so the hash can never be left without an
-        # expiry.
-        async with redis.pipeline(transaction=True) as pipe:
-            pipe.hset(redis_key, field_key, payload)
-            pipe.expire(redis_key, settings.CONTRACT_SELECTORS_CACHE_TTL, nx=True)
-            await pipe.execute()
-        return selectors
+        if selectors:
+            return selectors
+
+        if chain_id is not None:
+            return await self._get_selectors(address, None)
+
+        return None
 
     async def get_abi_function(
         self, data: bytes, address: Address | None = None, chain_id: int | None = None

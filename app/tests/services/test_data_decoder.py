@@ -692,8 +692,8 @@ class TestDataDecoderService(AsyncDbTestCase):
     @db_session_context
     async def test_get_contract_abi_selectors_caches_negative_result(self):
         """
-        When a contract has no ABI, the resolved selectors (`None`) must be cached so
-        subsequent lookups are served from Redis without resolving the ABI again.
+        When a contract has no ABI, the cached selectors result is JSON null and lookups
+        return `None` without regenerating the selectors.
         """
         decoder_service = DataDecoderService()
         await decoder_service.init()
@@ -716,12 +716,12 @@ class TestDataDecoderService(AsyncDbTestCase):
         assert cached is not None
         self.assertIsNone(json.loads(cached))
 
-        # Second call must be served from cache, without resolving the ABI again
+        # Second call is served from cache, without regenerating the selectors
         with mock.patch.object(
-            decoder_service, "_get_abi_for_decoding", autospec=True
-        ) as mock_resolve:
+            decoder_service, "_generate_selectors_with_abis_from_abi", autospec=True
+        ) as mock_generate:
             selectors = await decoder_service.get_contract_abi_selectors_with_functions(
                 Address(HexBytes(address)), chain_id
             )
         self.assertIsNone(selectors)
-        mock_resolve.assert_not_called()
+        mock_generate.assert_not_called()

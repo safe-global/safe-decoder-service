@@ -6,7 +6,6 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from eth_account import Account
-from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.clients import (
     AsyncBlockscoutClient,
@@ -32,7 +31,6 @@ from app.services.contract_metadata_service import (
     ContractSource,
     EnhancedContractMetadata,
 )
-from app.services.data_decoder import DataDecoderService
 
 from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..mocks.contract_metadata_mocks import (
@@ -398,45 +396,6 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertEqual(
             fast_to_checksum_address(contract.implementation), implementation_address
         )
-
-    @db_session_context
-    async def test_process_contract_metadata_invalidates_cache_on_implementation_change(
-        self,
-    ):
-        contract_address = Account.create().address
-        chain_id = 1
-        await AbiSource(name="Etherscan", url="").create()
-
-        proxy_metadata = copy(etherscan_proxy_metadata_mock)
-        contract_metadata = EnhancedContractMetadata(
-            address=contract_address,
-            metadata=proxy_metadata,
-            source=ContractSource.ETHERSCAN,
-            chain_id=chain_id,
-        )
-        await ContractMetadataService.process_contract_metadata(contract_metadata)
-
-        # Populate the selector cache via the decoder (end-to-end)
-        decoder_service = DataDecoderService()
-        await decoder_service.init()
-        selectors = await decoder_service.get_contract_abi_selectors_with_functions(
-            Address(HexBytes(contract_address)), chain_id
-        )
-        self.assertIsNotNone(selectors)
-        redis = get_redis()
-        redis_key = get_key_for_contract_selectors(contract_address)
-        field_key = get_field_key_for_selectors(chain_id)
-        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
-
-        # Same implementation → cache must NOT be invalidated
-        await ContractMetadataService.process_contract_metadata(contract_metadata)
-        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
-
-        # Changed implementation → only this chain's selector field must be invalidated
-        assert contract_metadata.metadata is not None
-        contract_metadata.metadata.implementation = Account.create().address
-        await ContractMetadataService.process_contract_metadata(contract_metadata)
-        self.assertFalse(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
 
     @db_session_context
     async def test_process_contract_metadata_does_not_invalidate_cache_for_non_proxy(

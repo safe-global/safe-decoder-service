@@ -6,7 +6,8 @@ from typing import cast
 from eth_account import Account
 
 from app.datasources.cache.redis import (
-    del_contract_selectors_cache,
+    del_contract_cache,
+    get_field_key_for_implementation,
     get_field_key_for_selectors,
     get_key_for_contract_selectors,
     get_redis,
@@ -14,36 +15,27 @@ from app.datasources.cache.redis import (
 
 
 class TestRedisSelectorsCache(unittest.IsolatedAsyncioTestCase):
-    async def test_del_contract_selectors_cache_also_clears_chainless_field(self):
+    async def test_del_contract_cache_clears_selectors_and_implementation(self):
         """
-        Deleting the selectors cache for a specific chain must also drop the
-        chain-agnostic (`None`) field, while leaving other chains untouched.
+        `del_contract_cache` must drop the whole per-contract decoding hash: both the
+        selectors and the implementation fields, across all chains.
         """
         redis = get_redis()
         address = Account.create().address
         redis_key = get_key_for_contract_selectors(address)
-        chain_field = get_field_key_for_selectors(1)
-        chainless_field = get_field_key_for_selectors(None)
-        other_chain_field = get_field_key_for_selectors(2)
 
         await cast(
             Awaitable[int],
             redis.hset(
                 redis_key,
                 mapping={
-                    chain_field: "{}",
-                    chainless_field: "{}",
-                    other_chain_field: "{}",
+                    get_field_key_for_selectors(1): "{}",
+                    get_field_key_for_selectors(None): "{}",
+                    get_field_key_for_implementation(1): '"0x"',
                 },
             ),
         )
 
-        await del_contract_selectors_cache(address, 1)
+        await del_contract_cache(address)
 
-        # Target chain and the chainless field are gone...
-        self.assertFalse(await redis.hexists(redis_key, chain_field))  # type: ignore[misc]
-        self.assertFalse(await redis.hexists(redis_key, chainless_field))  # type: ignore[misc]
-        # ...but other chains are untouched
-        self.assertTrue(await redis.hexists(redis_key, other_chain_field))  # type: ignore[misc]
-
-        await redis.unlink(redis_key)
+        self.assertFalse(await redis.exists(redis_key))

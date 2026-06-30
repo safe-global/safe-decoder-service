@@ -2,7 +2,7 @@
 import asyncio
 import hashlib
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from functools import wraps
 from typing import cast
 from weakref import WeakKeyDictionary
@@ -72,25 +72,33 @@ def get_field_key_for_selectors(chain_id: int | None) -> str:
     return f"selectors:{chain_id}"
 
 
-async def del_contract_selectors_cache(address: str, chain_id: int | None):
+def get_field_key_for_implementation(chain_id: int | None) -> str:
     """
-    Delete the cached ABI selectors for a specific contract on a specific chain.
-    Always also deletes the chain-agnostic (None) field so chainless queries are invalidated too.
+    Build the Redis hash field key for a contract's cached implementation address on a
+    specific chain.
 
-    :param address: The contract address used to build the cache key.
-    :param chain_id: The chain id whose selector cache should be invalidated.
+    :param chain_id: Chain id for the contract.
+    :return: A string field key in the format 'implementation:<chain_id>'.
+    """
+    return f"implementation:{chain_id}"
+
+
+async def hset_with_ttl(redis_key: str, field_key: str, value: str, ttl: int) -> None:
+    """
+    Set a hash field and ensure the hash has a TTL atomically, so the hash can never be
+    left without an expiry. The TTL is only applied when the hash has no expiry yet.
+
+    :param redis_key: Redis hash key.
+    :param field_key: Field within the hash to set.
+    :param value: Value to store in the field.
+    :param ttl: Expiry in seconds, applied only if the hash has no TTL yet.
     :return: None
     """
-    fields_to_delete = [get_field_key_for_selectors(chain_id)]
-    if chain_id is not None:
-        fields_to_delete.append(get_field_key_for_selectors(None))
-    await cast(
-        Awaitable[int],
-        get_redis().hdel(
-            get_key_for_contract_selectors(address),
-            *fields_to_delete,
-        ),
-    )
+    redis = get_redis()
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.hset(redis_key, field_key, value)
+        pipe.expire(redis_key, ttl, nx=True)
+        await pipe.execute()
 
 
 def get_field_key(kwargs: dict) -> str:
