@@ -349,10 +349,6 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         Fetch the contract's own ABI and its implementation address in a single query,
         avoiding a second round trip on the decoding cache-miss path.
 
-        A contract row only ever has an `implementation` set together with its own ABI
-        (see `ContractMetadataService.process_contract_metadata`), so the inner join on
-        `Abi` never drops a proxy that has an implementation.
-
         :param address: Contract address to look up.
         :param chain_id: Chain to filter by, or `None` to match any chain (returns the
             lowest `chain_id` match).

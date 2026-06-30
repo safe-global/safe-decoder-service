@@ -1,4 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import json
+from collections.abc import Awaitable
+from typing import cast
+from unittest import mock
+
+from eth_account import Account
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -20,7 +26,12 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
-from ...datasources.cache.redis import del_contract_cache
+from ...datasources.cache.redis import (
+    del_contract_cache,
+    get_field_key_for_selectors,
+    get_key_for_contract_selectors,
+    get_redis,
+)
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -677,3 +688,40 @@ class TestDataDecoderService(AsyncDbTestCase):
             example_data, address=Address(proxy_address), chain_id=1
         )
         self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+
+    @db_session_context
+    async def test_get_contract_abi_selectors_caches_negative_result(self):
+        """
+        When a contract has no ABI, the resolved selectors (`None`) must be cached so
+        subsequent lookups are served from Redis without resolving the ABI again.
+        """
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        address = Account.create().address
+        chain_id = 1
+
+        # No ABI stored for this address -> None
+        selectors = await decoder_service.get_contract_abi_selectors_with_functions(
+            Address(HexBytes(address)), chain_id
+        )
+        self.assertIsNone(selectors)
+
+        # The negative result must be cached as JSON null
+        redis = get_redis()
+        redis_key = get_key_for_contract_selectors(address)
+        field_key = get_field_key_for_selectors(chain_id)
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
+        cached = await cast(Awaitable[bytes | None], redis.hget(redis_key, field_key))
+        assert cached is not None
+        self.assertIsNone(json.loads(cached))
+
+        # Second call must be served from cache, without resolving the ABI again
+        with mock.patch.object(
+            decoder_service, "_get_abi_for_decoding", autospec=True
+        ) as mock_resolve:
+            selectors = await decoder_service.get_contract_abi_selectors_with_functions(
+                Address(HexBytes(address)), chain_id
+            )
+        self.assertIsNone(selectors)
+        mock_resolve.assert_not_called()
