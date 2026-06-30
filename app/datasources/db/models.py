@@ -394,11 +394,8 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
 
         :return: `True` if a matching contract with an ABI exists, `False` otherwise.
         """
-        query = (
-            select(cls.id)
-            .join(Abi, cls.abi_id == Abi.id)
-            .where(cls.address == address)
-        )
+        # Join condition is inferred from the abi_id -> abi.id foreign key
+        query = select(cls.id).join(Abi).where(cls.address == address)
         if chain_id is not None:
             query = query.where(cls.chain_id == chain_id)
         results = await db_session.execute(select(query.exists()))
