@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     ETHERSCAN_API_KEY: str = ""
     ETHERSCAN_MAX_REQUESTS: int = 1
     BLOCKSCOUT_MAX_REQUESTS: int = 1
+    ON_DEMAND_ABI_FETCH_ENABLED: bool = False
     SOURCIFY_MAX_REQUESTS: int = 100
     CONTRACT_MAX_DOWNLOAD_RETRIES: int = (
         90  # Task running once per day, means 3 months trying.
