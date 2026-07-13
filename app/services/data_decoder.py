@@ -601,10 +601,16 @@ class DataDecoderService:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
             async with transactional_session_context():
-                if chain_id is not None and await self._has_contract_abi(
-                    address, chain_id=chain_id
-                ):
-                    return DecodingAccuracyEnum.FULL_MATCH
+                if chain_id is not None:
+                    if await self._has_contract_abi(address, chain_id=chain_id):
+                        return DecodingAccuracyEnum.FULL_MATCH
+                    implementation_address = await self._get_implementation(
+                        address, chain_id
+                    )
+                    if implementation_address and await self._has_contract_abi(
+                        cast(Address, implementation_address), chain_id=chain_id
+                    ):
+                        return DecodingAccuracyEnum.FULL_MATCH
                 if await self._has_contract_abi(address, None):
                     return DecodingAccuracyEnum.PARTIAL_MATCH
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH

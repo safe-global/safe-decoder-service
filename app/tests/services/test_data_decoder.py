@@ -690,6 +690,68 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
 
     @db_session_context
+    async def test_proxy_contract_without_own_abi_reports_full_match(self):
+        """
+        A proxy contract with no ABI of its own, but whose implementation has an ABI
+        registered for the same chain, is decoded using the implementation's ABI.
+        Accuracy must be FULL_MATCH, not PARTIAL_MATCH/ONLY_FUNCTION_MATCH, since the
+        decoding is exact.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+
+        impl_abi_obj = Abi(
+            abi_json=example_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await impl_abi_obj.create()
+
+        proxy_address = b"proxy_no_abi"
+        impl_address = b"impl_no_abi"
+
+        impl_contract = Contract(
+            address=impl_address,
+            abi=impl_abi_obj,
+            name="Implementation",
+            chain_id=1,
+        )
+        await impl_contract.create()
+
+        # Proxy is registered with no ABI of its own, only the implementation link
+        proxy_contract = Contract(
+            address=proxy_address,
+            abi=None,
+            name="Proxy",
+            chain_id=1,
+            implementation=impl_address,
+        )
+        await proxy_contract.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
+
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+
+    @db_session_context
     async def test_get_contract_abi_selectors_caches_negative_result(self):
         """
         When a contract has no ABI, the cached selectors result is JSON null and lookups
