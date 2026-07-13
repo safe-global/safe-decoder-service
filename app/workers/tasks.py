@@ -131,11 +131,36 @@ async def get_contract_metadata_task(
                 "Adding task to download proxy implementation metadata with address %s",
                 proxy_implementation_address,
             )
-            await get_contract_metadata_task.kiq(
-                address=proxy_implementation_address, chain_id=chain_id
+            await get_proxy_implementation_metadata_task.kiq(
+                implementation_address=proxy_implementation_address,
+                chain_id=chain_id,
             )
     else:
         logger.debug("Skipping contract")
+
+
+@broker.task
+async def get_proxy_implementation_metadata_task(
+    implementation_address: str, chain_id: int
+):
+    contract_metadata_service = get_contract_metadata_service()
+    if await contract_metadata_service.should_attempt_download(
+        implementation_address, chain_id, 0
+    ):
+        logger.info("Downloading proxy implementation contract metadata")
+        contract_metadata = await contract_metadata_service.get_contract_metadata(
+            fast_to_checksum_address(implementation_address), chain_id
+        )
+        result = await contract_metadata_service.process_contract_metadata(
+            contract_metadata
+        )
+        if result:
+            logger.info("Success downloading proxy implementation contract metadata")
+            await del_contract_cache(implementation_address)
+        else:
+            logger.info("Failed to download proxy implementation contract metadata")
+    else:
+        logger.debug("Skipping proxy implementation contract")
 
 
 @broker.task(schedule=[{"cron": "0 0 * * *"}])  # Every midnight

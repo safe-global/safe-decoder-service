@@ -38,14 +38,67 @@ def get_key_for_contract(address: str, **kwargs) -> str:
     return f"contract:{address.lower()}"
 
 
+def get_key_for_contract_selectors(address: str) -> str:
+    """
+    Build the Redis key for ABI selector caching, separate from the API response cache.
+
+    :param address: The contract address.
+    :return: A string key in the format 'contract:<address>:selectors'.
+    """
+    return f"contract:{address.lower()}:selectors"
+
+
 async def del_contract_cache(address: str):
     """
     Delete the Redis cache entry for a specific contract by address.
+    This removes all cached data for the contract across all chains.
 
     :param address: The contract address used to build the cache key.
     :return: None
     """
-    await get_redis().unlink(get_key_for_contract(address))
+    await get_redis().unlink(
+        get_key_for_contract(address),
+        get_key_for_contract_selectors(address),
+    )
+
+
+def get_field_key_for_selectors(chain_id: int | None) -> str:
+    """
+    Build the Redis hash field key for cached ABI selectors of a contract on a specific chain.
+
+    :param chain_id: Chain id for the contract.
+    :return: A string field key in the format 'selectors:<chain_id>'.
+    """
+    return f"selectors:{chain_id}"
+
+
+def get_field_key_for_implementation(chain_id: int | None) -> str:
+    """
+    Build the Redis hash field key for a contract's cached implementation address on a
+    specific chain.
+
+    :param chain_id: Chain id for the contract.
+    :return: A string field key in the format 'implementation:<chain_id>'.
+    """
+    return f"implementation:{chain_id}"
+
+
+async def hset_with_ttl(redis_key: str, field_key: str, value: str, ttl: int) -> None:
+    """
+    Set a hash field and ensure the hash has a TTL atomically, so the hash can never be
+    left without an expiry. The TTL is only applied when the hash has no expiry yet.
+
+    :param redis_key: Redis hash key.
+    :param field_key: Field within the hash to set.
+    :param value: Value to store in the field.
+    :param ttl: Expiry in seconds, applied only if the hash has no TTL yet.
+    :return: None
+    """
+    redis = get_redis()
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.hset(redis_key, field_key, value)
+        pipe.expire(redis_key, ttl, nx=True)
+        await pipe.execute()
 
 
 def get_field_key(kwargs: dict) -> str:
