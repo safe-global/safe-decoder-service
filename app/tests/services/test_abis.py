@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from collections import Counter
 
 from ...datasources.db.database import db_session_context
@@ -19,18 +20,18 @@ class TestAbiService(AsyncDbTestCase):
         await self.abi_service.load_local_abis_in_database()
         self.assertEqual(len(await AbiSource.get_all()), 1)
         abis = await Abi.get_all()
-        self.assertEqual(len(abis), 153)
+        self.assertEqual(len(abis), 154)
         relevance_counts = Counter(abi.relevance for abi in abis)
-        self.assertEqual(relevance_counts[100], 5)
+        self.assertEqual(relevance_counts[100], 6)
         self.assertEqual(relevance_counts[90], 5)
         self.assertEqual(relevance_counts[50], 143)
 
         await self.abi_service.load_local_abis_in_database()
-        self.assertEqual(len(await Abi.get_all()), 153)
+        self.assertEqual(len(await Abi.get_all()), 154)
 
     def test_get_safe_contracts_abis(self):
         abis = self.abi_service.get_safe_contracts_abis()
-        self.assertEqual(len(abis), 5)
+        self.assertEqual(len(abis), 6)
 
     def test_get_safe_abis(self):
         abis = self.abi_service.get_safe_abis()
