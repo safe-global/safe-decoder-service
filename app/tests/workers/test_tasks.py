@@ -81,6 +81,8 @@ class TestTasks(AsyncDbTestCase):
         groups = await redis.xinfo_groups("taskiq")
         self.assertEqual(groups[0]["lag"], 0)
         self.assertEqual(groups[0]["pending"], 0)
+        # Acknowledged entries must be deleted, XACK alone leaves them in the stream
+        self.assertEqual(await redis.xlen("taskiq"), 0)
 
 
 class TestAsyncTasks(AsyncDbTestCase):
