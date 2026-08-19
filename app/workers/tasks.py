@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import Token
 
+from redis.asyncio import Redis
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -36,6 +37,28 @@ from app.services.safe_contracts_service import get_safe_contract_service
 logger = logging.getLogger(__name__)
 
 
+class DeleteOnAckRedisStreamBroker(RedisStreamBroker):
+    """
+    RedisStreamBroker that removes entries from the stream once acknowledged.
+
+    XACK only clears the pending entries list of the consumer group, the entry
+    itself stays in the append only stream forever, so the stream grows with
+    every task ever enqueued. Deleting on ack keeps the stream size proportional
+    to the messages in flight. Both commands run in a single transaction so an
+    acknowledged entry is never left behind.
+    """
+
+    def _ack_generator(self, id: str, queue_name: str) -> Callable[[], Awaitable[None]]:
+        async def _ack() -> None:
+            async with Redis(connection_pool=self.connection_pool) as redis_conn:
+                async with redis_conn.pipeline(transaction=True) as pipe:
+                    pipe.xack(queue_name, self.consumer_group_name, id)
+                    pipe.xdel(queue_name, id)
+                    await pipe.execute()
+
+        return _ack
+
+
 class TaskLoggingMiddleware(TaskiqMiddleware):
     def __init__(self) -> None:
         super().__init__()
@@ -60,7 +83,7 @@ class TaskLoggingMiddleware(TaskiqMiddleware):
 
 
 def build_broker() -> RedisStreamBroker:
-    return RedisStreamBroker(
+    return DeleteOnAckRedisStreamBroker(
         url=settings.REDIS_URL,
         socket_keepalive=True,
         health_check_interval=30,
