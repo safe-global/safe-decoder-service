@@ -97,7 +97,7 @@ def cache_response(
 
             # Try to fetch from Redis cache
             redis = get_redis()
-            cached_response = await redis.hget(hash_key, field_key)  # type: ignore[misc]
+            cached_response = await redis.hget(hash_key, field_key)
             if cached_response:
                 # Return cached response if it exists
                 return json.loads(cast(str, cached_response))
