@@ -1,4 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import json
+from collections.abc import Awaitable
+from typing import cast
+from unittest import mock
+
+from eth_account import Account
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -20,6 +26,12 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
+from ...datasources.cache.redis import (
+    del_contract_cache,
+    get_field_key_for_selectors,
+    get_key_for_contract_selectors,
+    get_redis,
+)
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -457,6 +469,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         expected_arguments_reversed = {"numberOfDroids": "4", "droidId": "10"}
 
         contract_address = Address(b"a")
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         fn_name, arguments = await decoder_service.decode_transaction(
             example_data, address=contract_address, chain_id=1
         )
@@ -505,18 +518,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         contract_reversed.address = b"b"
         await contract_reversed.update()
 
-        # Check caches are working even if contract was updated on DB
-        fn_name, arguments = await decoder_service.decode_transaction(
-            example_data, address=contract_address, chain_id=1
-        )
-        accuracy = await decoder_service.get_decoding_accuracy(
-            example_data, address=contract_address, chain_id=1
-        )
-        self.assertEqual(fn_name, "buyDroid")
-        self.assertEqual(arguments, expected_arguments)
-        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
-
-        # Init a new service to remove caches
+        await del_contract_cache(to_0x_hex_str(HexBytes(contract_address)))
         decoder_service = DataDecoderService()
         await decoder_service.init()
 
@@ -603,3 +605,185 @@ class TestDataDecoderService(AsyncDbTestCase):
             len(decoder_service.fn_selectors_with_abis), len_previous_selectors
         )
         self.assertEqual(decoder_service.last_abi_id, abi.id)
+
+    @db_session_context
+    async def test_proxy_contract_uses_implementation_abi(self):
+        """
+        When decoding calldata sent to a proxy contract, the implementation's ABI should
+        be used so that parameter names are correct. Accuracy must still be FULL_MATCH
+        because the proxy address itself is registered on that chain.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+
+        # Proxy has an ABI with generic/incorrect parameter names
+        proxy_abi_obj = Abi(
+            abi_json=example_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await proxy_abi_obj.create()
+
+        # Implementation has the correct parameter names (swapped in this test)
+        impl_abi_obj = Abi(
+            abi_json=example_swapped_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await impl_abi_obj.create()
+
+        proxy_address = b"proxy"
+        impl_address = b"impl"
+
+        impl_contract = Contract(
+            address=impl_address,
+            abi=impl_abi_obj,
+            name="Implementation",
+            chain_id=1,
+        )
+        await impl_contract.create()
+
+        proxy_contract = Contract(
+            address=proxy_address,
+            abi=proxy_abi_obj,
+            name="Proxy",
+            chain_id=1,
+            implementation=impl_address,
+        )
+        await proxy_contract.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        # Decoding against the implementation directly uses its own ABI
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(impl_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+
+        # Decoding against the proxy must follow the proxy → implementation chain
+        # and use the implementation ABI for correct parameter names
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(
+            arguments,
+            {"numberOfDroids": "4", "droidId": "10"},
+            "Proxy decoding should use implementation ABI parameter names",
+        )
+
+        # Accuracy must still be FULL_MATCH because the proxy is registered on chain 1
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+
+    @db_session_context
+    async def test_proxy_contract_without_own_abi_reports_full_match(self):
+        """
+        A proxy contract with no ABI of its own, but whose implementation has an ABI
+        registered for the same chain, is decoded using the implementation's ABI.
+        Accuracy must be FULL_MATCH, not PARTIAL_MATCH/ONLY_FUNCTION_MATCH, since the
+        decoding is exact.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+
+        impl_abi_obj = Abi(
+            abi_json=example_abi,
+            relevance=1,
+            source_id=source.id,
+        )
+        await impl_abi_obj.create()
+
+        proxy_address = b"proxy_no_abi"
+        impl_address = b"impl_no_abi"
+
+        impl_contract = Contract(
+            address=impl_address,
+            abi=impl_abi_obj,
+            name="Implementation",
+            chain_id=1,
+        )
+        await impl_contract.create()
+
+        # Proxy is registered with no ABI of its own, only the implementation link
+        proxy_contract = Contract(
+            address=proxy_address,
+            abi=None,
+            name="Proxy",
+            chain_id=1,
+            implementation=impl_address,
+        )
+        await proxy_contract.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        fn_name, arguments = await decoder_service.decode_transaction(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(fn_name, "buyDroid")
+        self.assertEqual(arguments, {"droidId": "4", "numberOfDroids": "10"})
+
+        accuracy = await decoder_service.get_decoding_accuracy(
+            example_data, address=Address(proxy_address), chain_id=1
+        )
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+
+    @db_session_context
+    async def test_get_contract_abi_selectors_caches_negative_result(self):
+        """
+        When a contract has no ABI, the cached selectors result is JSON null and lookups
+        return `None` without regenerating the selectors.
+        """
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        address = Account.create().address
+        chain_id = 1
+
+        # No ABI stored for this address -> None
+        selectors = await decoder_service.get_contract_abi_selectors_with_functions(
+            Address(HexBytes(address)), chain_id
+        )
+        self.assertIsNone(selectors)
+
+        # The negative result must be cached as JSON null
+        redis = get_redis()
+        redis_key = get_key_for_contract_selectors(address)
+        field_key = get_field_key_for_selectors(chain_id)
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
+        cached = await cast(Awaitable[bytes | None], redis.hget(redis_key, field_key))
+        assert cached is not None
+        self.assertIsNone(json.loads(cached))
+
+        # Second call is served from cache, without regenerating the selectors
+        with mock.patch.object(
+            decoder_service, "_generate_selectors_with_abis_from_abi", autospec=True
+        ) as mock_generate:
+            selectors = await decoder_service.get_contract_abi_selectors_with_functions(
+                Address(HexBytes(address)), chain_id
+            )
+        self.assertIsNone(selectors)
+        mock_generate.assert_not_called()

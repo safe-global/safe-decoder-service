@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from collections.abc import Awaitable
 from copy import copy
+from typing import cast
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -17,6 +19,11 @@ from safe_eth.eth.clients import (
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_to_checksum_address
 
+from app.datasources.cache.redis import (
+    get_field_key_for_selectors,
+    get_key_for_contract_selectors,
+    get_redis,
+)
 from app.datasources.db.database import db_session, db_session_context
 from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.contract_metadata_service import (
@@ -389,3 +396,31 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertEqual(
             fast_to_checksum_address(contract.implementation), implementation_address
         )
+
+    @db_session_context
+    async def test_process_contract_metadata_does_not_invalidate_cache_for_non_proxy(
+        self,
+    ):
+        contract_address = Account.create().address
+        chain_id = 1
+        await AbiSource(name="Etherscan", url="").create()
+
+        contract_metadata = EnhancedContractMetadata(
+            address=contract_address,
+            metadata=copy(etherscan_metadata_mock),
+            source=ContractSource.ETHERSCAN,
+            chain_id=chain_id,
+        )
+        await ContractMetadataService.process_contract_metadata(contract_metadata)
+
+        redis = get_redis()
+        redis_key = get_key_for_contract_selectors(contract_address)
+        field_key = get_field_key_for_selectors(chain_id)
+        await cast(
+            Awaitable[int], redis.hset(redis_key, field_key, '{"cached": "data"}')
+        )
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]
+
+        # Processing a non-proxy contract must NOT touch the cache
+        await ContractMetadataService.process_contract_metadata(contract_metadata)
+        self.assertTrue(await redis.hexists(redis_key, field_key))  # type: ignore[misc]

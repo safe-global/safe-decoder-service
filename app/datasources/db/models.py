@@ -342,6 +342,23 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return cast("Contract", await cls.get_contract(address, chain_id)), False
 
     @classmethod
+    async def get_implementation(cls, address: bytes, chain_id: int) -> bytes | None:
+        """
+        Fetch the implementation address of a proxy contract without transferring its
+        ABI. Returns `None` for regular (non-proxy) contracts and for unknown addresses.
+
+        :param address: Contract address to look up.
+        :param chain_id: Chain to filter by.
+        :return: Implementation address or `None`.
+        """
+        query = select(cls.implementation).where(
+            cls.address == address, cls.chain_id == chain_id
+        )
+        results = await db_session.execute(query)
+        row = results.first()
+        return row[0] if row is not None else None
+
+    @classmethod
     async def get_abi_by_contract_address(
         cls, address: bytes, chain_id: int | None
     ) -> ABI | None:
@@ -364,6 +381,27 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         if result := results.scalars().first():
             return cast(ABI, result)
         return None
+
+    @classmethod
+    async def has_abi_by_contract_address(
+        cls, address: bytes, chain_id: int | None
+    ) -> bool:
+        """
+        Check whether a contract with an ABI exists for the given `address` (and
+        `chain_id` when provided), without fetching the ABI JSON.
+
+        Lightweight counterpart to `get_abi_by_contract_address` for callers that only
+        need to know if a match exists (e.g. computing decoding accuracy), avoiding the
+        cost of transferring the full ABI on every call.
+
+        :return: `True` if a matching contract with an ABI exists, `False` otherwise.
+        """
+        # Join condition is inferred from the abi_id -> abi.id foreign key
+        query = select(cls.id).join(Abi).where(cls.address == address)
+        if chain_id is not None:
+            query = query.where(cls.chain_id == chain_id)
+        results = await db_session.execute(select(query.exists()))
+        return bool(results.scalar())
 
     @classmethod
     async def get_contracts_without_abi(
