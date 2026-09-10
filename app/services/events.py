@@ -2,6 +2,7 @@
 import json
 import logging
 
+from eth_abi.exceptions import DecodingError
 from eth_typing import ChecksumAddress, HexStr
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -28,10 +29,14 @@ class EventsService:
         """
         if not data:
             return set()
-        return {
-            multisend_tx.to
-            for multisend_tx in MultiSend.from_transaction_data(HexBytes(data))
-        }
+        try:
+            return {
+                multisend_tx.to
+                for multisend_tx in MultiSend.from_transaction_data(HexBytes(data))
+            }
+        except (ValueError, DecodingError, ArithmeticError) as exc:
+            logger.warning("Cannot decode MultiSend from data %s: %s", data, exc)
+            return set()
 
     async def process_event(self, message: str) -> None:
         """
