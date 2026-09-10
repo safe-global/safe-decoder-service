@@ -12,14 +12,47 @@ from starlette.responses import Response
 from app.loggers.safe_logger import HttpRequestLog, HttpResponseLog
 
 from . import VERSION
+from .config import settings
 from .datasources.queue.exceptions import QueueProviderUnableToConnectException
 from .datasources.queue.queue_provider import QueueProvider
 from .routers import about, admin, contracts, data_decoder, default
 from .services.abis import AbiService
-from .services.data_decoder import get_data_decoder_service
+from .services.data_decoder import (
+    get_data_decoder_service,
+    set_data_decoder_ready,
+)
 from .services.events import EventsService
 
 logger = logging.getLogger()
+
+
+async def _load_data_decoder(abi_service: AbiService) -> None:
+    """
+    Load the ABIs into the decoder and publish readiness once done.
+
+    Retries forever because it runs outside the startup path: a database that is
+    slow or unreachable must delay readiness, not abort the process. The
+    `get_data_decoder_service` cache entry is dropped when its coroutine raises,
+    so every attempt starts from a clean service.
+
+    :param abi_service:
+    """
+    local_abis_loaded = False
+    while True:
+        try:
+            if not local_abis_loaded:
+                await abi_service.load_local_abis_in_database()
+                local_abis_loaded = True
+            await get_data_decoder_service()
+            set_data_decoder_ready(True)
+            logger.info("Data decoder is ready")
+            return
+        except Exception:
+            logger.exception(
+                "Cannot load contract ABIs, retrying in %d seconds",
+                settings.DECODER_LOAD_RETRY_SECONDS,
+            )
+            await asyncio.sleep(settings.DECODER_LOAD_RETRY_SECONDS)
 
 
 @asynccontextmanager
@@ -28,14 +61,17 @@ async def lifespan(app: FastAPI):
     Define the lifespan of the application:
     - At startup:
          - Connects to the QueueProvider.
-         - Load hardcoded ABIs in database
-         - Initializes DataDecoderService
+         - Starts loading the hardcoded ABIs and the DataDecoderService in the
+           background, so requests are accepted while it happens. Readiness is
+           published when it finishes.
     - At shutdown:
         - Disconnects from the QueueProvider.
     """
     queue_provider = QueueProvider()
     consume_task = None
     abi_service = AbiService()
+    load_decoder_task = asyncio.create_task(_load_data_decoder(abi_service))
+    logger.debug("Created task to load the contract ABIs for decoding")
     try:
         loop = asyncio.get_running_loop()
         try:
@@ -50,13 +86,10 @@ async def lifespan(app: FastAPI):
                 queue_provider.consume(events_service.process_event)
             )
             logger.debug("Created task to consume elements from Queue Provider")
-
-        # Load hardcoded ABIs in database
-        await abi_service.load_local_abis_in_database()
-        # Initializes DataDecoderService
-        await get_data_decoder_service()
         yield
     finally:
+        load_decoder_task.cancel()
+        set_data_decoder_ready(False)
         if consume_task:
             consume_task.cancel()
         await queue_provider.disconnect()

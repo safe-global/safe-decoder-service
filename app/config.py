@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     CONTRACT_MAX_DOWNLOAD_RETRIES: int = (
         90  # Task running once per day, means 3 months trying.
     )
+    DECODER_ABI_RELOAD_SECONDS: int = 30
+    DECODER_LOAD_RETRY_SECONDS: int = 10
     CONTRACT_LOGO_BASE_URL: str = (
         "https://safe-transaction-assets.safe.global/contracts/logos"
     )

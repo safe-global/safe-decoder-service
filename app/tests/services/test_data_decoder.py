@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from unittest.mock import patch
+
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -20,6 +22,7 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
+from ...config import settings
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -568,6 +571,7 @@ class TestDataDecoderService(AsyncDbTestCase):
             },
         )
 
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
     @db_session_context
     async def test_load_new_abis(self):
         decoder_service = DataDecoderService()
