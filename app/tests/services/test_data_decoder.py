@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from unittest.mock import patch
+
 from eth_typing import Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -11,6 +13,7 @@ from safe_eth.eth.contracts import (
 from safe_eth.eth.utils import fast_keccak_text, get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
 from safe_eth.util.util import to_0x_hex_str
+from sqlalchemy.exc import OperationalError
 from web3 import Web3
 
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
@@ -20,6 +23,7 @@ from app.datasources.abis.gnosis_protocol import (
     gnosis_protocol_abi,
 )
 
+from ...config import settings
 from ...datasources.db.database import db_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
@@ -568,6 +572,42 @@ class TestDataDecoderService(AsyncDbTestCase):
             },
         )
 
+    @db_session_context
+    async def test_decoding_degrades_when_the_database_is_unreachable(self):
+        await self._store_safe_contract_abi()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        with patch.object(
+            Contract,
+            "get_abi_by_contract_address",
+            side_effect=OperationalError("SELECT", {}, Exception("connection refused")),
+        ):
+            fn_name, arguments = await decoder_service.decode_transaction(
+                HexBytes(exec_transaction_data_mock), address=Address(b"a"), chain_id=1
+            )
+            accuracy = await decoder_service.get_decoding_accuracy(
+                HexBytes(exec_transaction_data_mock), address=Address(b"a"), chain_id=1
+            )
+
+        # The selector map is in memory, so the function still decodes
+        self.assertEqual(fn_name, "execTransaction")
+        self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
+
+    @db_session_context
+    async def test_load_new_abis_skipped_while_another_reload_holds_the_lock(self):
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        # Past the reload interval, so only the lock can stop it
+        decoder_service._next_reload_at = 0
+
+        await decoder_service.lock_load_new_abis.acquire()
+        try:
+            self.assertEqual(await decoder_service.load_new_abis(), 0)
+        finally:
+            decoder_service.lock_load_new_abis.release()
+
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
     @db_session_context
     async def test_load_new_abis(self):
         decoder_service = DataDecoderService()

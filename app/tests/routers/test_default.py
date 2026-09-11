@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import unittest
 
 from fastapi.testclient import TestClient
 
 from ...main import app
+from ...services.data_decoder import set_data_decoder_ready
 
 
 class TestRouterDefault(unittest.TestCase):
@@ -30,6 +32,24 @@ class TestRouterDefault(unittest.TestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), "OK")
+
+    def test_view_health_live(self):
+        response = self.client.get("/health/live")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), "OK")
+
+    def test_view_health_ready(self):
+        self.addCleanup(set_data_decoder_ready, False)
+
+        set_data_decoder_ready(False)
+        response = self.client.get("/health/ready")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"ready": False})
+
+        set_data_decoder_ready(True)
+        response = self.client.get("/health/ready")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ready": True})
 
     def test_redirect_middleware(self):
         """Test that redirects work correctly with or without proxy headers (x-forwarded-prefix and x-forwarded-host)"""

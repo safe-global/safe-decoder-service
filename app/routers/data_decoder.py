@@ -1,14 +1,19 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_typing import Address
 from fastapi import APIRouter, HTTPException
 
+from app.config import settings
 from app.routers.models import (
     DataDecodedPublic,
     DataDecoderInput,
     ParameterDecodedPublic,
 )
-from app.services.data_decoder import get_data_decoder_service
+from app.services.data_decoder import (
+    get_data_decoder_service,
+    is_data_decoder_ready,
+)
 
 router = APIRouter(
     prefix="/data-decoder",
@@ -32,6 +37,13 @@ async def data_decoder(input_data: DataDecoderInput) -> DataDecodedPublic:
     - *ONLY_FUNCTION_MATCH*: Matched function from another contract.
     - *NO_MATCH*: Selector cannot be decoded.
     """
+    if not is_data_decoder_ready():
+        raise HTTPException(
+            status_code=503,
+            detail="Contract ABIs are still being loaded",
+            headers={"Retry-After": str(settings.DECODER_LOAD_RETRY_SECONDS)},
+        )
+
     data_decoder_service = await get_data_decoder_service()
 
     # Load new ABIs from the database (runs before decoding to ensure fresh ABIs)

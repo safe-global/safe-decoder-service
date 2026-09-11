@@ -9,12 +9,17 @@ from safe_eth.eth.utils import get_empty_tx_params
 from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
 
+from ...config import settings
 from ...datasources.abis.gnosis_protocol import cowswap_settlement_v2_abi
 from ...datasources.db.database import db_session_context, transactional_session_context
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
-from ...services.data_decoder import DecodingAccuracyEnum, get_data_decoder_service
+from ...services.data_decoder import (
+    DecodingAccuracyEnum,
+    get_data_decoder_service,
+    set_data_decoder_ready,
+)
 from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from ..services.mocks_data_decoder import example_abi, example_swapped_abi
 
@@ -33,9 +38,25 @@ class TestRouterAbout(AsyncDbTestCase):
 
     def setUp(self):
         get_data_decoder_service.cache_clear()
+        # Readiness is published by the lifespan, which does not run under
+        # `ASGITransport`
+        set_data_decoder_ready(True)
 
     def tearDown(self):
         get_data_decoder_service.cache_clear()
+        set_data_decoder_ready(False)
+
+    async def test_view_data_decoder_not_ready(self):
+        set_data_decoder_ready(False)
+
+        response = await self.client.post(
+            "/api/v1/data-decoder", json={"data": "0x12345678"}
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.headers["retry-after"], str(settings.DECODER_LOAD_RETRY_SECONDS)
+        )
 
     @db_session_context
     async def test_view_data_decoder(self):

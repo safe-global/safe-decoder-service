@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from enum import Enum
 from typing import Any, NotRequired, TypedDict, Union, cast
 
@@ -15,10 +15,12 @@ from safe_eth.eth.contracts import get_multi_send_contract
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 from safe_eth.util.util import to_0x_hex_str
+from sqlalchemy.exc import SQLAlchemyError
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import implicitly_identity
 
+from ..config import settings
 from ..datasources.db.database import transactional_session_context
 from ..datasources.db.models import Abi, Contract
 
@@ -73,6 +75,42 @@ async def get_data_decoder_service() -> "DataDecoderService":
     return data_decoder_service
 
 
+_data_decoder_ready = False
+
+
+def is_data_decoder_ready() -> bool:
+    """
+    :return: `True` when the ABIs are loaded and decoding is possible
+    """
+    return _data_decoder_ready
+
+
+def set_data_decoder_ready(ready: bool) -> None:
+    """
+    Publish whether the decoder can serve requests.
+
+    :param ready:
+    """
+    global _data_decoder_ready
+    _data_decoder_ready = ready
+
+
+def selectors_from_abis(abis: Sequence[ABI]) -> dict[bytes, ABIFunction]:
+    """
+    Build the 4byte selector map for a group of ABIs. CPU bound and blocking, so
+    callers run it in a thread, that's why it's outside of the module.
+
+    :param abis: ABIs to index. Later ABIs win a selector collision
+    :return: Dictionary with function selector as bytes and the function abi
+    """
+    return {
+        function_abi_to_4byte_selector(fn_abi): fn_abi
+        for abi in abis
+        for fn_abi in abi
+        if fn_abi["type"] == "function"
+    }
+
+
 @implicitly_identity
 def addresses_checksummed_normalizer(
     type_str: TypeStr, data: Any
@@ -92,12 +130,20 @@ def addresses_checksummed_normalizer(
 class DataDecoderService:
     EXEC_TRANSACTION_SELECTOR = HexBytes("0x6a761202")
 
+    # ABIs handed to a single thread hop when building the selector map
+    SELECTOR_BATCH_SIZE = 500
+
     dummy_w3 = Web3()
 
     fn_selectors_with_abis: dict[bytes, ABIFunction]
     multisend_abis: list[ABI]
     multisend_fn_selectors_with_abis: dict[bytes, ABIFunction]
     last_abi_id: int | None
+    lock_load_new_abis: asyncio.Lock
+
+    def __init__(self) -> None:
+        self.lock_load_new_abis = asyncio.Lock()
+        self._next_reload_at = 0.0
 
     async def init(self) -> None:
         """
@@ -122,16 +168,15 @@ class DataDecoderService:
             logger.info(
                 "%s: Contract ABIs for decoding were loaded", self.__class__.__name__
             )
-            self.multisend_abis: list[ABI] = [
-                m async for m in self.get_multisend_abis()
-            ]
-            self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = {}
-            for abi in self.multisend_abis:
-                self.multisend_fn_selectors_with_abis.update(
-                    await self._generate_selectors_with_abis_from_abi(abi)
-                )
-        # lock_load_new_abis will avoid concurrent calls to load_new_abis
-        self.lock_load_new_abis = asyncio.Lock()
+        self.multisend_abis: list[ABI] = [m async for m in self.get_multisend_abis()]
+        self.multisend_fn_selectors_with_abis: dict[bytes, ABIFunction] = (
+            selectors_from_abis(self.multisend_abis)
+        )
+        # Everything up to `last_abi_id` is loaded, so the next reload is only
+        # due once the interval has passed
+        self._next_reload_at = (
+            asyncio.get_running_loop().time() + settings.DECODER_ABI_RELOAD_SECONDS
+        )
 
     async def _generate_selectors_with_abis_from_abi(
         self, abi: ABI
@@ -140,17 +185,9 @@ class DataDecoderService:
         :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
-        fn_abis = [fn_abi for fn_abi in abi if fn_abi["type"] == "function"]
-        if not fn_abis:
+        if not any(fn_abi["type"] == "function" for fn_abi in abi):
             return {}
-
-        # Process all selectors in a single thread to avoid thread creation overhead
-        def generate_selectors():
-            return {
-                function_abi_to_4byte_selector(fn_abi): fn_abi for fn_abi in fn_abis
-            }
-
-        return await asyncio.to_thread(generate_selectors)
+        return await asyncio.to_thread(selectors_from_abis, [abi])
 
     async def _generate_selectors_with_abis_from_abis(
         self, abis: AsyncIterator[ABI]
@@ -160,13 +197,17 @@ class DataDecoderService:
         selector
         :return: Dictionary with function selector as bytes and the function abi
         """
-        return {
-            fn_selector: fn_abi
-            async for supported_abi in abis
-            for fn_selector, fn_abi in (
-                await self._generate_selectors_with_abis_from_abi(supported_abi)
-            ).items()
-        }
+        # Optimization: Use one thread for a `SELECTOR_BATCH_SIZE` of ABIs
+        selectors: dict[bytes, ABIFunction] = {}
+        batch: list[ABI] = []
+        async for supported_abi in abis:
+            batch.append(supported_abi)
+            if len(batch) >= self.SELECTOR_BATCH_SIZE:
+                selectors.update(await asyncio.to_thread(selectors_from_abis, batch))
+                batch = []
+        if batch:
+            selectors.update(await asyncio.to_thread(selectors_from_abis, batch))
+        return selectors
 
     async def get_supported_abis(self) -> AsyncIterator[ABI]:
         """
@@ -224,11 +265,21 @@ class DataDecoderService:
         if selector in self.fn_selectors_with_abis:
             # Try to use specific ABI if address provided
             if address:
-                contract_selectors_with_abis = (
-                    await self.get_contract_abi_selectors_with_functions(
-                        address, chain_id
+                try:
+                    contract_selectors_with_abis = (
+                        await self.get_contract_abi_selectors_with_functions(
+                            address, chain_id
+                        )
                     )
-                )
+                except SQLAlchemyError:
+                    # The selector map still decodes the function, so losing the
+                    # database lowers accuracy instead of failing the request
+                    logger.exception(
+                        "%s: Cannot read the ABI for %s",
+                        self.__class__.__name__,
+                        address,
+                    )
+                    contract_selectors_with_abis = None
                 if (
                     contract_selectors_with_abis
                     and selector in contract_selectors_with_abis
@@ -493,13 +544,22 @@ class DataDecoderService:
         if selector not in self.fn_selectors_with_abis:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
-            async with transactional_session_context():
-                if chain_id is not None and await self.get_contract_abi(
-                    address, chain_id=chain_id
-                ):
-                    return DecodingAccuracyEnum.FULL_MATCH
-                if await self.get_contract_abi(address, None):
-                    return DecodingAccuracyEnum.PARTIAL_MATCH
+            try:
+                async with transactional_session_context():
+                    if chain_id is not None and await self.get_contract_abi(
+                        address, chain_id=chain_id
+                    ):
+                        return DecodingAccuracyEnum.FULL_MATCH
+                    if await self.get_contract_abi(address, None):
+                        return DecodingAccuracyEnum.PARTIAL_MATCH
+            except SQLAlchemyError:
+                # Without the database the address cannot be matched, which is
+                # what ONLY_FUNCTION_MATCH already reports
+                logger.exception(
+                    "%s: Cannot read the ABI for %s",
+                    self.__class__.__name__,
+                    address,
+                )
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
     async def add_abi(self, abi: ABI) -> bool:
@@ -523,12 +583,25 @@ class DataDecoderService:
         Uses a monotonic `id` cursor (``last_abi_id``) so that ABIs inserted
         with identical timestamps are never skipped.
 
-        :return: Number of new ABIs loaded
+        :return: Number of new ABIs loaded, 0 when the reload was skipped or failed
         """
-        acquired = False
+        loop = asyncio.get_running_loop()
+        if loop.time() < self._next_reload_at:
+            return 0
+
         try:
             await asyncio.wait_for(self.lock_load_new_abis.acquire(), timeout=0.01)
-            acquired = True
+        except TimeoutError:
+            logger.debug(
+                "%s: Reloading of ABIs in progress by another request, not doing anything",
+                self.__class__.__name__,
+            )
+            return 0
+
+        try:
+            # Arm the next window while the lock is held, so requests arriving
+            # during the reload skip it instead of waiting on the lock
+            self._next_reload_at = loop.time() + settings.DECODER_ABI_RELOAD_SECONDS
             logger.debug(
                 "%s: Reloading contract ABIs",
                 self.__class__.__name__,
@@ -563,12 +636,8 @@ class DataDecoderService:
                 loaded_abis,
             )
             return loaded_abis
-        except TimeoutError:
-            logger.debug(
-                "%s: Reloading of ABIs in progress by another request, not doing anything",
-                self.__class__.__name__,
-            )
+        except Exception:
+            logger.exception("%s: Cannot reload contract ABIs", self.__class__.__name__)
             return 0
         finally:
-            if acquired:
-                self.lock_load_new_abis.release()
+            self.lock_load_new_abis.release()
