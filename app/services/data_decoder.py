@@ -15,6 +15,7 @@ from safe_eth.eth.contracts import get_multi_send_contract
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 from safe_eth.util.util import to_0x_hex_str
+from sqlalchemy.exc import SQLAlchemyError
 from web3 import Web3
 from web3._utils.abi import get_abi_input_names, get_abi_input_types, map_abi_data
 from web3._utils.normalizers import implicitly_identity
@@ -184,6 +185,8 @@ class DataDecoderService:
         :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
+        if not any(fn_abi["type"] == "function" for fn_abi in abi):
+            return {}
         return await asyncio.to_thread(selectors_from_abis, [abi])
 
     async def _generate_selectors_with_abis_from_abis(
@@ -262,11 +265,21 @@ class DataDecoderService:
         if selector in self.fn_selectors_with_abis:
             # Try to use specific ABI if address provided
             if address:
-                contract_selectors_with_abis = (
-                    await self.get_contract_abi_selectors_with_functions(
-                        address, chain_id
+                try:
+                    contract_selectors_with_abis = (
+                        await self.get_contract_abi_selectors_with_functions(
+                            address, chain_id
+                        )
                     )
-                )
+                except SQLAlchemyError:
+                    # The selector map still decodes the function, so losing the
+                    # database lowers accuracy instead of failing the request
+                    logger.exception(
+                        "%s: Cannot read the ABI for %s",
+                        self.__class__.__name__,
+                        address,
+                    )
+                    contract_selectors_with_abis = None
                 if (
                     contract_selectors_with_abis
                     and selector in contract_selectors_with_abis
@@ -531,13 +544,22 @@ class DataDecoderService:
         if selector not in self.fn_selectors_with_abis:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
-            async with transactional_session_context():
-                if chain_id is not None and await self.get_contract_abi(
-                    address, chain_id=chain_id
-                ):
-                    return DecodingAccuracyEnum.FULL_MATCH
-                if await self.get_contract_abi(address, None):
-                    return DecodingAccuracyEnum.PARTIAL_MATCH
+            try:
+                async with transactional_session_context():
+                    if chain_id is not None and await self.get_contract_abi(
+                        address, chain_id=chain_id
+                    ):
+                        return DecodingAccuracyEnum.FULL_MATCH
+                    if await self.get_contract_abi(address, None):
+                        return DecodingAccuracyEnum.PARTIAL_MATCH
+            except SQLAlchemyError:
+                # Without the database the address cannot be matched, which is
+                # what ONLY_FUNCTION_MATCH already reports
+                logger.exception(
+                    "%s: Cannot read the ABI for %s",
+                    self.__class__.__name__,
+                    address,
+                )
         return DecodingAccuracyEnum.ONLY_FUNCTION_MATCH
 
     async def add_abi(self, abi: ABI) -> bool:

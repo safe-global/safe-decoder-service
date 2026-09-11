@@ -49,7 +49,8 @@ async def health_ready() -> JSONResponse:
 
     Decoding is served from an in-memory selector map built at startup, so the
     service is ready only once that map is loaded. The database is not part of
-    the check: selector-only decoding keeps working while it is unreachable.
+    the check: while it is unreachable the service keeps decoding from that map
+    and reports a lower accuracy, instead of failing the request.
     """
     decoder_ready = is_data_decoder_ready()
     return JSONResponse(

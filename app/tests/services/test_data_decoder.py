@@ -13,6 +13,7 @@ from safe_eth.eth.contracts import (
 from safe_eth.eth.utils import fast_keccak_text, get_empty_tx_params
 from safe_eth.safe.multi_send import MultiSendOperation
 from safe_eth.util.util import to_0x_hex_str
+from sqlalchemy.exc import OperationalError
 from web3 import Web3
 
 from app.datasources.abis.compound import comptroller_abi, ctoken_abi
@@ -570,6 +571,28 @@ class TestDataDecoderService(AsyncDbTestCase):
                 )
             },
         )
+
+    @db_session_context
+    async def test_decoding_degrades_when_the_database_is_unreachable(self):
+        await self._store_safe_contract_abi()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        with patch.object(
+            Contract,
+            "get_abi_by_contract_address",
+            side_effect=OperationalError("SELECT", {}, Exception("connection refused")),
+        ):
+            fn_name, arguments = await decoder_service.decode_transaction(
+                HexBytes(exec_transaction_data_mock), address=Address(b"a"), chain_id=1
+            )
+            accuracy = await decoder_service.get_decoding_accuracy(
+                HexBytes(exec_transaction_data_mock), address=Address(b"a"), chain_id=1
+            )
+
+        # The selector map is in memory, so the function still decodes
+        self.assertEqual(fn_name, "execTransaction")
+        self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
     @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
     @db_session_context
