@@ -589,10 +589,16 @@ class DataDecoderService:
         if loop.time() < self._next_reload_at:
             return 0
 
-        acquired = False
         try:
             await asyncio.wait_for(self.lock_load_new_abis.acquire(), timeout=0.01)
-            acquired = True
+        except TimeoutError:
+            logger.debug(
+                "%s: Reloading of ABIs in progress by another request, not doing anything",
+                self.__class__.__name__,
+            )
+            return 0
+
+        try:
             # Arm the next window while the lock is held, so requests arriving
             # during the reload skip it instead of waiting on the lock
             self._next_reload_at = loop.time() + settings.DECODER_ABI_RELOAD_SECONDS
@@ -630,15 +636,8 @@ class DataDecoderService:
                 loaded_abis,
             )
             return loaded_abis
-        except TimeoutError:
-            logger.debug(
-                "%s: Reloading of ABIs in progress by another request, not doing anything",
-                self.__class__.__name__,
-            )
-            return 0
         except Exception:
             logger.exception("%s: Cannot reload contract ABIs", self.__class__.__name__)
             return 0
         finally:
-            if acquired:
-                self.lock_load_new_abis.release()
+            self.lock_load_new_abis.release()

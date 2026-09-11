@@ -594,6 +594,19 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(fn_name, "execTransaction")
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
 
+    @db_session_context
+    async def test_load_new_abis_skipped_while_another_reload_holds_the_lock(self):
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        # Past the reload interval, so only the lock can stop it
+        decoder_service._next_reload_at = 0
+
+        await decoder_service.lock_load_new_abis.acquire()
+        try:
+            self.assertEqual(await decoder_service.load_new_abis(), 0)
+        finally:
+            decoder_service.lock_load_new_abis.release()
+
     @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
     @db_session_context
     async def test_load_new_abis(self):
