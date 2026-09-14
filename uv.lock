@@ -143,16 +143,16 @@ wheels = [
 
 [[package]]
 name = "alembic"
-version = "1.19.1"
+version = "1.19.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mako" },
     { name = "sqlalchemy" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/2b/e4153978368de59918115c9e01d3ebf58a558a7285efa7e960c383c4b59a/alembic-1.19.1.tar.gz", hash = "sha256:e0fca0518118c78acc493e31bcb5402f190057aaf6df8b5b95ce94c4789cf648", size = 2070816, upload-time = "2026-08-08T16:32:01.565Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/10/181eecdd552217d0342492bd6f3b8a96e973083379aace3d3402830ddc03/alembic-1.19.2.tar.gz", hash = "sha256:297950a8a91f6770eb82bfbce9bea55c728b90a5386c6e81430191a319d138b0", size = 2082643, upload-time = "2026-09-04T17:10:11.212Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/89/e62cc37b69ad357cc8ecd6e7367f5245f523d3cbb338a66197212bdf6749/alembic-1.19.1-py3-none-any.whl", hash = "sha256:b39018cb3d9413a19cbd54cf3c02ad33998641f0538eb77413a488a21c3e14be", size = 265946, upload-time = "2026-08-08T16:32:03.153Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/cb/9014784dcb0585977ae23b6f43331d0a33c51ac0d692506d12b4f5ee9f3b/alembic-1.19.2-py3-none-any.whl", hash = "sha256:32d553dcd577e6fe5c3c63e91468526d35e4dcecafe865d7db4e9b328fa93cb2", size = 267399, upload-time = "2026-09-04T17:10:12.796Z" },
 ]
 
 [[package]]
@@ -924,14 +924,14 @@ wheels = [
 
 [[package]]
 name = "faker"
-version = "40.37.0"
+version = "40.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/fb/35acc76128d5ee8983d940da871cc8eba876e7b0e9e6bd402ecd7104dcdc/faker-40.37.0.tar.gz", hash = "sha256:a92dff7f310e61fb544c61720e15edb2e7448bc33d15a321a99e9ab7b94abf54", size = 2025920, upload-time = "2026-08-21T16:33:16.261Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/55/baeae0ecb04ef56c92d6ac1ef7b3b965af0502ac9863fc85db7afc0884fd/faker-40.38.0.tar.gz", hash = "sha256:72e421098664edf38478f4269a5d5a539337de5da18883ce67cb1e6bb96b0b3a", size = 2029190, upload-time = "2026-09-01T19:19:46.958Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/22/bf589b6b2c7527047f55450358fbe5961aeaadf168d6b51a1a1c67da497f/faker-40.37.0-py3-none-any.whl", hash = "sha256:ddbafa55c94d5b69c08ced3a7f202614204a02e07ba6548c729b8d18acc0b490", size = 2062853, upload-time = "2026-08-21T16:33:14.516Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/b8/48cb8733de8448023983f64e81d7f731ce1459c21e93b9b29657e5c48cab/faker-40.38.0-py3-none-any.whl", hash = "sha256:69927515d61759c8a257540b8a91891cd622ba1c24a386b62a0a777e44ba46a9", size = 2065931, upload-time = "2026-09-01T19:19:45.234Z" },
 ]
 
 [[package]]
@@ -1295,7 +1295,7 @@ wheels = [
 
 [[package]]
 name = "ipython"
-version = "9.17.0"
+version = "9.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -1309,9 +1309,9 @@ dependencies = [
     { name = "stack-data" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/bc/e05ae123712ce4e1fde4408eedca1791fc1ff832684565132ea1dc646092/ipython-9.17.0.tar.gz", hash = "sha256:1dc69e6966b270fb259f676c71a21450e63607729b14a672b942914a54e8b730", size = 4538547, upload-time = "2026-08-28T09:00:58.233Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/32/99451b1283ec5d92ad77073f12e1c667dc10775384d8f15c2914207149dd/ipython-9.17.1.tar.gz", hash = "sha256:8919be8c27f20a6f4423145028063f6637b42a03ce57665bb12015ee1f073529", size = 4539289, upload-time = "2026-09-01T08:29:32.6Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/18/5f/f992b57e8deb8fa6c2e614b422d80698adb5107902bbc89832e203665bd1/ipython-9.17.0-py3-none-any.whl", hash = "sha256:ce647713be8fef3fab2418c515a0def4d45d6705dd102be2c6d1f3015d7368b0", size = 638698, upload-time = "2026-08-28T09:00:56.174Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/1e/65b59cf518c106aa755e7f7da3099027738687a862ec785060702a481320/ipython-9.17.1-py3-none-any.whl", hash = "sha256:6d1645743cfd1a07eb695d85aa2b5fa66721f8cbae9431d4049f7084bbf06509", size = 639038, upload-time = "2026-09-01T08:29:30.673Z" },
 ]
 
 [[package]]
@@ -2467,7 +2467,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aio-pika", specifier = "==9.6.2" },
-    { name = "alembic", specifier = "==1.19.1" },
+    { name = "alembic", specifier = "==1.19.2" },
     { name = "async-lru", specifier = "==2.3.0" },
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "fastapi", extras = ["standard-no-fastapi-cloud-cli"], specifier = "==0.141.1" },
@@ -2477,7 +2477,7 @@ requires-dist = [
     { name = "redis", extras = ["hiredis"], specifier = "==8.1.0" },
     { name = "safe-eth-py", specifier = "==7.24.0" },
     { name = "setuptools", specifier = ">=82.0.1,<83" },
-    { name = "sqladmin", extras = ["full"], specifier = "==0.31.0" },
+    { name = "sqladmin", extras = ["full"], specifier = "==0.31.1" },
     { name = "sqlmodel", specifier = "==0.0.42" },
     { name = "taskiq", specifier = "==0.12.6" },
     { name = "taskiq-redis", specifier = "==1.2.3" },
@@ -2563,7 +2563,7 @@ wheels = [
 
 [[package]]
 name = "sqladmin"
-version = "0.31.0"
+version = "0.31.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
@@ -2572,9 +2572,9 @@ dependencies = [
     { name = "starlette" },
     { name = "wtforms" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c9/68/8d333eefb54cfb531cf485026465abda62ecf0da86866dd0cef5d0c87a79/sqladmin-0.31.0.tar.gz", hash = "sha256:1b125cbdaf1aac75b13504a0bc7e6b4a1b2d6ffdc5e34272ac2a0c8b729c3e1b", size = 1012720, upload-time = "2026-08-06T08:50:36.976Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/74/277739921c1f8d44a9a40fda6efd18046b5f277c4ba544e36c324bfc9ca1/sqladmin-0.31.1.tar.gz", hash = "sha256:27f39dd851645ac3f059cf98e91372898e485c8c63a9e60eb287af2dcc571e3f", size = 1012836, upload-time = "2026-09-01T06:53:12.786Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/1a/882f69b61c218e10ce454a3122747a959621bc60321ae96b8d59adedb3e7/sqladmin-0.31.0-py3-none-any.whl", hash = "sha256:28e980d048d88f372e552fb7b2770e510aab78872e8bf1b6adf19dcaea0716b7", size = 1045133, upload-time = "2026-08-06T08:50:35.79Z" },
+    { url = "https://files.pythonhosted.org/packages/13/c7/b0e1edf56b637117527891ec5cbed0ca27b32893ed872f9913d8d9ceb9fb/sqladmin-0.31.1-py3-none-any.whl", hash = "sha256:1b74d40d0585268d71bd7653e9d99442bbc3e6e3112a670bd53e29d225be7659", size = 1045322, upload-time = "2026-09-01T06:53:11.474Z" },
 ]
 
 [package.optional-dependencies]
