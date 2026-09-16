@@ -2,7 +2,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-decoder-service/badge.svg?branch=main)](https://coveralls.io/github/safe-global/safe-decoder-service?branch=main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)
-[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/safeglobal/safe-decoder-service?label=Docker&sort=semver)](https://hub.docker.com/r/safeglobal/safe-decoder-service)
+[![Container image](https://img.shields.io/badge/ghcr.io-safe--global%2Fsafe--decoder--service-0b5d52?logo=github&logoColor=white)](https://github.com/safe-global/safe-decoder-service/pkgs/container/safe-decoder-service)
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/safeglobal/safe-decoder-service?label=Docker%20Hub%20(deprecated)&sort=semver)](https://hub.docker.com/r/safeglobal/safe-decoder-service)
 
 
 # Safe Decoder Service
