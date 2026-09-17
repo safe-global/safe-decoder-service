@@ -261,8 +261,10 @@ example_swapped_abi = cast(
     ],
 )
 
-# ABI entry without the mandatory `type` key, so building its selectors fails
-malformed_abi = cast(ABI, [{"name": "buyDroid"}])
+# A tuple input without `components` cannot be collapsed into a signature
+malformed_abi = cast(
+    ABI, [{"type": "function", "name": "buyDroid", "inputs": [{"type": "tuple"}]}]
+)
 
 # Abi with tuple parameters
 tuple_abi = [

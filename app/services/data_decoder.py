@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from enum import Enum
 from typing import Any, NotRequired, TypedDict, Union, cast
 
@@ -95,20 +95,53 @@ def set_data_decoder_ready(ready: bool) -> None:
     _data_decoder_ready = ready
 
 
+def function_abis(abi: ABI) -> Iterator[ABIFunction]:
+    """
+    Yield the function elements of an ABI.
+
+    The ABI spec defaults `type` to `"function"` when the key is missing, but
+    `function_abi_to_4byte_selector` reads it, so it is filled in here. An
+    element with no `name` has no signature, and decoding one raises later, so
+    it is left out.
+
+    :param abi: ABI
+    :return: Function elements, each one with a `type` and a `name`
+    """
+    if not isinstance(abi, list):
+        return
+    for fn_abi in abi:
+        if (
+            isinstance(fn_abi, dict)
+            and fn_abi.get("type", "function") == "function"
+            and "name" in fn_abi
+        ):
+            yield cast(
+                ABIFunction,
+                fn_abi if "type" in fn_abi else {**fn_abi, "type": "function"},
+            )
+
+
 def selectors_from_abis(abis: Sequence[ABI]) -> dict[bytes, ABIFunction]:
     """
     Build the 4byte selector map for a group of ABIs. CPU bound and blocking, so
     callers run it in a thread, that's why it's outside of the module.
 
+    ABIs come from third party sources, so an element can be missing the fields
+    a selector needs. The guard is per element and catches everything: no single
+    element may leave the decoder without a selector map, and which exception a
+    malformed element raises is a detail of the libraries that parse it.
+
     :param abis: ABIs to index. Later ABIs win a selector collision
     :return: Dictionary with function selector as bytes and the function abi
     """
-    return {
-        function_abi_to_4byte_selector(fn_abi): fn_abi
-        for abi in abis
-        for fn_abi in abi
-        if fn_abi["type"] == "function"
-    }
+    selectors: dict[bytes, ABIFunction] = {}
+    for abi in abis:
+        for fn_abi in function_abis(abi):
+            try:
+                selectors[function_abi_to_4byte_selector(fn_abi)] = fn_abi
+            except Exception:
+                logger.exception("Cannot index ABI function, skipping it: %s", fn_abi)
+    return selectors
 
 
 @implicitly_identity
@@ -185,7 +218,10 @@ class DataDecoderService:
         :param abi: ABI
         :return: Dictionary with function selector as bytes and the ContractFunction
         """
-        if not any(fn_abi["type"] == "function" for fn_abi in abi):
+        # The thread hop costs more than walking the ABI, so skip it when there
+        # is nothing to index. `function_abis` never raises, so this stays
+        # outside the guard in `selectors_from_abis`
+        if next(function_abis(abi), None) is None:
             return {}
         return await asyncio.to_thread(selectors_from_abis, [abi])
 
@@ -627,17 +663,8 @@ class DataDecoderService:
 
                 loaded_abis = 0
                 async for abi in abis:
-                    try:
-                        if await self.add_abi(abi):
-                            loaded_abis += 1
-                    except (KeyError, TypeError, ValueError):
-                        # A malformed ABI is dropped, the rest of the reload goes on.
-                        # The json is logged because the row id is not streamed
-                        logger.exception(
-                            "%s: Cannot load contract ABI, skipping it: %s",
-                            self.__class__.__name__,
-                            abi,
-                        )
+                    if await self.add_abi(abi):
+                        loaded_abis += 1
 
             # A reload that fails halfway is retried from the same point
             self.last_abi_id = new_last_abi_id
