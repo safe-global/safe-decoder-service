@@ -40,6 +40,7 @@ from .mocks_data_decoder import (
     exec_transaction_data_mock,
     exec_transaction_decoded_mock,
     insufficient_data_bytes_mock,
+    malformed_abi,
     tuple_abi,
 )
 
@@ -643,3 +644,62 @@ class TestDataDecoderService(AsyncDbTestCase):
             len(decoder_service.fn_selectors_with_abis), len_previous_selectors
         )
         self.assertEqual(decoder_service.last_abi_id, abi.id)
+
+    @staticmethod
+    async def _decoder_with_one_abi() -> tuple[DataDecoderService, AbiSource, Abi]:
+        """
+        :return: A started decoder holding one ABI, its source, and that ABI, so the
+            reload cursor is set and the next reload takes the incremental path
+        """
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        source = AbiSource(name="local", url="")
+        await source.create()
+        abi = Abi(abi_json=example_abi, relevance=1, source_id=source.id)
+        await abi.create()
+        assert await decoder_service.load_new_abis() == 1
+        return decoder_service, source, abi
+
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
+    @db_session_context
+    async def test_load_new_abis_keeps_cursor_when_reload_fails(self):
+        decoder_service, source, abi = await self._decoder_with_one_abi()
+        self.assertEqual(decoder_service.last_abi_id, abi.id)
+
+        first_new_abi = Abi(abi_json=comptroller_abi, relevance=1, source_id=source.id)
+        await first_new_abi.create()
+        second_new_abi = Abi(abi_json=ctoken_abi, relevance=1, source_id=source.id)
+        await second_new_abi.create()
+
+        # The connection drops after the first ABI was applied
+        async def _drop_connection(last_id: int):
+            yield comptroller_abi
+            raise OperationalError("Connection lost", None, Exception())
+
+        with patch.object(Abi, "get_abis_with_id_greater_than", _drop_connection):
+            self.assertEqual(await decoder_service.load_new_abis(), 0)
+
+        # The cursor stayed behind, so the next reload picks up the ABI that was missed
+        self.assertEqual(decoder_service.last_abi_id, abi.id)
+        self.assertEqual(await decoder_service.load_new_abis(), 1)
+        self.assertEqual(decoder_service.last_abi_id, second_new_abi.id)
+        self.assertIn(
+            fast_keccak_text("mint(uint256)")[:4],
+            decoder_service.fn_selectors_with_abis,
+        )
+
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
+    @db_session_context
+    async def test_load_new_abis_skips_a_malformed_abi(self):
+        decoder_service, source, _ = await self._decoder_with_one_abi()
+
+        bad_abi = Abi(abi_json=malformed_abi, relevance=1, source_id=source.id)
+        await bad_abi.create()
+        good_abi = Abi(abi_json=comptroller_abi, relevance=1, source_id=source.id)
+        await good_abi.create()
+
+        # The malformed ABI is dropped and the rest of the reload goes through
+        self.assertEqual(await decoder_service.load_new_abis(), 1)
+        self.assertEqual(decoder_service.last_abi_id, good_abi.id)
+        self.assertEqual(await decoder_service.load_new_abis(), 0)

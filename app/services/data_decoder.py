@@ -608,28 +608,39 @@ class DataDecoderService:
             )
             previous_last_abi_id = self.last_abi_id
             async with transactional_session_context():
-                self.last_abi_id = await Abi.get_last_inserted_id()
+                new_last_abi_id = await Abi.get_last_inserted_id()
                 if previous_last_abi_id is None:
                     # No reference to compare, so we get all the ABIs
                     abis = Abi.get_abis_sorted_by_relevance()
+                elif (
+                    new_last_abi_id is not None
+                    and new_last_abi_id > previous_last_abi_id
+                ):
+                    # Only reload if new ABIs were inserted
+                    abis = Abi.get_abis_with_id_greater_than(previous_last_abi_id)
                 else:
-                    if (
-                        self.last_abi_id is not None
-                        and self.last_abi_id > previous_last_abi_id
-                    ):
-                        # Only reload if new ABIs were inserted
-                        abis = Abi.get_abis_with_id_greater_than(previous_last_abi_id)
-                    else:
-                        logger.debug(
-                            "%s: No new contract ABIs to load",
-                            self.__class__.__name__,
-                        )
-                        return 0
+                    logger.debug(
+                        "%s: No new contract ABIs to load",
+                        self.__class__.__name__,
+                    )
+                    return 0
 
                 loaded_abis = 0
                 async for abi in abis:
-                    if await self.add_abi(abi):
-                        loaded_abis += 1
+                    try:
+                        if await self.add_abi(abi):
+                            loaded_abis += 1
+                    except (KeyError, TypeError, ValueError):
+                        # A malformed ABI is dropped, the rest of the reload goes on.
+                        # The json is logged because the row id is not streamed
+                        logger.exception(
+                            "%s: Cannot load contract ABI, skipping it: %s",
+                            self.__class__.__name__,
+                            abi,
+                        )
+
+            # A reload that fails halfway is retried from the same point
+            self.last_abi_id = new_last_abi_id
             logger.debug(
                 "%s: Loaded new %d contract ABIs",
                 self.__class__.__name__,

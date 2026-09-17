@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
 
 from eth_typing import ABI
@@ -259,6 +260,9 @@ example_swapped_abi = cast(
         },
     ],
 )
+
+# ABI entry without the mandatory `type` key, so building its selectors fails
+malformed_abi = cast(ABI, [{"name": "buyDroid"}])
 
 # Abi with tuple parameters
 tuple_abi = [
