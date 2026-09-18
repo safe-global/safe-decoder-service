@@ -108,10 +108,10 @@ def function_abis(abi: ABI) -> Iterator[ABIFunction]:
     :return: Function elements, each one with a `type` and a `name`
     """
     if not isinstance(abi, list):
-        logger.warning(                                                                                                                                                                                                                                                                                                   
-              "Cannot index ABI, expected a list of elements and got %s",                                                                                                                                                                                                                                                   
-              type(abi).__name__,                                                                                                                                                                                                                                                                                           
-          ) 
+        logger.warning(
+            "Cannot index ABI, expected a list of elements and got %s",
+            type(abi).__name__,
+        )
         return
     for fn_abi in abi:
         if (
