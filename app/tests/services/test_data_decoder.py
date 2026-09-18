@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from typing import cast
 from unittest.mock import patch
 
-from eth_typing import Address
+from eth_typing import ABI, Address
 from hexbytes import HexBytes
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.contracts import (
@@ -32,6 +33,7 @@ from ...services.data_decoder import (
     DecodingAccuracyEnum,
     UnexpectedProblemDecoding,
     get_data_decoder_service,
+    selectors_from_abis,
 )
 from ..datasources.db.async_db_test_case import AsyncDbTestCase
 from .mocks_data_decoder import (
@@ -95,6 +97,50 @@ class TestDataDecoderService(AsyncDbTestCase):
         exec_transaction_bytes = bytes.fromhex("6a761202")
         name = decoder_service.fn_selectors_with_abis[exec_transaction_bytes]["name"]
         assert name == "execTransaction"
+
+    @db_session_context
+    async def test_init_skips_an_abi_without_selectors(self):
+        await self._store_safe_contract_abi()
+        source = AbiSource(name="broken", url="")
+        await source.create()
+        broken_abi = Abi(abi_json=malformed_abi, relevance=200, source_id=source.id)
+        await broken_abi.create()
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        # The row drops itself, the rest of the batch is still indexed
+        exec_transaction_bytes = bytes.fromhex("6a761202")
+        self.assertEqual(
+            decoder_service.fn_selectors_with_abis[exec_transaction_bytes]["name"],
+            "execTransaction",
+        )
+
+    def test_selectors_from_abis_reads_an_element_without_type_as_a_function(self):
+        abi = cast(ABI, [{"name": "noType", "inputs": [], "outputs": []}])
+
+        selectors = selectors_from_abis([abi])
+
+        self.assertEqual(len(selectors), 1)
+        (fn_abi,) = selectors.values()
+        self.assertEqual(fn_abi["name"], "noType")
+
+    def test_selectors_from_abis_keeps_the_good_functions_of_a_broken_abi(self):
+        abi = cast(
+            ABI,
+            [
+                {"type": "function", "name": "good", "inputs": []},
+                {"type": "function", "name": "bad", "inputs": [{"type": "tuple"}]},
+            ],
+        )
+
+        selectors = selectors_from_abis([abi])
+
+        # Only the element that cannot be indexed is dropped
+        self.assertEqual([fn_abi["name"] for fn_abi in selectors.values()], ["good"])
+
+    def test_selectors_from_abis_ignores_an_abi_that_is_not_a_list(self):
+        self.assertEqual(selectors_from_abis([cast(ABI, {"type": "function"})]), {})
 
     @db_session_context
     async def test_decode_execute_transaction(self):
