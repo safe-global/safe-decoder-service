@@ -126,3 +126,7 @@ safe_transaction_service/media
 .idea/
 .vscode/
 .DS_Store
+
+# Claude Code worktrees
+/.claude/worktrees/
+/.claude/settings.local.json
