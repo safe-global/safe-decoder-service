@@ -137,7 +137,10 @@ database. This is the hot path of the service, so:
 
 Decoding accuracy is reported per request: `FULL_MATCH` (address and chain), `PARTIAL_MATCH`
 (address only), `ONLY_FUNCTION_MATCH` (selector known from another contract), `NO_MATCH`.
-MultiSend calldata is decoded recursively into nested `data_decoded` entries.
+MultiSend and Safe `execTransaction` calldata is decoded recursively into nested
+`data_decoded` / `value_decoded` entries, up to `DECODER_MAX_NESTED_DEPTH` levels. Deeper inner
+data keeps its raw `value` and has no `value_decoded`, since every level holds its own copy of the
+payload and memory grows with the square of its size.
 
 ### Database Session Management
 
@@ -227,6 +230,11 @@ Environment variables (see `.env.sample` and `app/config.py`):
 - `DECODER_ABI_RELOAD_SECONDS`: Minimum interval between ABI reloads (default: 30)
 - `DECODER_LOAD_RETRY_SECONDS`: Wait between failed initial ABI loads, also sent as `Retry-After`
   when the decoder is not ready (default: 10)
+- `DECODER_MAX_DATA_BYTES`: Maximum byte length of `data` accepted by the data decoder endpoint,
+  larger requests get a 422. Matches `API_MAX_TRANSACTION_DATA_BYTES` in Safe Queue Service
+  (default: 131072, 128 KiB)
+- `DECODER_MAX_NESTED_DEPTH`: Maximum nesting level of `execTransaction` / MultiSend calls that
+  is decoded (default: 8)
 - `CONTRACT_LOGO_BASE_URL`: Base URL used to build `logoUrl` in contract responses
 - `CONTRACTS_TRUSTED_FOR_DELEGATE_CALL`: Safe contract names flagged as trusted for delegate call
 - `SECRET_KEY`: Admin session signing key. Must be set in production or sessions break on restart
@@ -258,7 +266,8 @@ Environment variables (see `.env.sample` and `app/config.py`):
 ### Data Decoder
 - `POST /api/v1/data-decoder` - Decode `data` for an optional `to` address and `chainId`
   (`chainId` requires `to`). Returns the decoded method, parameters and `accuracy`. 404 when the
-  selector is unknown, 503 with `Retry-After` while the ABIs are still loading
+  selector is unknown, 422 when `data` is above `DECODER_MAX_DATA_BYTES`, 503 with `Retry-After`
+  while the ABIs are still loading
 
 **Pagination**: `limit` (default 10, max 100) and `offset`, responses carry
 `count` / `next` / `previous` / `results`.
