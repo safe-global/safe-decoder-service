@@ -7,6 +7,7 @@ import logging.config
 import os
 import secrets
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.loggers.safe_logger import SafeJsonFormatter
@@ -50,6 +51,9 @@ class Settings(BaseSettings):
     )
     DECODER_ABI_RELOAD_SECONDS: int = 30
     DECODER_LOAD_RETRY_SECONDS: int = 10
+    # 128 KiB, same as `API_MAX_TRANSACTION_DATA_BYTES` in Safe Queue Service
+    DECODER_MAX_DATA_BYTES: int = Field(default=131072, gt=0)
+    DECODER_MAX_NESTED_DEPTH: int = Field(default=8, ge=0)
     CONTRACT_LOGO_BASE_URL: str = (
         "https://safe-transaction-assets.safe.global/contracts/logos"
     )

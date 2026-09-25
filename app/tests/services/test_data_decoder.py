@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from typing import cast
+from typing import Any, cast
 from unittest.mock import patch
 
 from eth_typing import ABI, Address
@@ -414,6 +414,66 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(
             await decoder_service.get_data_decoded(data), exec_transaction_decoded_mock
         )
+
+    @staticmethod
+    def _build_exec_transaction_data(to: str, data: bytes | str) -> str:
+        """
+        :param to: Address called by the Safe
+        :param data: Inner calldata
+        :return: Safe `execTransaction` calldata wrapping `data`
+        """
+        return get_safe_V1_4_1_contract(Web3()).encode_abi(
+            "execTransaction",
+            [to, 0, HexBytes(data), 0, 0, 0, 0, NULL_ADDRESS, NULL_ADDRESS, b""],
+        )
+
+    @db_session_context
+    async def test_decode_nested_exec_transaction_stops_at_max_depth(self):
+        await self._store_safe_contract_abi()
+        safe_address = "0x5B9ea52Aaa931D4EEf74C8aEaf0Fe759434FeD74"
+        max_depth = settings.DECODER_MAX_NESTED_DEPTH
+
+        # `levels[depth]` is the calldata decoded at `depth`, the last one is an
+        # ERC20 transfer wrapped `max_depth + 1` times
+        levels = [get_erc20_contract(Web3()).encode_abi("transfer", [safe_address, 1])]
+        for _ in range(max_depth + 1):
+            levels.insert(0, self._build_exec_transaction_data(safe_address, levels[0]))
+
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        data_decoded: Any = await decoder_service.get_data_decoded(levels[0])
+
+        for depth in range(max_depth + 1):
+            self.assertIsNotNone(data_decoded)
+            self.assertEqual(data_decoded["method"], "execTransaction")
+            data_parameter = data_decoded["parameters"][2]
+            self.assertEqual(data_parameter["name"], "data")
+            self.assertEqual(data_parameter["value"], levels[depth + 1])
+            if depth < max_depth:
+                data_decoded = data_parameter["value_decoded"]
+            else:
+                self.assertNotIn("value_decoded", data_parameter)
+
+    @db_session_context
+    async def test_decode_multisend_stops_at_max_depth(self):
+        await self._store_safe_contract_abi()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        # `execTransaction` -> MultiSend at depth 1 -> its transactions at depth 2
+        with patch.object(settings, "DECODER_MAX_NESTED_DEPTH", 1):
+            data_decoded: Any = await decoder_service.get_data_decoded(
+                exec_transaction_data_mock
+            )
+        multisend_decoded = data_decoded["parameters"][2]["value_decoded"]
+        self.assertEqual(multisend_decoded["method"], "multiSend")
+        self.assertNotIn("value_decoded", multisend_decoded["parameters"][0])
+
+        with patch.object(settings, "DECODER_MAX_NESTED_DEPTH", 2):
+            self.assertEqual(
+                await decoder_service.get_data_decoded(exec_transaction_data_mock),
+                exec_transaction_decoded_mock,
+            )
 
     @db_session_context
     async def test_unexpected_problem_decoding(self):

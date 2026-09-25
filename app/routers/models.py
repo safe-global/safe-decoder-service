@@ -75,6 +75,8 @@ class ContractsPublic(CamelModel):
 class DataDecoderInput(CamelModel):
     data: str = Field(
         pattern=r"^0x[0-9a-fA-F]*$",
+        # `data` is a hex string, so the byte limit is 2 characters per byte plus `0x`
+        max_length=2 + 2 * settings.DECODER_MAX_DATA_BYTES,
         description="0x-prefixed hexadecimal string",
         examples=[
             "0xa9059cbb0000000000000000000000005afe3855358e112b5647b952709e6165e1c1eeee00000000000000000000000000000000000000000000001e1de1d2517bae38ac"
