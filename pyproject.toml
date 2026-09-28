@@ -12,7 +12,7 @@ dependencies = [
     "gunicorn==26.2.0",
     "pydantic-settings==2.15.0",
     "redis[hiredis]==8.1.0",
-    "safe-eth-py==7.25.0",
+    "safe-eth-py==7.26.1",
     "setuptools>=84.0.0,<85",
     "sqladmin[full]==0.31.1",
     "sqlmodel==0.0.42",
