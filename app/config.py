@@ -20,6 +20,9 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
     TEST: bool = False
+    # Commit the image was built from. A Docker build without the argument
+    # still sets the variable, empty
+    BUILD_COMMIT: str = ""
     LOG_LEVEL: str = "INFO"
     LOG_LEVEL_EVENTS_SERVICE: str = "INFO"
     REDIS_URL: str = "redis://"

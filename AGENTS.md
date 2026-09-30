@@ -208,6 +208,8 @@ Two uses, both in `app/datasources/cache/redis.py` and `app/workers/tasks.py`:
 
 Environment variables (see `.env.sample` and `app/config.py`):
 
+- `BUILD_COMMIT`: Commit shown in `/about`. CI passes it as a Docker build
+  argument; local builds leave it unset
 - `DATABASE_URL`: PostgreSQL connection string (must use `postgresql+asyncpg://`)
 - `DATABASE_POOL_CLASS`: Pool class, `AsyncAdaptedQueuePool` or `NullPool` (default: `AsyncAdaptedQueuePool`)
 - `DATABASE_POOL_SIZE`: Max connections in pool (default: 10)
