@@ -17,6 +17,7 @@ from ..services.data_decoder import DecodingAccuracyEnum
 
 class AboutPublic(CamelModel):
     version: str
+    build_commit: str | None
 
 
 class ProjectPublic(CamelModel):

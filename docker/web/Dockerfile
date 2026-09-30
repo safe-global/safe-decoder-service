@@ -37,3 +37,7 @@ COPY --chown=python:python . .
 
 # Use numeric ids so kubernetes identifies the user correctly
 USER 999:999
+
+# Declared last so a new commit does not invalidate the cached layers above
+ARG BUILD_COMMIT
+ENV BUILD_COMMIT=${BUILD_COMMIT}

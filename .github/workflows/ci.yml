@@ -132,6 +132,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-decoder-service:staging
           ghcr.io/safe-global/safe-decoder-service:staging
@@ -147,6 +149,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-decoder-service:develop
           ghcr.io/safe-global/safe-decoder-service:develop
@@ -162,6 +166,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-decoder-service:${{ github.event.release.tag_name }}
           safeglobal/safe-decoder-service:latest
