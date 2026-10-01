@@ -68,8 +68,8 @@ uv run pytest app/tests/services/test_contracts.py::TestContractService::test_ge
 
 ### Linting and Type Checking
 ```bash
-uv run ruff check --fix
-uv run ruff format
+uv run pre-commit run ruff-check --all-files
+uv run pre-commit run ruff-format --all-files
 uv run mypy .
 SKIP=insert-license uv run pre-commit run --all-files
 ```
