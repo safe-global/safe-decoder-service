@@ -399,13 +399,15 @@ class DataDecoderService:
         return fn_abi["name"], list(zip(names, types, values, strict=False))  # type: ignore
 
     async def decode_multisend_data(
-        self, data: bytes | str, chain_id: int | None = None
+        self, data: bytes | str, chain_id: int | None = None, depth: int = 0
     ) -> list[MultisendDecoded] | None:
         """
         Decodes Multisend raw data to Multisend dictionary
 
         :param data:
         :param chain_id:
+        :param depth: Nesting level of the MultiSend call, its transactions are
+            decoded one level deeper
         :return:
         """
         try:
@@ -422,6 +424,7 @@ class DataDecoderService:
                         multisend_tx.data,
                         address=cast(Address, multisend_tx.to),
                         chain_id=chain_id,
+                        depth=depth + 1,
                     ),
                 )
                 for multisend_tx in multisend_txs
@@ -439,6 +442,7 @@ class DataDecoderService:
         data: bytes | str,
         address: Address | None = None,
         chain_id: int | None = None,
+        depth: int = 0,
     ) -> DataDecoded | None:
         """
         Return data prepared for serializing
@@ -446,6 +450,7 @@ class DataDecoderService:
         :param data:
         :param address: contract address in case of ABI colliding
         :param chain_id: chain for contract
+        :param depth: Nesting level of `data`, 0 for the top level call
         :return:
         """
         if not data:
@@ -456,7 +461,7 @@ class DataDecoderService:
             logger.debug("Decoding data %s", data_str)
             async with transactional_session_context():
                 fn_name, parameters = await self.decode_transaction_with_types(
-                    data, address=address, chain_id=chain_id
+                    data, address=address, chain_id=chain_id, depth=depth
                 )
             decoded: DataDecoded = {"method": fn_name, "parameters": parameters}
             logger.debug("Decoded data %s into %s", data_str, decoded)
@@ -470,22 +475,32 @@ class DataDecoderService:
         data: bytes,
         parameters: list[ParameterDecoded],
         chain_id: int | None = None,
+        *,
+        depth: int,
     ) -> list[ParameterDecoded]:
         """
         Decode inner data for function parameters for:
             - Multisend `data`
             - Safe `execTransaction` `data`
 
+        Every level keeps its own copy of the inner data, so memory grows with the
+        square of the payload size. Inner data is decoded only while `depth` is below
+        `DECODER_MAX_NESTED_DEPTH`, deeper parameters keep their raw `value`.
+
         :param data:
         :param parameters:
         :param chain_id:
+        :param depth: Nesting level of `data`, 0 for the top level call
         :return: Parameters with an extra object with key `value_decoded` if decoding is possible
         """
+        if depth >= settings.DECODER_MAX_NESTED_DEPTH:
+            return parameters
+
         fn_selector = data[:4]
         if fn_selector in self.multisend_fn_selectors_with_abis:
             # If MultiSend, decode the transactions
             parameters[0]["value_decoded"] = await self.decode_multisend_data(
-                data, chain_id=chain_id
+                data, chain_id=chain_id, depth=depth
             )
 
         elif (
@@ -498,7 +513,10 @@ class DataDecoderService:
             # selector is `0x6a761202` and parameters[2] is data
             try:
                 parameters[2]["value_decoded"] = await self.get_data_decoded(
-                    data, address=parameters[0]["value"], chain_id=chain_id
+                    data,
+                    address=parameters[0]["value"],
+                    chain_id=chain_id,
+                    depth=depth + 1,
                 )
             except DataDecoderException:
                 logger.warning("Cannot decode `execTransaction`", exc_info=True)
@@ -509,6 +527,7 @@ class DataDecoderService:
         data: bytes | str,
         address: Address | None = None,
         chain_id: int | None = None,
+        depth: int = 0,
     ) -> tuple[str, list[ParameterDecoded]]:
         """
         Decode tx data and return a list of dictionaries
@@ -516,6 +535,7 @@ class DataDecoderService:
         :param data: Tx data as `hex string` or `bytes`
         :param address: contract address in case of ABI colliding
         :param chain_id: chain for the contract
+        :param depth: Nesting level of `data`, 0 for the top level call
         :return: tuple with the `function name` and a list of dictionaries
             [{'name': str, 'type': str, 'value': `depending on type`}...]
         :raises: CannotDecode if data cannot be decoded. You should catch this exception when using this function
@@ -531,7 +551,7 @@ class DataDecoderService:
             for name, argument_type, value in raw_parameters
         ]
         nested_parameters = await self.decode_parameters_data(
-            data, parameters, chain_id=chain_id
+            data, parameters, chain_id=chain_id, depth=depth
         )
         return fn_name, nested_parameters
 

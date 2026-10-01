@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from typing import cast
+from unittest.mock import patch
 
 from eth_typing import ABIEvent, ABIFunction
 from hexbytes import HexBytes
@@ -16,6 +17,7 @@ from ...datasources.db.models import Abi, AbiSource, Contract
 from ...main import app
 from ...services.abis import AbiService
 from ...services.data_decoder import (
+    DataDecoderService,
     DecodingAccuracyEnum,
     get_data_decoder_service,
     set_data_decoder_ready,
@@ -140,6 +142,25 @@ class TestRouterAbout(AsyncDbTestCase):
                 ]
             },
         )
+
+    async def test_view_data_decoder_data_above_max_size(self):
+        data = "0x" + "00" * (settings.DECODER_MAX_DATA_BYTES + 1)
+        with patch.object(DataDecoderService, "get_data_decoded") as get_data_decoded:
+            response = await self.client.post(
+                "/api/v1/data-decoder", json={"data": data}
+            )
+        self.assertEqual(response.status_code, 422)
+        (error,) = response.json()["detail"]
+        self.assertEqual(error["type"], "string_too_long")
+        self.assertEqual(error["loc"], ["body", "data"])
+        get_data_decoded.assert_not_called()
+
+    @db_session_context
+    async def test_view_data_decoder_data_at_max_size(self):
+        # Selector `0x00000000` is unknown, so the request is decoded and not found
+        data = "0x" + "00" * settings.DECODER_MAX_DATA_BYTES
+        response = await self.client.post("/api/v1/data-decoder", json={"data": data})
+        self.assertEqual(response.status_code, 404)
 
     async def test_view_data_decoder_with_chain_id(self):
         # No outer context: the endpoint must scope its own session
