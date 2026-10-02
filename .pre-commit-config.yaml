@@ -1,5 +1,7 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+# `language: unsupported` needs pre-commit 4.4.0
+minimum_pre_commit_version: "4.4.0"
 repos:
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.6
@@ -26,17 +28,27 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=1024']
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.0
-    hooks:
-      - id: mypy
-        exclude: env
-        args: [ --check-untyped-defs, --ignore-missing-imports, --warn-unused-ignores, --warn-redundant-casts, --warn-unused-configs ]
-        language: system
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9
+    rev: v0.16.9
     hooks:
-    -   id: ruff
-        args:
-        - --fix
-    -   id: ruff-format
+      - id: ruff-check
+        types_or: [python, pyi]
+        args: [--fix]
+      - id: ruff-format
+        types_or: [python, pyi]
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.21
+    hooks:
+      - id: uv-lock
+  - repo: local
+    hooks:
+      # Runs the project's mypy with the [tool.mypy] config, on the whole
+      # project like CI, as checking single files can give other results
+      - id: mypy
+        name: mypy
+        entry: uv run mypy .
+        language: unsupported
+        types: [python]
+        pass_filenames: false
