@@ -75,10 +75,11 @@ class AbiService:
         abi_source: AbiSource,
     ) -> None:
         for abi_json in abi_jsons:
-            abi = await Abi.get_abi(cast(list[dict], abi_json))
+            abi_dicts = cast(list[dict], abi_json)
+            abi = await Abi.get_abi(abi_dicts)
             if abi is None:
                 await Abi(
-                    abi_json=abi_json, source_id=abi_source.id, relevance=relevance
+                    abi_json=abi_dicts, source_id=abi_source.id, relevance=relevance
                 ).create()
 
     async def load_local_abis_in_database(self) -> None:

@@ -58,14 +58,14 @@ class TimeStampedSQLModel(SQLModel):
 
     """
 
-    created: datetime.datetime = Field(  # type: ignore[call-overload]
+    created: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),
         index=True,
     )
 
-    modified: datetime.datetime = Field(  # type: ignore[call-overload]
+    modified: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),

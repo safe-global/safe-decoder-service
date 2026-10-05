@@ -169,7 +169,11 @@ class TestRouterAbout(AsyncDbTestCase):
             source = AbiSource(name="local", url="")
             await source.create()
 
-            abi = Abi(abi_json=example_abi, relevance=101, source_id=source.id)
+            abi = Abi(
+                abi_json=cast(list[dict], example_abi),
+                relevance=101,
+                source_id=source.id,
+            )
             await abi.create()
             contract = Contract(
                 address=HexBytes(contract_address),
@@ -180,7 +184,9 @@ class TestRouterAbout(AsyncDbTestCase):
             await contract.create()
 
             swapped_abi = Abi(
-                abi_json=example_swapped_abi, relevance=100, source_id=source.id
+                abi_json=cast(list[dict], example_swapped_abi),
+                relevance=100,
+                source_id=source.id,
             )
             await swapped_abi.create()
             contract = Contract(
