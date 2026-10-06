@@ -23,6 +23,12 @@ from .exceptions import (
 
 logger = logging.getLogger(__name__)
 
+# Event types the service consumes. `EventsService` processes only these types,
+# so only these are bound and the queue does not fill up with unused events
+CONSUMED_EVENT_TYPES = ("EXECUTED_MULTISIG_TRANSACTION",)
+# Routing keys are `{chainId}.{type}.{address}`
+EVENTS_BINDING_KEYS = tuple(f"*.{event_type}.*" for event_type in CONSUMED_EVENT_TYPES)
+
 
 class QueueProvider:
     _connection: AbstractRobustConnection | None
@@ -54,15 +60,17 @@ class QueueProvider:
             raise QueueProviderUnableToConnectException from e
 
         channel = await self._connection.channel()
+        # Type and durability must match the exchange declared by Transaction
+        # Service, or RabbitMQ closes the channel with PRECONDITION_FAILED
         self._exchange = await channel.declare_exchange(
-            settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.FANOUT, durable=True
+            settings.RABBITMQ_AMQP_EXCHANGE, ExchangeType.TOPIC, durable=True
         )
         logger.info("Connected to %s exchange", settings.RABBITMQ_AMQP_EXCHANGE)
         self._events_queue = await channel.declare_queue(
             settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME, durable=True
         )
-        if self._events_queue:
-            await self._events_queue.bind(self._exchange)
+        for binding_key in EVENTS_BINDING_KEYS:
+            await self._events_queue.bind(self._exchange, routing_key=binding_key)
         logger.info(
             "Reading from %s queue", settings.RABBITMQ_DECODER_EVENTS_QUEUE_NAME
         )

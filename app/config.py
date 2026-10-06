@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # Force-closes transactions left idle so leaked connections are reclaimed
     DATABASE_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS: int = 30_000
     RABBITMQ_AMQP_URL: str = "amqp://guest:guest@"
-    RABBITMQ_AMQP_EXCHANGE: str = "safe-transaction-service-events"
+    RABBITMQ_AMQP_EXCHANGE: str = "safe-transaction-service-events-with-topics"
     RABBITMQ_DECODER_EVENTS_QUEUE_NAME: str = "safe-decoder-service"
     SECRET_KEY: str = secrets.token_urlsafe(
         32
