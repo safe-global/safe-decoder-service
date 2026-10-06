@@ -8,6 +8,7 @@ from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_is_checksum_address
 from safe_eth.safe.multi_send import MultiSend
 
+from ..datasources.queue.queue_provider import CONSUMED_EVENT_TYPES
 from ..workers.tasks import (
     create_safe_contracts_task_for_new_chains,
     get_contract_metadata_task,
@@ -82,7 +83,7 @@ class EventsService:
 
         return (
             isinstance(event_type, str)
-            and event_type == "EXECUTED_MULTISIG_TRANSACTION"
+            and event_type in CONSUMED_EVENT_TYPES
             and isinstance(chain_id, str)
             and chain_id.isdigit()
             and (data is None or isinstance(data, str))
