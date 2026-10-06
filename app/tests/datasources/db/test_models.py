@@ -98,9 +98,7 @@ class TestModels(AsyncDbTestCase):
 
     @db_session_context
     async def test_project(self):
-        project = Project(
-            name="Safe", description="A Test Project", logo_file="logo.jpg"
-        )
+        project = Project(description="A Test Project", logo_file="logo.jpg")
         await project.create()
         result = await project.get_all()
         self.assertEqual(result[0], project)
@@ -440,7 +438,7 @@ class TestModels(AsyncDbTestCase):
         source = AbiSource(name="null_test_source", url="")
         await source.create()
 
-        abi = Abi(abi_json=None, source_id=source.id)
+        abi = Abi(abi_json=None, source_id=source.id)  # type: ignore[arg-type]
         with self.assertRaises(IntegrityError):
             await abi.create()
         await db_session.rollback()

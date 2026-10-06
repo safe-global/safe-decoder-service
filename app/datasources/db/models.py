@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import datetime
 import json
-from collections.abc import AsyncIterator
-from typing import Self, cast
+from collections.abc import AsyncIterator, Mapping, Sequence
+from typing import Any, Self, cast
 
 from eth_typing import ABI
 from sqlalchemy import (
@@ -32,6 +32,10 @@ from sqlmodel.sql._expression_select_cls import SelectBase
 
 from .database import db_session
 
+# JSON stored in ``Abi.abi_json``. ``Mapping`` accepts both plain dicts and the
+# ``eth_typing`` ABI TypedDicts.
+type AbiJson = Sequence[Mapping[str, Any]] | Mapping[str, Any]
+
 
 class SqlQueryBase:
     @classmethod
@@ -58,14 +62,14 @@ class TimeStampedSQLModel(SQLModel):
 
     """
 
-    created: datetime.datetime = Field(  # type: ignore[call-overload]
+    created: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),
         index=True,
     )
 
-    modified: datetime.datetime = Field(  # type: ignore[call-overload]
+    modified: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
         sa_type=DateTime(timezone=True),
@@ -123,9 +127,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         ),
     )
     relevance: int | None = Field(nullable=False, default=0, index=True)
-    abi_json: list[dict] | dict = Field(
-        sa_column=Column(JSON(none_as_null=True), nullable=False)
-    )
+    abi_json: AbiJson = Field(sa_column=Column(JSON(none_as_null=True), nullable=False))
     source_id: int | None = Field(
         nullable=False, default=None, foreign_key="abisource.id"
     )
@@ -183,7 +185,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_abi(
         cls,
-        abi_json: list[dict] | dict,
+        abi_json: AbiJson,
     ):
         """
         Checks if an Abi with the given 'abi_json' exists by matching the
@@ -207,7 +209,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_or_create_abi(
         cls,
-        abi_json: list[dict] | dict,
+        abi_json: AbiJson,
         source_id: int | None,
         relevance: int | None = 0,
     ) -> tuple["Abi", bool]:

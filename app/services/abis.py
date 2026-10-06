@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from typing import cast
 
 from eth_typing import ABI
 from safe_eth.eth.contracts import (
@@ -75,7 +74,7 @@ class AbiService:
         abi_source: AbiSource,
     ) -> None:
         for abi_json in abi_jsons:
-            abi = await Abi.get_abi(cast(list[dict], abi_json))
+            abi = await Abi.get_abi(abi_json)
             if abi is None:
                 await Abi(
                     abi_json=abi_json, source_id=abi_source.id, relevance=relevance
