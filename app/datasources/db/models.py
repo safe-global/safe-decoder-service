@@ -2,7 +2,7 @@
 import datetime
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
-from typing import Any, Self, cast
+from typing import Any, cast
 
 from eth_typing import ABI
 from sqlalchemy import (
@@ -370,36 +370,44 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
     @classmethod
     async def get_contracts_without_abi(
         cls, max_retries: int = 0
-    ) -> AsyncIterator[Self]:
+    ) -> AsyncIterator[tuple[bytes, int]]:
         """
         Fetches contracts without an ABI and fewer retries than max_retries,
         streaming results in batches to reduce memory usage for large datasets.
         More information about streaming results can be found here:
         https://docs.sqlalchemy.org/en/20/core/connections.html#streaming-with-a-dynamically-growing-buffer-using-stream-results
 
-        :param max_retries:
-        :return:
+        Only the columns are selected, loading entities would join and decode
+        the ABI of every row.
+
+        :param max_retries: maximum `fetch_retries` of a returned contract, inclusive
+        :return: `(address, chain_id)` of every contract
         """
         query = (
-            select(cls)
+            select(cls.address, cls.chain_id)
             .where(cls.abi_id == None)  # noqa: E711
             .where(cls.fetch_retries <= max_retries)
         )
         result = await db_session.stream(query)
-        async for (contract,) in result:
-            yield contract
+        async for address, chain_id in result:
+            yield address, chain_id
 
     @classmethod
-    async def get_proxy_contracts(cls) -> AsyncIterator[Self]:
+    async def get_proxy_contracts(cls) -> AsyncIterator[tuple[bytes, int]]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 
-        :return:
+        Only the columns are selected, loading entities would join and decode
+        the ABI of every row.
+
+        :return: `(address, chain_id)` of every proxy contract
         """
-        query = select(cls).where(cls.implementation.isnot(None))  # type: ignore
+        query = select(cls.address, cls.chain_id).where(
+            col(cls.implementation).isnot(None)
+        )
         result = await db_session.stream(query)
-        async for (contract,) in result:
-            yield contract
+        async for address, chain_id in result:
+            yield address, chain_id
 
     @classmethod
     async def update_contract_info(

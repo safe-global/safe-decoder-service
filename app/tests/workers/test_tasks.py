@@ -10,7 +10,11 @@ from safe_eth.eth.clients import AsyncEtherscanClientV2
 from safe_eth.eth.utils import fast_to_checksum_address
 from taskiq.receiver import Receiver
 
-from app.datasources.db.database import db_session, db_session_context
+from app.datasources.db.database import (
+    db_session,
+    db_session_context,
+    transactional_session_context,
+)
 from app.datasources.db.models import AbiSource, Contract
 from app.services.safe_contracts_service import SafeContractsService
 from app.workers.tasks import (
@@ -18,7 +22,9 @@ from app.workers.tasks import (
     build_broker,
     create_safe_contracts_task_for_new_chains,
     get_contract_metadata_task,
+    get_missing_contract_metadata_task,
     task_to_test,
+    update_proxies_task,
 )
 
 from ...datasources.cache.redis import get_redis
@@ -83,6 +89,56 @@ class TestTasks(AsyncDbTestCase):
         self.assertEqual(groups[0]["pending"], 0)
         # Acknowledged entries must be deleted, XACK alone leaves them in the stream
         self.assertEqual(await redis.xlen("taskiq"), 0)
+
+
+class TestCronTasks(AsyncDbTestCase):
+    def test_cron_tasks_do_not_retry(self):
+        # A retry would enqueue every contract again
+        for task in (update_proxies_task, get_missing_contract_metadata_task):
+            with self.subTest(task=task.task_name):
+                self.assertIs(task.labels["retry_on_error"], False)
+
+    async def test_update_proxies_task(self):
+        proxy_address = HexBytes(Account.create().address)
+        async with transactional_session_context():
+            await Contract(
+                address=proxy_address,
+                name="Proxy",
+                chain_id=1,
+                implementation=HexBytes(Account.create().address),
+            ).create()
+            await Contract(
+                address=HexBytes(Account.create().address),
+                name="Not a proxy",
+                chain_id=1,
+            ).create()
+
+        with mock.patch.object(
+            get_contract_metadata_task, "kiq", new_callable=mock.AsyncMock
+        ) as kiq_mock:
+            await update_proxies_task()
+
+        kiq_mock.assert_awaited_once_with(
+            address=proxy_address.to_0x_hex(), chain_id=1, skip_attempt_download=True
+        )
+
+    async def test_get_missing_contract_metadata_task(self):
+        contract_address = HexBytes(Account.create().address)
+        async with transactional_session_context():
+            await Contract(
+                address=contract_address, name="Without ABI", chain_id=1
+            ).create()
+
+        with mock.patch.object(
+            get_contract_metadata_task, "kiq", new_callable=mock.AsyncMock
+        ) as kiq_mock:
+            await get_missing_contract_metadata_task()
+
+        kiq_mock.assert_awaited_once_with(
+            address=contract_address.to_0x_hex(),
+            chain_id=1,
+            skip_attempt_download=True,
+        )
 
 
 class TestAsyncTasks(AsyncDbTestCase):

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-from typing import cast
 
 from eth_account import Account
 from hexbytes import HexBytes
@@ -245,8 +244,10 @@ class TestModels(AsyncDbTestCase):
         expected_contract = await Contract(
             address=random_address, name="A test contract", chain_id=1
         ).create()
-        async for contract in Contract.get_contracts_without_abi(0):
-            self.assertEqual(expected_contract, contract)
+        contracts = [
+            contract async for contract in Contract.get_contracts_without_abi(0)
+        ]
+        self.assertEqual(contracts, [(random_address, 1)])
 
         # Contracts with more retries shouldn't be returned
         expected_contract.fetch_retries = 1
@@ -278,14 +279,18 @@ class TestModels(AsyncDbTestCase):
             enhanced_contract_metadata
         )
         self.assertTrue(result)
-        async for proxy_contract in Contract.get_proxy_contracts():
-            self.assertEqual(
-                fast_to_checksum_address(proxy_contract.address), random_address
-            )
-            self.assertEqual(
-                fast_to_checksum_address(cast(bytes, proxy_contract.implementation)),
-                "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
-            )
+        proxy_contracts = [
+            proxy_contract async for proxy_contract in Contract.get_proxy_contracts()
+        ]
+        self.assertEqual(len(proxy_contracts), 1)
+        address, chain_id = proxy_contracts[0]
+        self.assertEqual(fast_to_checksum_address(address), random_address)
+        self.assertEqual(chain_id, 1)
+        proxy_contract = await Contract.get_contract(address, chain_id)
+        self.assertEqual(
+            fast_to_checksum_address(proxy_contract.implementation),
+            "0x43506849D7C04F9138D1A2050bbF3A0c054402dd",
+        )
 
     @db_session_context
     async def test_update_contract_info(self):
