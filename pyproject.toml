@@ -19,7 +19,7 @@ dependencies = [
     "taskiq==0.13.0",
     "taskiq-redis==1.2.4",
     "uvicorn-worker==0.4.0",
-    "web3==7.16.0",
+    "web3==8.0.0",
 ]
 
 [dependency-groups]
