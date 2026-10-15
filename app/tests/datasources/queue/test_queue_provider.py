@@ -1,4 +1,6 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 import asyncio
+import socket
 import unittest
 from unittest.mock import patch
 
@@ -7,7 +9,7 @@ from aio_pika.abc import AbstractRobustConnection
 
 from app.config import settings
 from app.datasources.queue.exceptions import QueueProviderUnableToConnectException
-from app.datasources.queue.queue_provider import QueueProvider
+from app.datasources.queue.queue_provider import AMQP_CONNECTION_NAME, QueueProvider
 
 
 class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
@@ -21,6 +23,19 @@ class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.provider.is_connected())
         await self.provider.disconnect()
         self.assertFalse(self.provider.is_connected())
+
+    async def test_connect_connection_name(self):
+        self.assertEqual(
+            AMQP_CONNECTION_NAME, f"safe-decoder-service@{socket.gethostname()}"
+        )
+        await self.provider.connect(self.loop)
+        assert isinstance(self.provider._connection, aio_pika.RobustConnection)
+        # Kept on the connection, so reconnections send the same name
+        self.assertEqual(
+            self.provider._connection.kwargs["client_properties"],
+            {"connection_name": AMQP_CONNECTION_NAME},
+        )
+        await self.provider.disconnect()
 
     async def test_connect_failure(self):
         provider = QueueProvider()
