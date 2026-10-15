@@ -7,6 +7,7 @@ from typing import Any, cast
 from eth_typing import ABI
 from sqlalchemy import (
     BigInteger,
+    ColumnElement,
     Computed,
     DateTime,
     LargeBinary,
@@ -368,46 +369,47 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         return None
 
     @classmethod
-    async def get_contracts_without_abi(
-        cls, max_retries: int = 0
+    async def _stream_address_chain_id_where(
+        cls, *conditions: ColumnElement[bool]
     ) -> AsyncIterator[tuple[bytes, int]]:
         """
-        Fetches contracts without an ABI and fewer retries than max_retries,
-        streaming results in batches to reduce memory usage for large datasets.
-        More information about streaming results can be found here:
-        https://docs.sqlalchemy.org/en/20/core/connections.html#streaming-with-a-dynamically-growing-buffer-using-stream-results
+        Stream `SELECT address, chain_id FROM contract WHERE <conditions>`.
 
-        Only the columns are selected, loading entities would join and decode
-        the ABI of every row.
+        Selects only the columns, to avoid loading the ABI of every contract.
 
-        :param max_retries: maximum `fetch_retries` of a returned contract, inclusive
-        :return: `(address, chain_id)` of every contract
+        :param conditions: `WHERE` conditions, all of them must match
+        :return: `(address, chain_id)` of every matching contract
         """
-        query = (
-            select(cls.address, cls.chain_id)
-            .where(cls.abi_id == None)  # noqa: E711
-            .where(cls.fetch_retries <= max_retries)
-        )
+        query = select(cls.address, cls.chain_id).where(*conditions)
         result = await db_session.stream(query)
         async for address, chain_id in result:
             yield address, chain_id
 
     @classmethod
-    async def get_proxy_contracts(cls) -> AsyncIterator[tuple[bytes, int]]:
+    def get_contracts_without_abi(
+        cls, max_retries: int = 0
+    ) -> AsyncIterator[tuple[bytes, int]]:
+        """
+        Fetches contracts without an ABI and at most `max_retries` fetch retries,
+        streaming results in batches to reduce memory usage for large datasets.
+        More information about streaming results can be found here:
+        https://docs.sqlalchemy.org/en/20/core/connections.html#streaming-with-a-dynamically-growing-buffer-using-stream-results
+
+        :param max_retries: maximum `fetch_retries` of a returned contract, inclusive
+        :return: `(address, chain_id)` of every contract
+        """
+        return cls._stream_address_chain_id_where(
+            col(cls.abi_id).is_(None), col(cls.fetch_retries) <= max_retries
+        )
+
+    @classmethod
+    def get_proxy_contracts(cls) -> AsyncIterator[tuple[bytes, int]]:
         """
         Return all the contracts with implementation address, so proxy contracts.
 
-        Only the columns are selected, loading entities would join and decode
-        the ABI of every row.
-
         :return: `(address, chain_id)` of every proxy contract
         """
-        query = select(cls.address, cls.chain_id).where(
-            col(cls.implementation).isnot(None)
-        )
-        result = await db_session.stream(query)
-        async for address, chain_id in result:
-            yield address, chain_id
+        return cls._stream_address_chain_id_where(col(cls.implementation).isnot(None))
 
     @classmethod
     async def update_contract_info(

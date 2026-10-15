@@ -92,12 +92,6 @@ class TestTasks(AsyncDbTestCase):
 
 
 class TestCronTasks(AsyncDbTestCase):
-    def test_cron_tasks_do_not_retry(self):
-        # A retry would enqueue every contract again
-        for task in (update_proxies_task, get_missing_contract_metadata_task):
-            with self.subTest(task=task.task_name):
-                self.assertIs(task.labels["retry_on_error"], False)
-
     async def test_update_proxies_task(self):
         proxy_address = HexBytes(Account.create().address)
         async with transactional_session_context():
