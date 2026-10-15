@@ -161,36 +161,45 @@ async def get_contract_metadata_task(
         logger.debug("Skipping contract")
 
 
-@broker.task(schedule=[{"cron": "0 0 * * *"}])  # Every midnight
-async def get_missing_contract_metadata_task():
+async def _enqueue_metadata_tasks(
+    stream_contracts: Callable[[], AsyncIterator[tuple[bytes, int]]],
+    contracts_description: str,
+) -> None:
+    """
+    Enqueue a `get_contract_metadata_task` for every contract.
+
+    :param stream_contracts: streams the `(address, chain_id)` of the contracts,
+        consumed inside a database session
+    :param contracts_description: what the contracts are, for the logs
+    """
+    logger.info("Enqueuing %s", contracts_description)
     async with transactional_session_context():
-        targets = [
-            (to_0x_hex_str(contract.address), contract.chain_id)
-            async for contract in Contract.get_contracts_without_abi(
-                settings.CONTRACT_MAX_DOWNLOAD_RETRIES
-            )
+        contracts = [
+            (to_0x_hex_str(address), chain_id)
+            async for address, chain_id in stream_contracts()
         ]
-    for address, chain_id in targets:
+    for address, chain_id in contracts:
         await get_contract_metadata_task.kiq(
             address=address,
             chain_id=chain_id,
             skip_attempt_download=True,
         )
+    logger.info("Enqueued %d %s", len(contracts), contracts_description)
+
+
+@broker.task(schedule=[{"cron": "0 0 * * *"}])  # Every midnight
+async def get_missing_contract_metadata_task() -> None:
+    await _enqueue_metadata_tasks(
+        lambda: Contract.get_contracts_without_abi(
+            settings.CONTRACT_MAX_DOWNLOAD_RETRIES
+        ),
+        "contracts without ABI",
+    )
 
 
 @broker.task(schedule=[{"cron": "0 5 * * *"}])  # Every day at 5 am
-async def update_proxies_task():
-    async with transactional_session_context():
-        targets = [
-            (to_0x_hex_str(proxy_contract.address), proxy_contract.chain_id)
-            async for proxy_contract in Contract.get_proxy_contracts()
-        ]
-    for address, chain_id in targets:
-        await get_contract_metadata_task.kiq(
-            address=address,
-            chain_id=chain_id,
-            skip_attempt_download=True,
-        )
+async def update_proxies_task() -> None:
+    await _enqueue_metadata_tasks(Contract.get_proxy_contracts, "proxy contracts")
 
 
 @broker.task(schedule=[{"cron": "0 * * * *"}])  # Every hour
