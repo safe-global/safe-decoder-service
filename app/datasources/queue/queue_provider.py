@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
+import socket
 from asyncio import AbstractEventLoop
 from collections.abc import Callable
 from typing import Any
@@ -22,6 +23,10 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Name shown by RabbitMQ in the management UI and logs. The hostname is the pod name
+# in Kubernetes, so every replica can be told apart.
+AMQP_CONNECTION_NAME = f"safe-decoder-service@{socket.gethostname()}"
 
 
 class QueueProvider:
@@ -47,7 +52,9 @@ class QueueProvider:
         try:
             logger.info("Connecting to RabbitMQ")
             self._connection = await aio_pika.connect_robust(
-                url=settings.RABBITMQ_AMQP_URL, loop=loop
+                url=settings.RABBITMQ_AMQP_URL,
+                loop=loop,
+                client_properties={"connection_name": AMQP_CONNECTION_NAME},
             )
             logger.info("Connected to RabbitMQ")
         except aio_pika.exceptions.AMQPConnectionError as e:
