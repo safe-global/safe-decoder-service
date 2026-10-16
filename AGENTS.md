@@ -99,8 +99,10 @@ Three processes share the same code:
 1. **Web** (`app/main.py`): FastAPI app, routers mounted under `/api/v1`, plus the unprefixed
    `default` router (docs, health) and the sqladmin panel at `/admin`.
 2. **Queue consumer**: started inside the FastAPI lifespan, not a separate process. `QueueProvider`
-   binds a durable queue to the `safe-transaction-service-events` fanout exchange and
-   `EventsService.process_event` turns each event into taskiq tasks.
+   binds a durable queue to the `safe-transaction-service-events-with-topics` topic exchange
+   with one `*.<TYPE>.*` binding per event type in `CONSUMED_EVENT_TYPES` (the types
+   `EventsService` handles), and `EventsService.process_event` turns each event into taskiq
+   tasks.
 3. **Taskiq worker + scheduler** (`app/workers/tasks.py`): `docker/web/taskiq/worker/run.sh` runs
    both, backed by Redis Streams.
 
@@ -221,8 +223,8 @@ Environment variables (see `.env.sample` and `app/config.py`):
   connections are reclaimed (default: 30000)
 - `REDIS_URL`: Redis connection string, used for the response cache and the taskiq broker
 - `RABBITMQ_AMQP_URL`: RabbitMQ connection for the event queue
-- `RABBITMQ_AMQP_EXCHANGE`: Fanout exchange published by Transaction Service
-  (default: `safe-transaction-service-events`)
+- `RABBITMQ_AMQP_EXCHANGE`: Topic exchange published by Transaction Service, declared as
+  durable `topic` (default: `safe-transaction-service-events-with-topics`)
 - `RABBITMQ_DECODER_EVENTS_QUEUE_NAME`: Queue name for this service (default: `safe-decoder-service`)
 - `ETHERSCAN_API_KEY`: API key for the Etherscan V2 client
 - `ETHERSCAN_MAX_REQUESTS` / `BLOCKSCOUT_MAX_REQUESTS` / `SOURCIFY_MAX_REQUESTS`: Concurrent
