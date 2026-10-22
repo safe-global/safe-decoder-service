@@ -12,6 +12,11 @@ from safe_eth.eth.clients import (
     BlockScoutConfigurationProblem,
     ContractMetadata,
     EtherscanClientConfigurationProblem,
+    EtherscanClientException,
+    EtherscanConnectionError,
+    EtherscanDailyRateLimitError,
+    EtherscanHttpError,
+    EtherscanRateLimitError,
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -128,6 +133,58 @@ class TestContractMetadataService(AsyncDbTestCase):
         self.assertIsNone(
             contract_data.metadata,
         )
+
+    @mock.patch.object(
+        AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
+    )
+    @mock.patch.object(
+        AsyncBlockscoutClient, "async_get_contract_metadata", autospec=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "is_chain_supported", autospec=True, return_value=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "async_get_contract_metadata", autospec=True
+    )
+    async def test_get_contract_metadata_etherscan_errors(
+        self,
+        sourcify_get_contract_metadata_mock: MagicMock,
+        sourcify_is_chain_supported: MagicMock,
+        blockscout_get_contract_metadata_mock: MagicMock,
+        etherscan_get_contract_metadata_mock: MagicMock,
+    ):
+        contract_metadata_service = ContractMetadataService("")
+        chain_id = 100
+        random_address = Account.create().address
+        etherscan_errors = [
+            EtherscanRateLimitError("Max calls per sec rate limit reached"),
+            EtherscanDailyRateLimitError("Max daily rate limit reached"),
+            EtherscanHttpError(502),
+            EtherscanConnectionError("Error querying Etherscan"),
+            EtherscanClientException("Invalid API Key"),
+        ]
+        for etherscan_error in etherscan_errors:
+            with self.subTest(etherscan_error=etherscan_error):
+                etherscan_get_contract_metadata_mock.side_effect = etherscan_error
+                sourcify_get_contract_metadata_mock.side_effect = None
+                sourcify_get_contract_metadata_mock.return_value = (
+                    sourcify_metadata_mock
+                )
+                contract_data = await contract_metadata_service.get_contract_metadata(
+                    random_address, chain_id
+                )
+                self.assertEqual(contract_data.metadata, sourcify_metadata_mock)
+                self.assertEqual(contract_data.source, ContractSource.SOURCIFY)
+
+                # Every client failing returns no metadata instead of raising
+                sourcify_get_contract_metadata_mock.side_effect = IOError
+                blockscout_get_contract_metadata_mock.side_effect = IOError
+                contract_data = await contract_metadata_service.get_contract_metadata(
+                    random_address, chain_id
+                )
+                self.assertIsNone(contract_data.metadata)
+                self.assertIsNone(contract_data.source)
+                blockscout_get_contract_metadata_mock.side_effect = None
 
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True

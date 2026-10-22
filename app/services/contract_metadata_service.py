@@ -14,7 +14,7 @@ from safe_eth.eth.clients import (
     BlockScoutConfigurationProblem,
     ContractMetadata,
     EtherscanClientConfigurationProblem,
-    EtherscanRateLimitError,
+    EtherscanClientException,
     SourcifyClientConfigurationProblem,
 )
 from safe_eth.eth.clients.etherscan_client_v2 import AsyncEtherscanClientV2
@@ -145,12 +145,15 @@ class ContractMetadataService:
                         chain_id=chain_id,
                     )
 
-            except (OSError, EtherscanRateLimitError):
+            except (OSError, EtherscanClientException) as exc:
+                # Etherscan raises on rate limits, HTTP and API errors instead of
+                # returning `None`, so fall back to the next client
                 logger.debug(
-                    "Cannot get metadata for contract=%s on network=%s using client=%s",
+                    "Cannot get metadata for contract=%s on network=%s using client=%s: %r",
                     contract_address,
                     EthereumNetwork(chain_id),
                     client.__class__.__name__,
+                    exc,
                 )
 
         return EnhancedContractMetadata(
