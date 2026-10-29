@@ -4,6 +4,7 @@ from functools import cache
 
 from hexbytes import HexBytes
 from safe_eth.safe.safe_deployments import default_safe_deployments
+from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
 from app.datasources.db.database import transactional_session_context
@@ -31,6 +32,16 @@ class SafeContractsService:
                     chain_deployments.append((version, contract_name, contract_address))
 
         return chain_deployments
+
+    @classmethod
+    def _get_safe_addresses(cls) -> set[bytes]:
+        """
+        :return: addresses of every default Safe deployment
+        """
+        return {
+            HexBytes(address)
+            for _, _, address in cls._get_default_deployments_by_version()
+        }
 
     @staticmethod
     def _generate_safe_contract_display_name(contract_name: str, version: str) -> str:
@@ -61,12 +72,10 @@ class SafeContractsService:
         if chain_id in self._safe_contracts_cache:
             return True
 
-        safe_addresses: set[bytes] = {
-            HexBytes(address)
-            for _, _, address in self._get_default_deployments_by_version()
-        }
         async with transactional_session_context():
-            exists = await Contract.exists_safe_contracts(chain_id, safe_addresses)
+            exists = await Contract.exists_safe_contracts(
+                chain_id, self._get_safe_addresses()
+            )
 
         if exists:
             self._safe_contracts_cache.add(chain_id)
@@ -117,9 +126,11 @@ class SafeContractsService:
 
         return created_count
 
-    async def update_safe_contracts_info(self) -> None:
+    async def update_safe_contracts_info(self, chain_id: int | None = None) -> None:
         """
         Update contracts from given deployments list.
+
+        :param chain_id: if provided, only the contracts on this chain are updated
         """
         async with transactional_session_context():
             for (
@@ -136,6 +147,7 @@ class SafeContractsService:
                     display_name=display_name,
                     trusted_for_delegate_call=contract_name
                     in settings.CONTRACTS_TRUSTED_FOR_DELEGATE_CALL,
+                    chain_id=chain_id,
                 )
                 if affected_rows:
                     logger.info(
@@ -148,6 +160,25 @@ class SafeContractsService:
                         "Could not find any contract with address: %s",
                         contract_address,
                     )
+
+    async def sync_safe_contracts(self, chain_id: int) -> tuple[int, list[str]]:
+        """
+        Create the missing Safe contracts on `chain_id`, update the metadata of all
+        of them and reset `fetch_retries` of the ones without ABI, in a single
+        transaction.
+
+        :param chain_id:
+        :return: number of created contracts and addresses of the contracts
+            without ABI
+        """
+        async with transactional_session_context():
+            created_count = await self.create_safe_contracts(chain_id)
+            await self.update_safe_contracts_info(chain_id)
+            addresses = await Contract.reset_fetch_retries_without_abi(
+                chain_id, self._get_safe_addresses()
+            )
+
+        return created_count, [to_0x_hex_str(address) for address in addresses]
 
 
 @cache
