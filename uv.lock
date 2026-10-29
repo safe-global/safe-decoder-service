@@ -2678,7 +2678,7 @@ requires-dist = [
     { name = "gunicorn", specifier = "==26.2.0" },
     { name = "pydantic-settings", specifier = "==2.16.1" },
     { name = "redis", extras = ["hiredis"], specifier = "==8.1.0" },
-    { name = "safe-eth-py", specifier = "==7.27.0" },
+    { name = "safe-eth-py", specifier = "==7.28.0" },
     { name = "setuptools", specifier = ">=84.0.0,<85" },
     { name = "sqladmin", extras = ["full"], specifier = "==0.32.0" },
     { name = "sqlmodel", specifier = "==0.0.48" },
@@ -2704,7 +2704,7 @@ dev = [
 
 [[package]]
 name = "safe-eth-py"
-version = "7.27.0"
+version = "7.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
@@ -2713,9 +2713,9 @@ dependencies = [
     { name = "safe-pysha3" },
     { name = "web3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/38/191d04af60fd93c8e91b71702eb1e342abf9c127fcc649ec31d0cbfc872f/safe_eth_py-7.27.0.tar.gz", hash = "sha256:0d11f0e9ffc9b2f9ca359b9e6216d1748c9c8339c4d2d7258435b65291e15050", size = 895059, upload-time = "2026-10-22T09:52:22.564Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/e8/d36c7b01fa7754aff3c02af71371809d589b7eee36d027a221f4904c8b6b/safe_eth_py-7.28.0.tar.gz", hash = "sha256:d0fdbcd3923f4ef799bd7e53a614b04e1cf656a2ad32114d1045030f0f51938b", size = 896382, upload-time = "2026-10-28T16:41:31.361Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/bb/81a195fee0cb411cf2e18c0fd8394cb95f54b607d8f1b01fd49a49aea862/safe_eth_py-7.27.0-py3-none-any.whl", hash = "sha256:3ce4b763f99ff1f78bdd3578d052e6082992ddb47f418b59c9ba4dedd0ba86c8", size = 1018530, upload-time = "2026-10-22T09:52:21.034Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/30/2d8e857014a826b404a397e87792797265fc331fc64c3d56be6c2d78acc4/safe_eth_py-7.28.0-py3-none-any.whl", hash = "sha256:9b9830434cd5d45b8ef6968e1acb946f13ee2c4ddce005bfbbd211845e9169e6", size = 1019972, upload-time = "2026-10-28T16:41:29.642Z" },
 ]
 
 [[package]]
