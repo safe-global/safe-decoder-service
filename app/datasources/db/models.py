@@ -418,28 +418,53 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         name: str,
         display_name: str,
         trusted_for_delegate_call: bool | None = False,
+        chain_id: int | None = None,
     ) -> int:
         """
-        Update the contract metadata for all the chains
+        Update the contract metadata for all the chains, or only for `chain_id`
 
         :param address:
         :param name:
         :param display_name:
         :param trusted_for_delegate_call:
+        :param chain_id: if provided, only the contract on this chain is updated
         :return: number of affected rows
         """
-        query = (
-            update(cls)
-            .where(col(cls.address) == address)
-            .values(
-                name=name,
-                display_name=display_name,
-                trusted_for_delegate_call=trusted_for_delegate_call,
-            )
+        query = update(cls).where(col(cls.address) == address)
+        if chain_id is not None:
+            query = query.where(col(cls.chain_id) == chain_id)
+        query = query.values(
+            name=name,
+            display_name=display_name,
+            trusted_for_delegate_call=trusted_for_delegate_call,
         )
         result = cast(CursorResult, await db_session.execute(query))
         await db_session.flush()
         return result.rowcount
+
+    @classmethod
+    async def reset_fetch_retries_without_abi(
+        cls, chain_id: int, addresses: set[bytes]
+    ) -> list[bytes]:
+        """
+        Set `fetch_retries` to 0 for the contracts in `addresses` without ABI on
+        `chain_id`, so they are retried again.
+
+        :param chain_id:
+        :param addresses:
+        :return: addresses of the updated contracts
+        """
+        query = (
+            update(cls)
+            .where(col(cls.chain_id) == chain_id)
+            .where(col(cls.address).in_(addresses))
+            .where(col(cls.abi_id).is_(None))
+            .values(fetch_retries=0)
+            .returning(col(cls.address))
+        )
+        result = await db_session.execute(query)
+        await db_session.flush()
+        return list(result.scalars().all())
 
     @classmethod
     async def exists_safe_contracts(cls, chain_id: int, addresses: set[bytes]) -> bool:

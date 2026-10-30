@@ -3,13 +3,14 @@ import asyncio
 import inspect
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Annotated, Any
 
-from typer import Typer
+from typer import Option, Typer
 
 from app.commands.download_contract import download_contract_command
 from app.commands.safe_contracts import (
     setup_safe_contracts,
+    sync_safe_contracts_command,
 )
 
 
@@ -42,6 +43,18 @@ def register_commands(app: Typer):
     @async_command
     async def load_safe_contracts():
         await setup_safe_contracts()
+
+    @app.command(
+        help="Create the missing Safe contracts of the given chains and download "
+        "again the ones without ABI"
+    )
+    @async_command
+    async def sync_safe_contracts(
+        chain_ids: Annotated[
+            list[int], Option("--chain-id", help="Chain id, can be repeated")
+        ],
+    ):
+        await sync_safe_contracts_command(chain_ids)
 
     @app.command(help="Force to download a contract")
     @async_command

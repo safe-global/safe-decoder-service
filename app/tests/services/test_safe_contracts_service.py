@@ -1,10 +1,12 @@
+# SPDX-License-Identifier: FSL-1.1-MIT
 from unittest.mock import AsyncMock, patch
 
 from hexbytes import HexBytes
+from safe_eth.util.util import to_0x_hex_str
 
 from app.config import settings
-from app.datasources.db.database import db_session_context
-from app.datasources.db.models import Contract
+from app.datasources.db.database import db_session, db_session_context
+from app.datasources.db.models import Abi, AbiSource, Contract
 from app.services.safe_contracts_service import (
     SafeContractsService,
     get_safe_contract_service,
@@ -63,12 +65,14 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
             name="MultiSendCallOnly",
             display_name="Safe: MultiSendCallOnly 1.4.1",
             trusted_for_delegate_call=True,
+            chain_id=None,
         )
         mock_update.assert_any_call(
             address=HexBytes("0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"),
             name="MultiSend",
             display_name="Safe: MultiSend 1.4.1",
             trusted_for_delegate_call=False,
+            chain_id=None,
         )
 
         mock_logger.info.assert_called_once_with(
@@ -159,3 +163,60 @@ class TestSafeContractsServiceIntegration(AsyncDbTestCase):
         # Try to create again should return 0
         created_count = await self.service.create_safe_contracts(new_chain_id)
         assert created_count == 0
+
+    @db_session_context
+    async def test_update_safe_contracts_info_for_chain(self):
+        address = HexBytes("0x6439e7ABD8Bb915A5263094784C5CF561c4172AC")
+        await Contract(address=address, chain_id=480).create()
+        await Contract(address=address, chain_id=1).create()
+
+        await self.service.update_safe_contracts_info(chain_id=480)
+
+        updated_contract = await Contract.get_contract(address=address, chain_id=480)
+        self.assertEqual(updated_contract.name, "SafeMigration")
+        self.assertEqual(updated_contract.display_name, "SafeMigration 1.5.0")
+        self.assertTrue(updated_contract.trusted_for_delegate_call)
+
+        other_chain_contract = await Contract.get_contract(address=address, chain_id=1)
+        self.assertIsNone(other_chain_contract.name)
+        self.assertFalse(other_chain_contract.trusted_for_delegate_call)
+
+    @db_session_context
+    async def test_sync_safe_contracts(self):
+        chain_id = 480
+        safe_addresses = [
+            HexBytes(address)
+            for _, _, address in self.service._get_default_deployments_by_version()
+        ]
+        non_safe_address = HexBytes("0x0000000000000000000000000000000000000001")
+        source, _ = await AbiSource.get_or_create("Etherscan", "")
+        abi, _ = await Abi.get_or_create_abi(abi_json=[], source_id=source.id)
+        await Contract(
+            address=safe_addresses[0],
+            chain_id=chain_id,
+            abi_id=abi.id,
+            fetch_retries=91,
+        ).create()
+        await Contract(
+            address=safe_addresses[1], chain_id=chain_id, fetch_retries=91
+        ).create()
+        await Contract(address=safe_addresses[1], chain_id=1, fetch_retries=91).create()
+        await Contract(
+            address=non_safe_address, chain_id=chain_id, fetch_retries=91
+        ).create()
+
+        created_count, addresses = await self.service.sync_safe_contracts(chain_id)
+
+        self.assertEqual(created_count, len(safe_addresses) - 2)
+        self.assertCountEqual(
+            addresses, [to_0x_hex_str(address) for address in safe_addresses[1:]]
+        )
+        db_session.expire_all()
+        fetch_retries = {
+            (bytes(contract.address), contract.chain_id): contract.fetch_retries
+            for contract in await Contract.get_all()
+        }
+        self.assertEqual(fetch_retries[(safe_addresses[0], chain_id)], 91)
+        self.assertEqual(fetch_retries[(safe_addresses[1], chain_id)], 0)
+        self.assertEqual(fetch_retries[(safe_addresses[1], 1)], 91)
+        self.assertEqual(fetch_retries[(non_safe_address, chain_id)], 91)
