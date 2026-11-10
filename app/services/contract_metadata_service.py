@@ -11,6 +11,8 @@ from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.clients import (
     AsyncBlockscoutClient,
     AsyncSourcifyClient,
+    BlockscoutApiKeyError,
+    BlockscoutClientException,
     BlockScoutConfigurationProblem,
     ContractMetadata,
     EtherscanClientConfigurationProblem,
@@ -61,12 +63,15 @@ class EnhancedContractMetadata:
 
 @cache
 def get_contract_metadata_service():
-    return ContractMetadataService(settings.ETHERSCAN_API_KEY)
+    return ContractMetadataService(
+        settings.ETHERSCAN_API_KEY, settings.BLOCKSCOUT_API_KEY
+    )
 
 
 class ContractMetadataService:
-    def __init__(self, etherscan_api_key: str):
+    def __init__(self, etherscan_api_key: str, blockscout_api_key: str):
         self.etherscan_api_key = etherscan_api_key
+        self.blockscout_api_key = blockscout_api_key
 
     def _get_etherscan_client(self, chain_id: int) -> AsyncEtherscanClientV2 | None:
         try:
@@ -85,12 +90,15 @@ class ContractMetadataService:
     def _get_blockscout_client(self, chain_id: int) -> AsyncBlockscoutClient | None:
         try:
             return AsyncBlockscoutClient(
-                EthereumNetwork(chain_id), max_requests=settings.BLOCKSCOUT_MAX_REQUESTS
-            )
-        except BlockScoutConfigurationProblem:
-            logger.warning(
-                "Blockscout client is not available for current network %s",
                 EthereumNetwork(chain_id),
+                max_requests=settings.BLOCKSCOUT_MAX_REQUESTS,
+                api_key=self.blockscout_api_key,
+            )
+        except BlockScoutConfigurationProblem as exc:
+            logger.warning(
+                "Blockscout client is not available for current network %s: %s",
+                EthereumNetwork(chain_id),
+                exc,
             )
             return None
 
@@ -145,9 +153,20 @@ class ContractMetadataService:
                         chain_id=chain_id,
                     )
 
-            except (OSError, EtherscanClientException) as exc:
-                # Etherscan raises on rate limits, HTTP and API errors instead of
-                # returning `None`, so fall back to the next client
+            except BlockscoutApiKeyError as exc:
+                logger.error(
+                    "Blockscout API key error for contract=%s on network=%s: %r",
+                    contract_address,
+                    EthereumNetwork(chain_id),
+                    exc,
+                )
+            except (
+                OSError,
+                EtherscanClientException,
+                BlockscoutClientException,
+            ) as exc:
+                # Etherscan and Blockscout raise on rate limits, HTTP and API errors
+                # instead of returning `None`, so fall back to the next client
                 logger.debug(
                     "Cannot get metadata for contract=%s on network=%s using client=%s: %r",
                     contract_address,
