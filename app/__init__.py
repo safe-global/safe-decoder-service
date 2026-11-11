@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
-VERSION = "1.18.0"
+VERSION = "1.19.0"
