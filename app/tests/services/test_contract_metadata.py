@@ -9,7 +9,11 @@ from safe_eth.eth.clients import (
     AsyncBlockscoutClient,
     AsyncEtherscanClientV2,
     AsyncSourcifyClient,
+    BlockscoutApiKeyError,
     BlockScoutConfigurationProblem,
+    BlockscoutConnectionError,
+    BlockscoutHttpError,
+    BlockscoutRateLimitError,
     ContractMetadata,
     EtherscanClientConfigurationProblem,
     EtherscanClientException,
@@ -85,7 +89,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         blockscout_get_contract_metadata_mock: MagicMock,
         etherscan_get_contract_metadata_mock: MagicMock,
     ):
-        contract_metadata_service = ContractMetadataService("")
+        contract_metadata_service = ContractMetadataService("", "proapi_test")
         chain_id = 100
         etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
         sourcify_get_contract_metadata_mock.return_value = sourcify_metadata_mock
@@ -153,7 +157,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         blockscout_get_contract_metadata_mock: MagicMock,
         etherscan_get_contract_metadata_mock: MagicMock,
     ):
-        contract_metadata_service = ContractMetadataService("")
+        contract_metadata_service = ContractMetadataService("", "proapi_test")
         chain_id = 100
         random_address = Account.create().address
         etherscan_errors = [
@@ -189,12 +193,92 @@ class TestContractMetadataService(AsyncDbTestCase):
     @mock.patch.object(
         AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
     )
+    @mock.patch.object(
+        AsyncBlockscoutClient, "async_get_contract_metadata", autospec=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "is_chain_supported", autospec=True, return_value=True
+    )
+    @mock.patch.object(
+        AsyncSourcifyClient, "async_get_contract_metadata", autospec=True
+    )
+    @mock.patch("app.services.contract_metadata_service.logger")
+    async def test_get_contract_metadata_blockscout_errors(
+        self,
+        logger_mock: MagicMock,
+        sourcify_get_contract_metadata_mock: MagicMock,
+        sourcify_is_chain_supported: MagicMock,
+        blockscout_get_contract_metadata_mock: MagicMock,
+        etherscan_get_contract_metadata_mock: MagicMock,
+    ):
+        """
+        Blockscout errors do not raise and return no metadata, since Blockscout is
+        the last client. Only an API key error is logged at error level.
+        """
+        contract_metadata_service = ContractMetadataService("", "proapi_test")
+        chain_id = 100
+        random_address = Account.create().address
+        etherscan_get_contract_metadata_mock.return_value = None
+        sourcify_get_contract_metadata_mock.return_value = None
+        blockscout_errors = [
+            BlockscoutRateLimitError("Rate limit reached, HTTP 429"),
+            BlockscoutHttpError(403),
+            BlockscoutConnectionError("Error connecting to Blockscout"),
+        ]
+        for blockscout_error in blockscout_errors:
+            with self.subTest(blockscout_error=blockscout_error):
+                blockscout_get_contract_metadata_mock.side_effect = blockscout_error
+                contract_data = await contract_metadata_service.get_contract_metadata(
+                    random_address, chain_id
+                )
+                self.assertIsNone(contract_data.metadata)
+                self.assertIsNone(contract_data.source)
+                logger_mock.error.assert_not_called()
+
+        blockscout_get_contract_metadata_mock.side_effect = BlockscoutApiKeyError(
+            "Blockscout API key rejected, HTTP 402"
+        )
+        contract_data = await contract_metadata_service.get_contract_metadata(
+            random_address, chain_id
+        )
+        self.assertIsNone(contract_data.metadata)
+        logger_mock.error.assert_called_once()
+        self.assertIn("Blockscout API key", logger_mock.error.call_args.args[0])
+
+    async def test_get_blockscout_client_without_api_key(self):
+        """
+        Without an API key, Blockscout is not available for networks only served
+        by the PRO API (Gnosis), but it is for networks with a public instance (Celo).
+        """
+        service_without_blockscout_key = ContractMetadataService("", "")
+        self.assertIsNone(service_without_blockscout_key._get_blockscout_client(100))
+        celo_blockscout_client = service_without_blockscout_key._get_blockscout_client(
+            42220
+        )
+        assert isinstance(celo_blockscout_client, AsyncBlockscoutClient)
+        await celo_blockscout_client.async_session.close()
+
+    async def test_get_blockscout_client_with_api_key(self):
+        """
+        With an API key, Blockscout is available for networks only served by the
+        PRO API (Gnosis).
+        """
+        service_with_blockscout_key = ContractMetadataService("", "proapi_test")
+        gnosis_blockscout_client = service_with_blockscout_key._get_blockscout_client(
+            100
+        )
+        assert isinstance(gnosis_blockscout_client, AsyncBlockscoutClient)
+        await gnosis_blockscout_client.async_session.close()
+
+    @mock.patch.object(
+        AsyncEtherscanClientV2, "async_get_contract_metadata", autospec=True
+    )
     async def test_multichain_contract_metadata(
         self,
         etherscan_get_contract_metadata_mock: MagicMock,
     ):
         etherscan_get_contract_metadata_mock.return_value = etherscan_metadata_mock
-        contract_metadata_service = ContractMetadataService("")
+        contract_metadata_service = ContractMetadataService("", "")
         contract_address = fast_to_checksum_address(
             "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"
         )
@@ -220,7 +304,7 @@ class TestContractMetadataService(AsyncDbTestCase):
         mock_blockscout_client: MagicMock,
     ):
         chain_id = 100
-        contract_metadata_service = ContractMetadataService("")
+        contract_metadata_service = ContractMetadataService("", "")
         enabled_clients = contract_metadata_service.enabled_clients(chain_id)
         self.assertEqual(len(enabled_clients), 3)
         self.assertIsInstance(enabled_clients[0], AsyncEtherscanClientV2)

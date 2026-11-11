@@ -6,8 +6,9 @@ Base settings file for FastApi application.
 import logging.config
 import os
 import secrets
+from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.loggers.safe_logger import SafeJsonFormatter
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     )  # Admin token expires in 1 week
     ETHERSCAN_API_KEY: str = ""
     ETHERSCAN_MAX_REQUESTS: int = 1
+    BLOCKSCOUT_API_KEY: Annotated[str, StringConstraints(strip_whitespace=True)] = ""
     BLOCKSCOUT_MAX_REQUESTS: int = 1
     SOURCIFY_MAX_REQUESTS: int = 100
     CONTRACT_MAX_DOWNLOAD_RETRIES: int = (

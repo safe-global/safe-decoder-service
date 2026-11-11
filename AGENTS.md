@@ -227,6 +227,10 @@ Environment variables (see `.env.sample` and `app/config.py`):
   durable `topic` (default: `safe-transaction-service-events-with-topics`)
 - `RABBITMQ_DECODER_EVENTS_QUEUE_NAME`: Queue name for this service (default: `safe-decoder-service`)
 - `ETHERSCAN_API_KEY`: API key for the Etherscan V2 client
+- `BLOCKSCOUT_API_KEY`: Blockscout PRO API key. Gnosis, Gnosis Chiado and Immutable zkEVM
+  are only served by the PRO API, so without it Blockscout is skipped for them. The free plan
+  allows 5 requests per second, and `BLOCKSCOUT_MAX_REQUESTS` does not enforce it: it limits
+  concurrent connections per chain and per process, not requests per second
 - `ETHERSCAN_MAX_REQUESTS` / `BLOCKSCOUT_MAX_REQUESTS` / `SOURCIFY_MAX_REQUESTS`: Concurrent
   requests allowed per client (defaults: 1 / 1 / 100)
 - `CONTRACT_MAX_DOWNLOAD_RETRIES`: Retries before a contract stops being retried. The retry task
