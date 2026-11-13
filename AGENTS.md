@@ -250,6 +250,9 @@ Environment variables (see `.env.sample` and `app/config.py`):
 - `LOG_LEVEL`, `LOG_LEVEL_EVENTS_SERVICE`: Logging levels (default: INFO). Logs are JSON, see
   `app/loggers/safe_logger.py`
 - `TEST`: Forces `NullPool` on the engine, set in `.env.test`
+- `DD_APM_ENABLED`: Truthy (`true`, `1`, `yes`, ...) starts every process with `ddtrace-run`.
+  Default off. Read by `docker/web/datadog_tracer.sh`, not by `app/config.py`. See README
+  "Datadog APM"
 
 ## API Endpoints
 
