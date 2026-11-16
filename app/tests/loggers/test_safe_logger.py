@@ -60,3 +60,52 @@ class TestSafeJsonFormatter(TestCase):
                 "env": "production",
             },
         )
+
+    def test_omits_empty_datadog_trace_fields(self):
+        """Version and env are empty without DD_VERSION and DD_ENV, so they are not written."""
+        record = logging.makeLogRecord(
+            {
+                "dd.trace_id": "6afad78300000000a4289ab1112176c0",
+                "dd.span_id": "14239931113675422624",
+                "dd.service": "safe-decoder-service-web",
+                "dd.version": "",
+                "dd.env": "",
+            }
+        )
+
+        log = json.loads(SafeJsonFormatter().format(record))
+
+        self.assertEqual(
+            log["dd"],
+            {
+                "trace_id": "6afad78300000000a4289ab1112176c0",
+                "span_id": "14239931113675422624",
+                "service": "safe-decoder-service-web",
+            },
+        )
+
+    def test_writes_only_present_datadog_trace_fields(self):
+        """A record with dd.trace_id but no other dd.* attribute writes only the trace id."""
+        record = logging.makeLogRecord(
+            {"dd.trace_id": "6afad78300000000a4289ab1112176c0"}
+        )
+
+        log = json.loads(SafeJsonFormatter().format(record))
+
+        self.assertEqual(log["dd"], {"trace_id": "6afad78300000000a4289ab1112176c0"})
+
+    def test_omits_dd_key_when_all_datadog_fields_are_empty(self):
+        """Outside a span with empty service, version and env there is nothing to write."""
+        record = logging.makeLogRecord(
+            {
+                "dd.trace_id": "0",
+                "dd.span_id": "0",
+                "dd.service": "",
+                "dd.version": "",
+                "dd.env": "",
+            }
+        )
+
+        log = json.loads(SafeJsonFormatter().format(record))
+
+        self.assertNotIn("dd", log)
