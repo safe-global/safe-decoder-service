@@ -50,6 +50,26 @@ class JsonLog(BaseModel):
     context: str
     message: str
     contextMessage: ContextMessageLog | dict | None = None
+    # Datadog reads dd.trace_id and dd.span_id to link the log to its APM trace
+    dd: dict[str, str] | None = None
+
+
+DATADOG_TRACE_FIELDS = ("trace_id", "span_id", "service", "version", "env")
+
+
+def get_datadog_trace_fields(record: logging.LogRecord) -> dict[str, str] | None:
+    """
+    Return the dd.* attributes ddtrace adds to the record, or None without ddtrace.
+    Outside a span ddtrace sets trace_id and span_id to "0", so they are left out.
+    """
+    if not hasattr(record, "dd.trace_id"):
+        return None
+    trace_fields = {
+        field: getattr(record, f"dd.{field}", "") for field in DATADOG_TRACE_FIELDS
+    }
+    if trace_fields["trace_id"] == "0":
+        del trace_fields["trace_id"], trace_fields["span_id"]
+    return trace_fields
 
 
 class SafeJsonFormatter(logging.Formatter):
@@ -97,6 +117,7 @@ class SafeJsonFormatter(logging.Formatter):
                 if len(context_message.model_dump(exclude_none=True))
                 else None
             ),
+            dd=get_datadog_trace_fields(record),
         )
 
         return json_log.model_dump_json(exclude_none=True)
