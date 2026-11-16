@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     ETHERSCAN_MAX_REQUESTS: int = 1
     BLOCKSCOUT_API_KEY: Annotated[str, StringConstraints(strip_whitespace=True)] = ""
     BLOCKSCOUT_MAX_REQUESTS: int = 1
+    ON_DEMAND_ABI_FETCH_ENABLED: bool = False
     SOURCIFY_MAX_REQUESTS: int = 100
     CONTRACT_MAX_DOWNLOAD_RETRIES: int = (
         90  # Task running once per day, means 3 months trying.
