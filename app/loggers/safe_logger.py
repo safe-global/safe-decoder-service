@@ -61,6 +61,9 @@ def get_datadog_trace_fields(record: logging.LogRecord) -> dict[str, str] | None
     """
     Return the dd.* attributes ddtrace adds to the record, or None without ddtrace.
     Outside a span ddtrace sets trace_id and span_id to "0", so they are left out.
+
+    :param record: log record, carrying `dd.*` attributes when ddtrace is running
+    :return: the Datadog trace fields, or `None` without ddtrace
     """
     if not hasattr(record, "dd.trace_id"):
         return None
