@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/../../datadog_tracer.sh"
+
 TASK_CONCURRENCY=${TASK_CONCURRENCY:-100}
 
 # Signal each process only once: a second signal while the taskiq worker is
@@ -14,8 +16,8 @@ stop_background_processes() {
 trap 'stop_background_processes; exit 0' TERM INT
 
 echo "==> $(date +%H:%M:%S) ==> Running Taskiq worker with concurrency $TASK_CONCURRENCY <=="
-taskiq worker app.workers.tasks:broker --workers 1 --max-async-tasks "$TASK_CONCURRENCY" & # async tasks
-taskiq scheduler app.workers.tasks:scheduler & # cron scheduled tasks
+"${DDTRACE_RUN[@]}" taskiq worker app.workers.tasks:broker --workers 1 --max-async-tasks "$TASK_CONCURRENCY" & # async tasks
+"${DDTRACE_RUN[@]}" taskiq scheduler app.workers.tasks:scheduler & # cron scheduled tasks
 
 # Neither process exits on its own, so when one does, stop the other and exit
 # with an error, also on status 0, so the container is restarted

@@ -13,6 +13,16 @@ Decodes transaction data providing a human-readable output.
 cp .env.sample .env
 ```
 
+### Datadog APM
+The Datadog tracer (`ddtrace`) is a locked dependency, off by default. Set `DD_APM_ENABLED` to
+`true` (or `y`, `yes`, `t`, `on`, `1`, any case) and the start scripts in `docker/web/` run the
+web, taskiq worker and scheduler processes with `ddtrace-run`. Any other value, or none, leaves
+it off and the tracer is not loaded.
+
+Other tracer settings use the standard `DD_*` variables (`DD_AGENT_HOST`, `DD_ENV`,
+`DD_SERVICE`, `DD_VERSION`, ...). The Datadog Agent has a setting with the same name, but this
+one only controls the tracer.
+
 ## Execution
 
 ```bash
