@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from datetime import datetime
-from typing import Any, Union
+from typing import Any
 
 from eth_typing import HexStr
 from fastapi_camelcase import CamelModel
@@ -123,9 +123,7 @@ class ParameterDecodedPublic(CamelModel):
     name: str
     type: str
     value: Any
-    value_decoded: Union[
-        list["MultisendDecodedPublic"], "BaseDataDecodedPublic", None
-    ] = None
+    value_decoded: list[MultisendDecodedPublic] | BaseDataDecodedPublic | None = None
 
 
 class BaseDataDecodedPublic(CamelModel):

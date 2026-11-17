@@ -3,7 +3,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterator, Sequence
 from enum import Enum
-from typing import Any, NotRequired, TypedDict, Union, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 from async_lru import alru_cache
 from eth_abi import decode as decode_abi
@@ -43,7 +43,7 @@ class ParameterDecoded(TypedDict):
     name: str
     type: str
     value: Any
-    value_decoded: NotRequired[Union[list["MultisendDecoded"], "DataDecoded", None]]
+    value_decoded: NotRequired[list[MultisendDecoded] | DataDecoded | None]
 
 
 class DataDecoded(TypedDict):
@@ -69,7 +69,7 @@ class MultisendDecoded(TypedDict):
 
 
 @alru_cache
-async def get_data_decoder_service() -> "DataDecoderService":
+async def get_data_decoder_service() -> DataDecoderService:
     data_decoder_service = DataDecoderService()
     await data_decoder_service.init()
     return data_decoder_service

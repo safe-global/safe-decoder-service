@@ -131,7 +131,7 @@ class SafeJsonFormatter(logging.Formatter):
         return json_log.model_dump_json(exclude_none=True)
 
 
-_task_info: ContextVar["TaskInfo"] = ContextVar("task_info")
+_task_info: ContextVar[TaskInfo] = ContextVar("task_info")
 
 
 def log_record_factory(*args, **kwargs) -> logging.LogRecord:

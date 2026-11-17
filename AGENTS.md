@@ -305,7 +305,7 @@ Tests live in `app/tests/`, mirroring the package layout (`routers/`, `services/
 
 ## Python Version
 
-This project uses **Python 3.13**. Ensure all code is compatible with this version.
+This project uses **Python 3.14**. Ensure all code is compatible with this version.
 
 ## Code Quality Standards
 

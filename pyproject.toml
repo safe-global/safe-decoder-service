@@ -1,7 +1,7 @@
 [project]
 name = "safe-decoder-service"
 dynamic = ["version"]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aio-pika==10.1.1",
     "alembic==1.20.0",
@@ -56,7 +56,7 @@ compile-bytecode = true
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 exclude = [
     ".tox", ".git", "*/migrations/*", "*/static/CACHE/*",
     "docs", "node_modules", "venv"
@@ -81,7 +81,7 @@ known-third-party = ["py_eth_sig_utils", "safe", "fastapi", "pydantic"]
 # src = ["src"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true

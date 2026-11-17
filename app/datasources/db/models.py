@@ -85,10 +85,10 @@ class AbiSource(SqlQueryBase, SQLModel, table=True):
     name: str = Field(nullable=False)
     url: str = Field(nullable=False)
 
-    abis: list["Abi"] = Relationship(back_populates="source")
+    abis: list[Abi] = Relationship(back_populates="source")
 
     @classmethod
-    async def get_or_create(cls, name: str, url: str) -> tuple["AbiSource", bool]:
+    async def get_or_create(cls, name: str, url: str) -> tuple[AbiSource, bool]:
         """
         Checks if an AbiSource with the given 'name' and 'url' exists.
         If found, returns it with False. If not, creates and returns it with True.
@@ -134,7 +134,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
     )
 
     source: AbiSource | None = Relationship(back_populates="abis")
-    contracts: list["Contract"] = Relationship(back_populates="abi")
+    contracts: list[Contract] = Relationship(back_populates="abi")
 
     @classmethod
     async def get_last_inserted_id(cls) -> int | None:
@@ -213,7 +213,7 @@ class Abi(SqlQueryBase, TimeStampedSQLModel, table=True):
         abi_json: AbiJson,
         source_id: int | None,
         relevance: int | None = 0,
-    ) -> tuple["Abi", bool]:
+    ) -> tuple[Abi, bool]:
         """
         Returns the existing Abi for the given 'abi_json' or creates a new one.
         Deduplication is enforced by the unique index on the generated abi_hash
@@ -242,7 +242,7 @@ class Project(SqlQueryBase, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     description: str = Field(nullable=False)
     logo_file: str = Field(nullable=False)
-    contracts: list["Contract"] = Relationship(back_populates="project")
+    contracts: list[Contract] = Relationship(back_populates="project")
 
 
 class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
@@ -277,7 +277,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         chain_ids: list[int] | None = None,
         trusted_for_delegate_call: bool | None = None,
         only_with_abi: bool = False,
-    ) -> SelectBase["Contract"]:
+    ) -> SelectBase[Contract]:
         """
         Return a statement to get contracts with abi for the provided address and chain_id
 
@@ -321,7 +321,7 @@ class Contract(SqlQueryBase, TimeStampedSQLModel, table=True):
         address: bytes,
         chain_id: int,
         **kwargs,
-    ) -> tuple["Contract", bool]:
+    ) -> tuple[Contract, bool]:
         """
         Update or create the given params.
         Handles concurrent inserts gracefully with INSERT ... ON CONFLICT DO

@@ -40,7 +40,7 @@ class ContractSource(enum.Enum):
     def from_client(
         cls,
         client: AsyncEtherscanClientV2 | AsyncSourcifyClient | AsyncBlockscoutClient,
-    ) -> "ContractSource":
+    ) -> ContractSource:
         mapping = {
             AsyncEtherscanClientV2: cls.ETHERSCAN,
             AsyncSourcifyClient: cls.SOURCIFY,
