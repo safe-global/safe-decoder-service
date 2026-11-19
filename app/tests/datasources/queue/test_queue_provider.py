@@ -13,7 +13,7 @@ from app.datasources.queue.queue_provider import AMQP_CONNECTION_NAME, QueueProv
 class TestQueueProviderIntegration(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.provider = QueueProvider()
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
 
     async def asyncTearDown(self):
         await self.provider.disconnect()
