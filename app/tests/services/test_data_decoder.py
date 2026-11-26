@@ -26,7 +26,11 @@ from app.datasources.abis.gnosis_protocol import (
 )
 
 from ...config import settings
-from ...datasources.db.database import db_session_context
+from ...datasources.db.database import (
+    _get_database_session_context,
+    db_session_context,
+    transactional_session_context,
+)
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
     CannotDecode,
@@ -758,6 +762,57 @@ class TestDataDecoderService(AsyncDbTestCase):
             ),
             DecodingAccuracyEnum.FULL_MATCH,
         )
+
+    async def test_get_decoding_accuracy_builds_selectors_without_session(self):
+        """
+        On a cache miss, `get_decoding_accuracy` closes its database scope before
+        building the selectors of the contract ABI, so no connection is held
+        during that CPU bound work.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        contract_address = Address(b"a")
+        async with transactional_session_context():
+            source = AbiSource(name="local", url="")
+            await source.create()
+            abi = Abi(abi_json=example_abi, relevance=100, source_id=source.id)
+            await abi.create()
+            await Contract(
+                address=contract_address, abi=abi, name="Example", chain_id=1
+            ).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        generate_selectors = decoder_service._generate_selectors_with_abis_from_abi
+        has_session_while_building_selectors: list[bool] = []
+
+        async def generate_selectors_recording_session(
+            abi: ABI,
+        ) -> dict[bytes, Any]:
+            try:
+                _get_database_session_context()
+                has_session_while_building_selectors.append(True)
+            except LookupError:
+                has_session_while_building_selectors.append(False)
+            return await generate_selectors(abi)
+
+        with patch.object(
+            decoder_service,
+            "_generate_selectors_with_abis_from_abi",
+            new=generate_selectors_recording_session,
+        ):
+            accuracy = await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            )
+
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+        self.assertEqual(has_session_while_building_selectors, [False])
 
     @db_session_context
     async def test_decode_tuples(self):

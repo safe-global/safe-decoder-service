@@ -280,18 +280,23 @@ class DataDecoderService:
             first contract with the same address in other chain. `None` if no ABI
             is found for the address
         """
-        if chain_id is not None:
-            abi_on_chain = await Contract.get_abi_by_contract_address(
-                HexBytes(address), chain_id
+        async with transactional_session_context():
+            abi_on_chain = (
+                await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
+                if chain_id is not None
+                else None
             )
-            if abi_on_chain:
-                return ContractAbiMatch(
-                    await self._generate_selectors_with_abis_from_abi(abi_on_chain),
-                    is_matched_on_chain=True,
-                )
-        if abi_on_any_chain := await Contract.get_abi_by_contract_address(
-            HexBytes(address), None
-        ):
+            abi_on_any_chain = (
+                None
+                if abi_on_chain
+                else await Contract.get_abi_by_contract_address(HexBytes(address), None)
+            )
+        if abi_on_chain:
+            return ContractAbiMatch(
+                await self._generate_selectors_with_abis_from_abi(abi_on_chain),
+                is_matched_on_chain=True,
+            )
+        if abi_on_any_chain:
             return ContractAbiMatch(
                 await self._generate_selectors_with_abis_from_abi(abi_on_any_chain),
                 is_matched_on_chain=False,
@@ -610,10 +615,9 @@ class DataDecoderService:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
             try:
-                async with transactional_session_context():
-                    contract_abi_match = await self.get_contract_abi_match(
-                        address, chain_id
-                    )
+                contract_abi_match = await self.get_contract_abi_match(
+                    address, chain_id
+                )
                 if contract_abi_match:
                     return (
                         DecodingAccuracyEnum.FULL_MATCH
