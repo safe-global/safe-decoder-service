@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterator, Sequence
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, NotRequired, TypedDict, cast
 
@@ -66,6 +67,12 @@ class MultisendDecoded(TypedDict):
     value: str
     data: HexStr | None
     data_decoded: DataDecoded | None
+
+
+@dataclass(frozen=True)
+class ContractAbiMatch:
+    contract_fn_selectors_with_abis: dict[bytes, ABIFunction]
+    is_matched_on_chain: bool
 
 
 @alru_cache
@@ -258,37 +265,42 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    @alru_cache(maxsize=2048)
-    async def get_contract_abi(
-        self,
-        address: Address,
-        chain_id: int | None,
-    ) -> ABI | None:
-        """
-        Retrieves the ABI for the contract at the given address.
-
-        :param address: Contract address
-        :param chain_id: Chain id for the contract
-        :return: List of ABI data if found, `None` otherwise.
-        """
-        return await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
-
-    @alru_cache(maxsize=2048)
-    async def get_contract_abi_selectors_with_functions(
+    # Contracts are written by the taskiq worker, the CLI and the admin of any web
+    # pod, so entries cannot be invalidated one by one. `load_new_abis` clears the
+    # cache when it reads new ABIs, and a contract linked to an ABI that was already
+    # stored is only picked up when its entry expires
+    @alru_cache(maxsize=2048, ttl=settings.DECODER_CONTRACT_ABI_CACHE_SECONDS)
+    async def get_contract_abi_match(
         self, address: Address, chain_id: int | None
-    ) -> dict[bytes, ABIFunction] | None:
+    ) -> ContractAbiMatch | None:
         """
         :param address: Contract address
         :param chain_id: Chain for the contract
-        :return: Dictionary of function selects with `ABIFunction` if found, `None` otherwise
-            If contract is not found for the chain, return the first one that matches in other chain.
+        :return: Selectors of the contract ABI on `chain_id`, or if not found, of the
+            first contract with the same address in other chain. `None` if no ABI
+            is found for the address
         """
-        abi = await self.get_contract_abi(address, chain_id)
-        if not abi and chain_id is not None:
-            # Try to find an ABI in other network
-            abi = await self.get_contract_abi(address, None)
-        if abi:
-            return await self._generate_selectors_with_abis_from_abi(abi)
+        async with transactional_session_context():
+            abi_on_chain = (
+                await Contract.get_abi_by_contract_address(HexBytes(address), chain_id)
+                if chain_id is not None
+                else None
+            )
+            abi_on_any_chain = (
+                None
+                if abi_on_chain
+                else await Contract.get_abi_by_contract_address(HexBytes(address), None)
+            )
+        if abi_on_chain:
+            return ContractAbiMatch(
+                await self._generate_selectors_with_abis_from_abi(abi_on_chain),
+                is_matched_on_chain=True,
+            )
+        if abi_on_any_chain:
+            return ContractAbiMatch(
+                await self._generate_selectors_with_abis_from_abi(abi_on_any_chain),
+                is_matched_on_chain=False,
+            )
         return None
 
     async def get_abi_function(
@@ -306,10 +318,8 @@ class DataDecoderService:
             # Try to use specific ABI if address provided
             if address:
                 try:
-                    contract_selectors_with_abis = (
-                        await self.get_contract_abi_selectors_with_functions(
-                            address, chain_id
-                        )
+                    contract_abi_match = await self.get_contract_abi_match(
+                        address, chain_id
                     )
                 except SQLAlchemyError:
                     # The selector map still decodes the function, so losing the
@@ -319,14 +329,14 @@ class DataDecoderService:
                         self.__class__.__name__,
                         address,
                     )
-                    contract_selectors_with_abis = None
+                    contract_abi_match = None
                 if (
-                    contract_selectors_with_abis
-                    and selector in contract_selectors_with_abis
+                    contract_abi_match
+                    and selector in contract_abi_match.contract_fn_selectors_with_abis
                 ):
                     # If the selector is available in the abi specific for the address we will use that one
                     # Otherwise we fall back to the general abi that matches the selector
-                    return contract_selectors_with_abis[selector]
+                    return contract_abi_match.contract_fn_selectors_with_abis[selector]
             return self.fn_selectors_with_abis[selector]
         return None
 
@@ -605,13 +615,15 @@ class DataDecoderService:
             return DecodingAccuracyEnum.NO_MATCH
         if address is not None:
             try:
-                async with transactional_session_context():
-                    if chain_id is not None and await self.get_contract_abi(
-                        address, chain_id=chain_id
-                    ):
-                        return DecodingAccuracyEnum.FULL_MATCH
-                    if await self.get_contract_abi(address, None):
-                        return DecodingAccuracyEnum.PARTIAL_MATCH
+                contract_abi_match = await self.get_contract_abi_match(
+                    address, chain_id
+                )
+                if contract_abi_match:
+                    return (
+                        DecodingAccuracyEnum.FULL_MATCH
+                        if contract_abi_match.is_matched_on_chain
+                        else DecodingAccuracyEnum.PARTIAL_MATCH
+                    )
             except SQLAlchemyError:
                 # Without the database the address cannot be matched, which is
                 # what ONLY_FUNCTION_MATCH already reports
@@ -692,6 +704,7 @@ class DataDecoderService:
 
             # A reload that fails halfway is retried from the same point
             self.last_abi_id = new_last_abi_id
+            self.get_contract_abi_match.cache_clear()
             logger.debug(
                 "%s: Loaded new %d contract ABIs",
                 self.__class__.__name__,

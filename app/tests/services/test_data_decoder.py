@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import asyncio
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -25,7 +26,11 @@ from app.datasources.abis.gnosis_protocol import (
 )
 
 from ...config import settings
-from ...datasources.db.database import db_session_context
+from ...datasources.db.database import (
+    _get_database_session_context,
+    db_session_context,
+    transactional_session_context,
+)
 from ...datasources.db.models import Abi, AbiSource, Contract
 from ...services.data_decoder import (
     CannotDecode,
@@ -640,6 +645,174 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments_reversed)
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
+
+    @db_session_context
+    async def test_contract_abi_cache_expires(self):
+        """
+        A contract ABI stored after the contract was decoded is used once the
+        cached lookup expires, without a new `DataDecoderService`.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        source = AbiSource(name="local", url="")
+        await source.create()
+        await Abi(abi_json=example_abi, relevance=100, source_id=source.id).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        contract_address = Address(b"a")
+
+        async def decode_with_accuracy() -> tuple[dict[str, Any], DecodingAccuracyEnum]:
+            _, arguments = await decoder_service.decode_transaction(
+                example_data, address=contract_address, chain_id=1
+            )
+            accuracy = await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            )
+            return arguments, accuracy
+
+        expected_arguments = {"droidId": "4", "numberOfDroids": "10"}
+        expected_arguments_swapped = {"numberOfDroids": "4", "droidId": "10"}
+
+        # Decoded before the contract ABI exists, so "no ABI" is cached
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH),
+        )
+
+        swapped_abi = Abi(
+            abi_json=example_swapped_abi, relevance=1, source_id=source.id
+        )
+        await swapped_abi.create()
+        await Contract(
+            address=contract_address, abi=swapped_abi, name="Swapped", chain_id=1
+        ).create()
+
+        # Inside the cache lifetime the database is not read again
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH),
+        )
+
+        # Move the event loop clock past the cache lifetime. async_lru expires
+        # entries with `loop.call_later`, and those callbacks run after this task
+        # in the next loop iteration, so yield twice
+        loop = asyncio.get_running_loop()
+        expired_at = loop.time() + settings.DECODER_CONTRACT_ABI_CACHE_SECONDS + 1
+        with patch.object(loop, "time", return_value=expired_at):
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments_swapped, DecodingAccuracyEnum.FULL_MATCH),
+        )
+
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
+    @db_session_context
+    async def test_load_new_abis_clears_contract_abi_cache(self):
+        """
+        A contract ABI stored after the contract was decoded is used after the next
+        ABI reload, even when the new ABI adds no selector to the decoder.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        source = AbiSource(name="local", url="")
+        await source.create()
+        await Abi(abi_json=example_abi, relevance=100, source_id=source.id).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        contract_address = Address(b"a")
+
+        self.assertEqual(
+            await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            ),
+            DecodingAccuracyEnum.ONLY_FUNCTION_MATCH,
+        )
+
+        # Same selector as `example_abi`, so the reload adds nothing to the decoder
+        swapped_abi = Abi(
+            abi_json=example_swapped_abi, relevance=1, source_id=source.id
+        )
+        await swapped_abi.create()
+        await Contract(
+            address=contract_address, abi=swapped_abi, name="Swapped", chain_id=1
+        ).create()
+        self.assertEqual(await decoder_service.load_new_abis(), 0)
+
+        _, arguments = await decoder_service.decode_transaction(
+            example_data, address=contract_address, chain_id=1
+        )
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+        self.assertEqual(
+            await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            ),
+            DecodingAccuracyEnum.FULL_MATCH,
+        )
+
+    async def test_get_decoding_accuracy_builds_selectors_without_session(self):
+        """
+        On a cache miss, `get_decoding_accuracy` closes its database scope before
+        building the selectors of the contract ABI, so no connection is held
+        during that CPU bound work.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        contract_address = Address(b"a")
+        async with transactional_session_context():
+            source = AbiSource(name="local", url="")
+            await source.create()
+            abi = Abi(abi_json=example_abi, relevance=100, source_id=source.id)
+            await abi.create()
+            await Contract(
+                address=contract_address, abi=abi, name="Example", chain_id=1
+            ).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+
+        generate_selectors = decoder_service._generate_selectors_with_abis_from_abi
+        has_session_while_building_selectors: list[bool] = []
+
+        async def generate_selectors_recording_session(
+            abi: ABI,
+        ) -> dict[bytes, Any]:
+            try:
+                _get_database_session_context()
+                has_session_while_building_selectors.append(True)
+            except LookupError:
+                has_session_while_building_selectors.append(False)
+            return await generate_selectors(abi)
+
+        with patch.object(
+            decoder_service,
+            "_generate_selectors_with_abis_from_abi",
+            new=generate_selectors_recording_session,
+        ):
+            accuracy = await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            )
+
+        self.assertEqual(accuracy, DecodingAccuracyEnum.FULL_MATCH)
+        self.assertEqual(has_session_while_building_selectors, [False])
 
     @db_session_context
     async def test_decode_tuples(self):

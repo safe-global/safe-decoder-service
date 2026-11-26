@@ -136,6 +136,14 @@ database. This is the hot path of the service, so:
 - `last_abi_id` is a monotonic cursor. `load_new_abis()` (called by the decode endpoint, throttled
   by `DECODER_ABI_RELOAD_SECONDS`) picks up only rows inserted after it, and takes the reload lock
   with a 0.01s timeout so concurrent requests do not queue behind a reload.
+- `get_contract_abi_match` caches the ABI selectors of a contract, and whether it matched on the
+  requested chain, in memory for `DECODER_CONTRACT_ABI_CACHE_SECONDS`, "no ABI" results
+  included. Decoding and `accuracy` read the same cache, so they agree unless the entry expires
+  between the two reads. Contracts are written by the taskiq worker, the CLI and the admin of any
+  web pod, so entries cannot be invalidated one by one. `load_new_abis()` clears the whole cache
+  when it reads new ABI rows, even if they add no new selector, so a new ABI is used within
+  `DECODER_ABI_RELOAD_SECONDS`. A contract linked to an ABI that was already stored (ABIs are
+  deduplicated, so no row is added) is only picked up when its entry expires.
 
 Decoding accuracy is reported per request: `FULL_MATCH` (address and chain), `PARTIAL_MATCH`
 (address only), `ONLY_FUNCTION_MATCH` (selector known from another contract), `NO_MATCH`.
@@ -236,6 +244,8 @@ Environment variables (see `.env.sample` and `app/config.py`):
 - `CONTRACT_MAX_DOWNLOAD_RETRIES`: Retries before a contract stops being retried. The retry task
   runs daily, so 90 means about 3 months (default: 90)
 - `DECODER_ABI_RELOAD_SECONDS`: Minimum interval between ABI reloads (default: 30)
+- `DECODER_CONTRACT_ABI_CACHE_SECONDS`: Lifetime of the in-memory per-contract ABI cache of the
+  data decoder, read at startup (default: 600)
 - `DECODER_LOAD_RETRY_SECONDS`: Wait between failed initial ABI loads, also sent as `Retry-After`
   when the decoder is not ready (default: 10)
 - `DECODER_MAX_DATA_BYTES`: Maximum byte length of `data` accepted by the data decoder endpoint,
