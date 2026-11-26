@@ -266,8 +266,9 @@ class DataDecoderService:
         yield get_multi_send_contract(self.dummy_w3).abi
 
     # Contracts are written by the taskiq worker, the CLI and the admin of any web
-    # pod, so this cache cannot be invalidated and a new or changed contract ABI is
-    # only used when its entry expires
+    # pod, so entries cannot be invalidated one by one. `load_new_abis` clears the
+    # cache when it reads new ABIs, and a contract linked to an ABI that was already
+    # stored is only picked up when its entry expires
     @alru_cache(maxsize=2048, ttl=settings.DECODER_CONTRACT_ABI_CACHE_SECONDS)
     async def get_contract_abi_match(
         self, address: Address, chain_id: int | None
@@ -699,6 +700,7 @@ class DataDecoderService:
 
             # A reload that fails halfway is retried from the same point
             self.last_abi_id = new_last_abi_id
+            self.get_contract_abi_match.cache_clear()
             logger.debug(
                 "%s: Loaded new %d contract ABIs",
                 self.__class__.__name__,

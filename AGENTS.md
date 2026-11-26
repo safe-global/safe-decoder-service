@@ -140,8 +140,10 @@ database. This is the hot path of the service, so:
   requested chain, in memory for `DECODER_CONTRACT_ABI_CACHE_SECONDS`, "no ABI" results
   included. Decoding and `accuracy` read the same cache, so they agree unless the entry expires
   between the two reads. Contracts are written by the taskiq worker, the CLI and the admin of any
-  web pod, so these entries cannot be invalidated and a new or changed contract ABI is used only
-  when they expire.
+  web pod, so entries cannot be invalidated one by one. `load_new_abis()` clears the whole cache
+  when it reads new ABI rows, even if they add no new selector, so a new ABI is used within
+  `DECODER_ABI_RELOAD_SECONDS`. A contract linked to an ABI that was already stored (ABIs are
+  deduplicated, so no row is added) is only picked up when its entry expires.
 
 Decoding accuracy is reported per request: `FULL_MATCH` (address and chain), `PARTIAL_MATCH`
 (address only), `ONLY_FUNCTION_MATCH` (selector known from another contract), `NO_MATCH`.

@@ -709,6 +709,56 @@ class TestDataDecoderService(AsyncDbTestCase):
             (expected_arguments_swapped, DecodingAccuracyEnum.FULL_MATCH),
         )
 
+    @patch.object(settings, "DECODER_ABI_RELOAD_SECONDS", 0)
+    @db_session_context
+    async def test_load_new_abis_clears_contract_abi_cache(self):
+        """
+        A contract ABI stored after the contract was decoded is used after the next
+        ABI reload, even when the new ABI adds no selector to the decoder.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        source = AbiSource(name="local", url="")
+        await source.create()
+        await Abi(abi_json=example_abi, relevance=100, source_id=source.id).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        contract_address = Address(b"a")
+
+        self.assertEqual(
+            await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            ),
+            DecodingAccuracyEnum.ONLY_FUNCTION_MATCH,
+        )
+
+        # Same selector as `example_abi`, so the reload adds nothing to the decoder
+        swapped_abi = Abi(
+            abi_json=example_swapped_abi, relevance=1, source_id=source.id
+        )
+        await swapped_abi.create()
+        await Contract(
+            address=contract_address, abi=swapped_abi, name="Swapped", chain_id=1
+        ).create()
+        self.assertEqual(await decoder_service.load_new_abis(), 0)
+
+        _, arguments = await decoder_service.decode_transaction(
+            example_data, address=contract_address, chain_id=1
+        )
+        self.assertEqual(arguments, {"numberOfDroids": "4", "droidId": "10"})
+        self.assertEqual(
+            await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            ),
+            DecodingAccuracyEnum.FULL_MATCH,
+        )
+
     @db_session_context
     async def test_decode_tuples(self):
         """
