@@ -13,7 +13,7 @@ dependencies = [
     "gunicorn==26.2.0",
     "pydantic-settings==2.16.3",
     "redis[hiredis]==8.1.0",
-    "safe-eth-py==7.30.0",
+    "safe-eth-py==8.0.0",
     "setuptools>=84.0.0,<85",
     "sqladmin[full]==0.32.0",
     "sqlmodel==0.0.48",
@@ -51,7 +51,8 @@ packages = ["app"]
 [tool.uv]
 # Reject packages published less than 7 days ago to avoid supply-chain attacks
 exclude-newer = "7 days"
-exclude-newer-package = { safe-eth-py = false }
+# Safe publishes both, and a safe-eth-py release can need a safe-eth-native release of the same day
+exclude-newer-package = { safe-eth-py = false, safe-eth-native = false }
 compile-bytecode = true
 
 [tool.ruff]
