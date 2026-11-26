@@ -699,7 +699,7 @@ class TestDataDecoderService(AsyncDbTestCase):
         # entries with `loop.call_later`, and those callbacks run after this task
         # in the next loop iteration, so yield twice
         loop = asyncio.get_running_loop()
-        expired_at = loop.time() + DataDecoderService.CONTRACT_ABI_CACHE_SECONDS + 1
+        expired_at = loop.time() + settings.DECODER_CONTRACT_ABI_CACHE_SECONDS + 1
         with patch.object(loop, "time", return_value=expired_at):
             await asyncio.sleep(0)
             await asyncio.sleep(0)

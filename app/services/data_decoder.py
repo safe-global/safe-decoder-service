@@ -177,11 +177,6 @@ class DataDecoderService:
     # ABIs handed to a single thread hop when building the selector map
     SELECTOR_BATCH_SIZE = 500
 
-    # Contracts are written by the taskiq worker, the CLI and the admin of any web
-    # pod, so this cache cannot be invalidated and a new or changed contract ABI is
-    # only used when its entry expires
-    CONTRACT_ABI_CACHE_SECONDS = 600
-
     dummy_w3 = Web3()
 
     fn_selectors_with_abis: dict[bytes, ABIFunction]
@@ -270,7 +265,10 @@ class DataDecoderService:
     async def get_multisend_abis(self) -> AsyncIterator[ABI]:
         yield get_multi_send_contract(self.dummy_w3).abi
 
-    @alru_cache(maxsize=2048, ttl=CONTRACT_ABI_CACHE_SECONDS)
+    # Contracts are written by the taskiq worker, the CLI and the admin of any web
+    # pod, so this cache cannot be invalidated and a new or changed contract ABI is
+    # only used when its entry expires
+    @alru_cache(maxsize=2048, ttl=settings.DECODER_CONTRACT_ABI_CACHE_SECONDS)
     async def get_contract_abi_match(
         self, address: Address, chain_id: int | None
     ) -> ContractAbiMatch | None:

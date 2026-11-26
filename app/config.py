@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     )
     DECODER_ABI_RELOAD_SECONDS: int = 30
     DECODER_LOAD_RETRY_SECONDS: int = 10
+    DECODER_CONTRACT_ABI_CACHE_SECONDS: int = Field(default=600, gt=0)
     # 128 KiB, same as `API_MAX_TRANSACTION_DATA_BYTES` in Safe Queue Service
     DECODER_MAX_DATA_BYTES: int = Field(default=131072, gt=0)
     DECODER_MAX_NESTED_DEPTH: int = Field(default=8, ge=0)
