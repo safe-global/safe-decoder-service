@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import asyncio
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -640,6 +641,73 @@ class TestDataDecoderService(AsyncDbTestCase):
         self.assertEqual(fn_name, "buyDroid")
         self.assertEqual(arguments, expected_arguments_reversed)
         self.assertEqual(accuracy, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH)
+
+    @db_session_context
+    async def test_contract_abi_cache_expires(self):
+        """
+        A contract ABI stored after the contract was decoded is used once the
+        cached lookup expires, without a new `DataDecoderService`.
+        """
+        example_data = (
+            Web3()
+            .eth.contract(abi=example_abi)
+            .functions.buyDroid(4, 10)
+            .build_transaction(
+                get_empty_tx_params() | {"to": NULL_ADDRESS, "chainId": 1}
+            )["data"]
+        )
+        source = AbiSource(name="local", url="")
+        await source.create()
+        await Abi(abi_json=example_abi, relevance=100, source_id=source.id).create()
+        decoder_service = DataDecoderService()
+        await decoder_service.init()
+        contract_address = Address(b"a")
+
+        async def decode_with_accuracy() -> tuple[dict[str, Any], DecodingAccuracyEnum]:
+            _, arguments = await decoder_service.decode_transaction(
+                example_data, address=contract_address, chain_id=1
+            )
+            accuracy = await decoder_service.get_decoding_accuracy(
+                example_data, address=contract_address, chain_id=1
+            )
+            return arguments, accuracy
+
+        expected_arguments = {"droidId": "4", "numberOfDroids": "10"}
+        expected_arguments_swapped = {"numberOfDroids": "4", "droidId": "10"}
+
+        # Decoded before the contract ABI exists, so "no ABI" is cached
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH),
+        )
+
+        swapped_abi = Abi(
+            abi_json=example_swapped_abi, relevance=1, source_id=source.id
+        )
+        await swapped_abi.create()
+        await Contract(
+            address=contract_address, abi=swapped_abi, name="Swapped", chain_id=1
+        ).create()
+
+        # Inside the cache lifetime the database is not read again
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments, DecodingAccuracyEnum.ONLY_FUNCTION_MATCH),
+        )
+
+        # Move the event loop clock past the cache lifetime. async_lru expires
+        # entries with `loop.call_later`, and those callbacks run after this task
+        # in the next loop iteration, so yield twice
+        loop = asyncio.get_running_loop()
+        expired_at = loop.time() + DataDecoderService.CONTRACT_ABI_CACHE_SECONDS + 1
+        with patch.object(loop, "time", return_value=expired_at):
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+
+        self.assertEqual(
+            await decode_with_accuracy(),
+            (expected_arguments_swapped, DecodingAccuracyEnum.FULL_MATCH),
+        )
 
     @db_session_context
     async def test_decode_tuples(self):

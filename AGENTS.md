@@ -136,6 +136,12 @@ database. This is the hot path of the service, so:
 - `last_abi_id` is a monotonic cursor. `load_new_abis()` (called by the decode endpoint, throttled
   by `DECODER_ABI_RELOAD_SECONDS`) picks up only rows inserted after it, and takes the reload lock
   with a 0.01s timeout so concurrent requests do not queue behind a reload.
+- `get_contract_abi_match` caches the ABI selectors of a contract, and whether it matched on the
+  requested chain, in memory for `CONTRACT_ABI_CACHE_SECONDS` (10 minutes), "no ABI" results
+  included. Decoding and `accuracy` read the same cache, so they agree unless the entry expires
+  between the two reads. Contracts are written by the taskiq worker, the CLI and the admin of any
+  web pod, so these entries cannot be invalidated and a new or changed contract ABI is used only
+  when they expire.
 
 Decoding accuracy is reported per request: `FULL_MATCH` (address and chain), `PARTIAL_MATCH`
 (address only), `ONLY_FUNCTION_MATCH` (selector known from another contract), `NO_MATCH`.
