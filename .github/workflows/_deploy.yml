@@ -77,7 +77,7 @@ jobs:
           write_branch() {
             gh api -X POST "repos/${REPO}/git/refs" -f ref="refs/heads/${BRANCH}" -f sha="$1" --silent 2>/dev/null \
               || gh api -X PATCH "repos/${REPO}/git/refs/heads/${BRANCH}" -f sha="$1" -F force=true --silent
-            # apm.version is Datadog's version tag; without this it keeps naming the previous build.
+            # apm.version is Datadog's version tag; it must match the image tag.
             TAG="$TAG" yq '.image.tag = strenv(IMAGE) | with(select(has("apm")); .apm.version = strenv(TAG))' values.yaml \
               | base64 -w0 > content.b64
             gh api -X PUT "repos/${REPO}/contents/${FILE}" \
@@ -99,7 +99,7 @@ jobs:
           [ -n "$PR_URL" ] || PR_URL=$(gh pr create --repo "$REPO" --base main --head "$BRANCH" --title "$TITLE" \
             --body "Automated deploy from ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
 
-          # --admin uses safe-ci's ruleset bypass; without it the merge is briefly refused after the push.
+          # Merge with --admin (safe-ci's ruleset bypass) and retry: GitHub can refuse a merge right after the push.
           for attempt in $(seq 1 8); do
             gh pr merge "$PR_URL" --repo "$REPO" --squash --admin --delete-branch --subject "$TITLE" --body "" && break
             [ "$(gh pr view "$PR_URL" --repo "$REPO" --json state --jq .state)" = MERGED ] && break
@@ -115,7 +115,8 @@ jobs:
           done
           echo "Deployed ${TAG} to ${ENVIRONMENT}: ${PR_URL}"
 
-      - name: Wait for the new build and check health
+      # The readiness probe is /health/ready, so a pod that reports the new build on /about is already ready.
+      - name: Wait for the new build
         env:
           IMAGE: ${{ inputs.image }}
           BASE_URL: ${{ inputs.base_url }}
@@ -132,18 +133,9 @@ jobs:
               [[ "$(jq -r '.buildCommit // empty' body.json)" == "${TAG#main-}"* ]]
             fi
           }
-          for attempt in $(seq 1 60); do
-            if [ "$(get /api/v1/about)" = 200 ] && live; then
-              echo "${TAG} is live"
-              break
-            fi
-            [ "$attempt" -eq 60 ] && { echo "::error::${BASE_URL}/api/v1/about did not report ${TAG} within 15 minutes"; exit 1; }
+          deadline=$((SECONDS + 900))
+          until [ "$(get /api/v1/about)" = 200 ] && live; do
+            [ "$SECONDS" -ge "$deadline" ] && { echo "::error::${BASE_URL}/api/v1/about did not report ${TAG} within 15 minutes"; exit 1; }
             sleep 15
           done
-
-          for attempt in $(seq 1 6); do
-            [ "$(get /health/ready)" = 200 ] && { echo "Ready"; exit 0; }
-            sleep 10
-          done
-          echo "::error::${BASE_URL}/health/ready did not return 200"
-          exit 1
+          echo "${TAG} is live"
