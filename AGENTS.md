@@ -402,6 +402,7 @@ only stream forever, so Redis memory grows with every task ever enqueued.
 - Branch from `main` for every change.
 - Use short-lived topic branches: `feat/<scope>`, `fix/<scope>`, `refactor/<scope>`, `chore/<scope>`.
 - Keep commits focused and atomic; avoid mixing unrelated changes.
-- Open PRs against `main`. `main` deploys to staging, `develop` to the develop environment, and a
-  released tag publishes `latest` on Docker Hub.
+- Open PRs against `main`. Each `main` build is tagged `main-<sha7>` and CI deploys it to
+  devstaging; `develop` publishes the `develop` tag, and a released tag publishes `vX.Y.Z` and
+  `latest`.
 - Link the PR to the Linear issue (Platform / Decoder Service).
