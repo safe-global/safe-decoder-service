@@ -9,7 +9,7 @@ dependencies = [
     "asyncpg==0.32.0",
     "ddtrace==4.16.3",
     "fastapi-camelcase==2.0.0",
-    "fastapi[standard-no-fastapi-cloud-cli]==0.163.1",
+    "fastapi[standard-no-fastapi-cloud-cli]==0.165.0",
     "gunicorn==26.2.0",
     "pydantic-settings==2.16.3",
     "redis[hiredis]==8.1.0",
