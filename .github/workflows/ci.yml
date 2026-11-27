@@ -8,11 +8,10 @@ on:
   release:
     types: [ released ]
 
-# A new run cancels the older run of the same ref, so an older commit cannot
-# publish its image over a newer one.
+# Main runs queue rather than cancel, so a deploy is never cut off mid-merge.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -123,8 +122,9 @@ jobs:
       meta-images: |
         safeglobal/safe-decoder-service
         ghcr.io/safe-global/safe-decoder-service
+      # deploy-devstaging reads the tag from this rule: keep it the only one enabled on main.
       meta-tags: |
-        type=raw,value=staging,enable=${{ github.ref == 'refs/heads/main' }}
+        type=sha,prefix=main-,enable=${{ github.ref == 'refs/heads/main' }}
         type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
         type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
         type=raw,value=latest,enable=${{ github.event_name == 'release' }}
@@ -136,3 +136,17 @@ jobs:
         - registry: docker.io
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+  deploy-devstaging:
+    needs: [docker-deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions: {}
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: devstaging
+      image: ${{ fromJSON(needs.docker-deploy.outputs.meta-json)['tag-names'][0] }}@${{ needs.docker-deploy.outputs.digest }}
+      values_file: apps/safe-decoder-service/values-devstaging.yaml
+      base_url: https://api.5afe.dev/decoder
+    secrets:
+      app_id: ${{ secrets.CI_APP_ID }}
+      app_private_key: ${{ secrets.CI_APP_PRIVATE_KEY }}
